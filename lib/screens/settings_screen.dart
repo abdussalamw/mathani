@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../providers/settings_provider.dart';
 import '../providers/mushaf_metadata_provider.dart';
+import 'mushaf_selection_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -329,176 +330,18 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+// Import the new screen at the top of file (I will handle imports carefully via multi-edit or assume it resolves if I could edit imports, but simplest is to just navigate)
+  // Since I cannot scroll to top to add import easily in Replace, I will rely on the user or context.
+  // Actually, I can navigate using MaterialPageRoute directly with the widget I just created.
+  
+  // Update the call site first
+  // ...
+  
+  // The method implementation:
   void _showMushafPicker(BuildContext context, MushafMetadataProvider provider) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, -2))],
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.6, // ارتفاع مناسب (60% من الشاشة)
-        ),
-        child: Column(
-          children: [
-            // المقبض العلوي
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-            ),
-            const SizedBox(height: 16),
-            
-            Text(
-              'اختر طبعة المصحف',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'يمكنك تحميل طبعات إضافية عالية الجودة',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-
-            // القائمة
-            Expanded(
-              child: ListView.separated(
-                itemCount: provider.availableMushafs.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final mushaf = provider.availableMushafs[index];
-                  final isSelected = mushaf.identifier == provider.currentMushafId;
-                  final isDownloadingThis = provider.isDownloading && provider.currentDownloadingId == mushaf.identifier;
-                  final needsDownload = !mushaf.isDownloaded && mushaf.baseUrl != null;
-                  
-                  // تصميم البطاقة
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: isSelected 
-                          ? AppColors.primary.withOpacity(0.05) 
-                          : Theme.of(context).cardColor,
-                      border: Border.all(
-                        color: isSelected ? AppColors.primary : Colors.grey.withOpacity(0.2),
-                        width: isSelected ? 2 : 1,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        // الأيقونة
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: isSelected ? AppColors.primary : Colors.grey.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            mushaf.type.contains('font') ? Icons.text_fields : Icons.menu_book,
-                            color: isSelected ? Colors.white : AppColors.darkBrown,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        
-                        // النصوص
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                mushaf.nameArabic,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Tajawal',
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                mushaf.type.contains('font') ? 'نص رقمي (سريع)' : 'خطوط الرسم العثماني (QCF)',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                              ),
-                              if (isDownloadingThis) ...[
-                                const SizedBox(height: 8),
-                                LinearProgressIndicator(
-                                  value: provider.downloadProgress, 
-                                  backgroundColor: Colors.grey[200],
-                                  color: AppColors.primary,
-                                  minHeight: 4,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'جاري التحميل ${(provider.downloadProgress * 100).toInt()}%',
-                                  style: TextStyle(fontSize: 10, color: AppColors.primary),
-                                ),
-                              ]
-                            ],
-                          ),
-                        ),
-                        
-                        // زر الإجراء (Action Button)
-                        const SizedBox(width: 8),
-                        if (isSelected) 
-                          // حالة: مفعل
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.check, size: 16, color: Colors.green),
-                                const SizedBox(width: 4),
-                                const Text('مفعل', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
-                              ],
-                            ),
-                          )
-                        else if (needsDownload)
-                           // حالة: يحتاج تحميل
-                           isDownloadingThis 
-                             ? const SizedBox() // يظهر شريط التقدم في الأسفل
-                             : ElevatedButton.icon(
-                                 onPressed: () => provider.downloadMushaf(mushaf.identifier),
-                                 icon: const Icon(Icons.download, size: 16),
-                                 label: const Text('تنزيل'),
-                                 style: ElevatedButton.styleFrom(
-                                   backgroundColor: Colors.grey[100],
-                                   foregroundColor: Colors.black87,
-                                   elevation: 0,
-                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                 ),
-                               )
-                        else 
-                           // حالة: محمل وجاهز للتفعيل
-                           ElevatedButton(
-                             onPressed: () {
-                               provider.setMushaf(mushaf.identifier);
-                               Navigator.pop(context);
-                             },
-                             child: const Text('تفعيل'),
-                             style: ElevatedButton.styleFrom(
-                               backgroundColor: AppColors.primary,
-                               foregroundColor: Colors.white,
-                               elevation: 0,
-                               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                             ),
-                           ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MushafSelectionScreen()),
     );
   }
-}
+} // End of class
