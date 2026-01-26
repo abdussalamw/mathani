@@ -11,239 +11,295 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.select<SettingsProvider, bool>((s) => s.isDarkMode);
+    
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF6F6F6), // خلفية رمادية فاتحة عصرية
       appBar: AppBar(
         title: Text(
           'الإعدادات',
-          style: Theme.of(context).textTheme.headlineMedium,
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+            fontFamily: 'Tajawal',
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_forward),
-          onPressed: () => Navigator.pop(context),
-        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: BackButton(color: isDark ? Colors.white : Colors.black),
       ),
-      body: Consumer<SettingsProvider>(
-        builder: (context, settings, child) {
-          return ListView(
-            padding: const EdgeInsets.all(24),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        children: [
+          // قسم المظهر
+          _buildSectionTitle(context, 'المظهر والخطوط'),
+          _buildSettingsGroup(
+            context,
             children: [
-              // قسم المظهر
-              _buildSectionHeader(context, 'المظهر'),
-              _buildSettingCard(
+              _buildSwitchTile(
                 context,
-                icon: settings.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                icon: Icons.dark_mode_outlined,
+                color: Colors.purple,
                 title: 'الوضع الليلي',
-                subtitle: settings.isDarkMode ? 'مفعل' : 'معطل',
-                trailing: Switch.adaptive(
-                  value: settings.isDarkMode,
-                  activeColor: AppColors.primary,
-                  onChanged: (value) => settings.toggleTheme(),
-                ),
+                value: isDark,
+                onChanged: (val) => context.read<SettingsProvider>().toggleTheme(),
               ),
-              const SizedBox(height: 16),
-              
-              // حجم الخط
-               _buildSettingCard(
-                context,
-                icon: Icons.format_size,
-                title: 'حجم خط المصحف',
-                subtitle: '${settings.fontSize.toInt()} بكسل',
-                child: Column(
+              _buildDivider(),
+              Consumer<SettingsProvider>(
+                builder: (context, settings, _) => Column(
                   children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          _buildIconBox(Icons.format_size, Colors.blue),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              'حجم الخط',
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          Text('${settings.fontSize.toInt()}', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
                     Slider(
                       value: settings.fontSize,
                       min: 20,
                       max: 48,
                       activeColor: AppColors.primary,
-                      inactiveColor: AppColors.greyLight,
-                      onChanged: (value) => settings.updateFontSize(value),
+                      onChanged: (val) => settings.updateFontSize(val),
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.only(bottom: 16),
                       child: Text(
                         'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontSize: settings.fontSize,
-                        ),
-                        textAlign: TextAlign.center,
+                        style: TextStyle(fontFamily: 'Amiri', fontSize: settings.fontSize),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
+            ],
+          ),
 
-              // قسم المصحف
-              _buildSectionHeader(context, 'نسخة المصحف'),
+          const SizedBox(height: 24),
+
+          // قسم المصحف (الذي كان فيه المشكلة)
+          _buildSectionTitle(context, 'المصحف الشريف'),
+          _buildSettingsGroup(
+            context,
+            children: [
               Consumer<MushafMetadataProvider>(
                 builder: (context, mushafProvider, _) {
-                  if (mushafProvider.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  
                   final currentMushaf = mushafProvider.availableMushafs.firstWhere(
                     (m) => m.identifier == mushafProvider.currentMushafId,
                     orElse: () => mushafProvider.availableMushafs.first,
                   );
-
-                  return _buildSettingCard(
+                  
+                  return _buildNavigationTile(
                     context,
-                    icon: Icons.book,
-                    title: 'المصحف المختار',
+                    icon: Icons.menu_book_rounded,
+                    color: AppColors.primary,
+                    title: 'طبعة المصحف',
                     subtitle: currentMushaf.nameArabic,
-                    trailing: const Icon(Icons.arrow_back_ios_new, size: 16, color: AppColors.greyMedium),
-                    onTap: () => _showMushafPicker(context, mushafProvider),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const MushafSelectionScreen()),
+                      );
+                    },
                   );
                 },
               ),
-              const SizedBox(height: 16),
+            ],
+          ),
 
-              // قسم القراءة
-              _buildSectionHeader(context, 'القراءة والتلاوة'),
-              _buildSettingCard(
-                context,
-                icon: Icons.record_voice_over,
-                title: 'القارئ الافتراضي',
-                subtitle: _getReciterName(settings.defaultReciter),
-                trailing: const Icon(Icons.arrow_back_ios_new, size: 16, color: AppColors.greyMedium),
-                onTap: () {
-                  // Show Reciter Picker Sheet
-                  _showReciterPicker(context, settings);
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildSettingCard(
-                context,
-                icon: Icons.menu_book,
-                title: 'التفسير الافتراضي',
-                subtitle: _getTafsirName(settings.defaultTafsir),
-                trailing: const Icon(Icons.arrow_back_ios_new, size: 16, color: AppColors.greyMedium),
-                onTap: () {
-                  // Show Tafsir Picker
-                  _showTafsirPicker(context, settings);
-                },
-              ),
-              
-              const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
-              // قسم التطبيق
-              _buildSectionHeader(context, 'عن التطبيق'),
-              _buildSettingCard(
+          // قسم الصوتيات والتلاوة
+          _buildSectionTitle(context, 'التلاوة والاستماع'),
+          _buildSettingsGroup(
+            context,
+            children: [
+               Consumer<SettingsProvider>(
+                 builder: (context, settings, _) => _buildNavigationTile(
+                  context,
+                  icon: Icons.record_voice_over_outlined,
+                  color: Colors.orange,
+                  title: 'القارئ المفضل',
+                  subtitle: _getReciterName(settings.defaultReciter),
+                  onTap: () => _showReciterPicker(context, settings),
+                ),
+               ),
+              _buildDivider(),
+              Consumer<SettingsProvider>(
+                 builder: (context, settings, _) => _buildNavigationTile(
+                  context,
+                  icon: Icons.library_books_outlined,
+                  color: Colors.teal,
+                  title: 'مرجع التفسير',
+                  subtitle: _getTafsirName(settings.defaultTafsir),
+                  onTap: () => _showTafsirPicker(context, settings),
+                ),
+               ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          // قسم التطبيق
+          _buildSectionTitle(context, 'عن التطبيق'),
+          _buildSettingsGroup(
+            context,
+            children: [
+              _buildNavigationTile(
                 context,
                 icon: Icons.info_outline,
+                color: Colors.grey,
                 title: 'حول مثاني',
                 subtitle: 'الإصدار 1.0.0',
-                onTap: () {
-                  // Show About Dialog
-                },
+                onTap: () {},
               ),
-              const SizedBox(height: 16),
-              _buildSettingCard(
+              _buildDivider(),
+              _buildNavigationTile(
                 context,
-                icon: Icons.share,
-                title: 'مشاركة التطبيق',
-                subtitle: 'شارك الأجر مع أصدقائك',
-                onTap: () {
-                  // Share implementation relative
-                },
+                icon: Icons.share_outlined,
+                color: Colors.green,
+                title: 'شارك التطبيق',
+                onTap: () {},
               ),
             ],
-          );
-        },
+          ),
+          
+          const SizedBox(height: 40),
+        ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
+  // --- Helper Widgets for Modern UI ---
+
+  Widget _buildSectionTitle(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
       child: Text(
         title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: AppColors.primary,
+        style: TextStyle(
+          color: Colors.grey[600],
+          fontSize: 14,
           fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
-  Widget _buildSettingCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    Widget? trailing,
-    Widget? child,
-    VoidCallback? onTap,
-  }) {
+  Widget _buildSettingsGroup(BuildContext context, {required List<Widget> children}) {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildIconBox(IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, color: color, size: 20),
+    );
+  }
+
+  Widget _buildSwitchTile(BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String title,
+    required bool value,
+    required Function(bool) onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          _buildIconBox(icon, color),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            activeColor: AppColors.primary,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavigationTile(BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String title,
+    String? subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            _buildIconBox(icon, color),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, color: AppColors.primary, size: 24),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
                     ),
-                  ),
-                  if (trailing != null) trailing,
+                  ],
                 ],
               ),
-              if (child != null) ...[
-                const SizedBox(height: 16),
-                child,
-              ],
-            ],
-          ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey[400]),
+          ],
         ),
       ),
     );
   }
 
+  Widget _buildDivider() {
+    return Divider(height: 1, thickness: 0.5, indent: 60, color: Colors.grey[200]);
+  }
+
   String _getReciterName(String id) {
-    // Map IDs to Names
-    switch (id) {
+     switch (id) {
       case 'minshawi_murattal': return 'محمد صديق المنشاوي';
       case 'alafasy': return 'مشاري العفاسي';
       default: return 'محمد صديق المنشاوي';
@@ -254,94 +310,72 @@ class SettingsScreen extends StatelessWidget {
     switch (id) {
       case 'muyassar': return 'التفسير الميسر';
       case 'saadi': return 'تفسير السعدي';
-      case 'baghawy': return 'تفسير البغوي';
       default: return 'التفسير الميسر';
     }
   }
 
+  // Simplified Pickers for Reciter/Tafsir (kept from old code logic but styled a bit)
   void _showReciterPicker(BuildContext context, SettingsProvider settings) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'اختر القارئ',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 24),
-            _buildRadioOption(context, 'محمد صديق المنشاوي', 'minshawi_murattal', settings.defaultReciter, (val) {
-              settings.updateDefaultReciter(val!); // You need to implement this method in Provider
-              Navigator.pop(context);
-            }),
-            _buildRadioOption(context, 'مشاري العفاسي', 'alafasy', settings.defaultReciter, (val) {
-              settings.updateDefaultReciter(val!);
-              Navigator.pop(context);
-            }),
-          ],
-        ),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => Container(
+         padding: const EdgeInsets.all(24),
+         child: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             const Text('اختر القارئ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+             const SizedBox(height: 16),
+             _buildRadioItem(context, 'محمد صديق المنشاوي', 'minshawi_murattal', settings.defaultReciter, (v) {
+               settings.updateDefaultReciter(v!);
+               Navigator.pop(context);
+             }),
+             _buildRadioItem(context, 'مشاري العفاسي', 'alafasy', settings.defaultReciter, (v) {
+               settings.updateDefaultReciter(v!);
+               Navigator.pop(context);
+             }),
+           ]
+         )
+      )
     );
   }
 
   void _showTafsirPicker(BuildContext context, SettingsProvider settings) {
      showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-             Text(
-              'اختر التفسير',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 24),
-            _buildRadioOption(context, 'التفسير الميسر', 'muyassar', settings.defaultTafsir, (val) {
-              settings.updateDefaultTafsir(val!); // Implement in Provider
-              Navigator.pop(context);
-            }),
-            _buildRadioOption(context, 'تفسير السعدي', 'saadi', settings.defaultTafsir, (val) {
-              settings.updateDefaultTafsir(val!);
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => Container(
+         padding: const EdgeInsets.all(24),
+         child: Column(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             const Text('اختر التفسير', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+             const SizedBox(height: 16),
+             _buildRadioItem(context, 'التفسير الميسر', 'muyassar', settings.defaultTafsir, (v) {
+               settings.updateDefaultTafsir(v!);
                Navigator.pop(context);
-            }),
-          ],
-        ),
-      ),
+             }),
+             _buildRadioItem(context, 'تفسير السعدي', 'saadi', settings.defaultTafsir, (v) {
+               settings.updateDefaultTafsir(v!);
+               Navigator.pop(context);
+             }),
+             _buildRadioItem(context, 'تفسير البغوي', 'baghawy', settings.defaultTafsir, (v) {
+               settings.updateDefaultTafsir(v!);
+               Navigator.pop(context);
+             }),
+           ]
+         )
+      )
     );
   }
-
-  Widget _buildRadioOption(BuildContext context, String label, String value, String groupValue, Function(String?) onChanged) {
-    return RadioListTile<String>(
-      title: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+  
+  Widget _buildRadioItem(BuildContext context, String label, String value, String groupValue, Function(String?) onChanged) {
+    return RadioListTile(
+      title: Text(label),
       value: value,
       groupValue: groupValue,
       activeColor: AppColors.primary,
       onChanged: onChanged,
-      contentPadding: EdgeInsets.zero,
     );
   }
-
-// Import the new screen at the top of file (I will handle imports carefully via multi-edit or assume it resolves if I could edit imports, but simplest is to just navigate)
-  // Since I cannot scroll to top to add import easily in Replace, I will rely on the user or context.
-  // Actually, I can navigate using MaterialPageRoute directly with the widget I just created.
-  
-  // Update the call site first
-  // ...
-  
-  // The method implementation:
-  void _showMushafPicker(BuildContext context, MushafMetadataProvider provider) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const MushafSelectionScreen()),
-    );
-  }
-} // End of class
+}
