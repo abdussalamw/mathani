@@ -332,84 +332,83 @@ class SettingsScreen extends StatelessWidget {
   void _showMushafPicker(BuildContext context, MushafMetadataProvider provider) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
+      isScrollControlled: true, // Allows the sheet to take up more functionality
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              Text(
-                'اختر نسخة المصحف',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 24),
-              Expanded(
-                child: ListView.separated(
-                  controller: scrollController,
-                  itemCount: provider.availableMushafs.length,
-                  separatorBuilder: (_, __) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final mushaf = provider.availableMushafs[index];
-                    final isSelected = mushaf.identifier == provider.currentMushafId;
-                    
-                    final isDownloadingThis = provider.isDownloading && provider.currentDownloadingId == mushaf.identifier;
-                    final needsDownload = !mushaf.isDownloaded && mushaf.baseUrl != null;
-                    
-                    return Column(
-                      children: [
-                        ListTile(
-                          title: Text(
-                            mushaf.nameArabic,
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? AppColors.primary : AppColors.darkBrown,
-                            ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75, // Cap height at 75%
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min, // Wrap content height
+          children: [
+            Text(
+              'اختر نسخة المصحف',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 24),
+            Flexible( // Allows ListView to scroll if content is too long
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: provider.availableMushafs.length,
+                separatorBuilder: (_, __) => const Divider(),
+                itemBuilder: (context, index) {
+                  final mushaf = provider.availableMushafs[index];
+                  final isSelected = mushaf.identifier == provider.currentMushafId;
+                  
+                  final isDownloadingThis = provider.isDownloading && provider.currentDownloadingId == mushaf.identifier;
+                  final needsDownload = !mushaf.isDownloaded && mushaf.baseUrl != null;
+                  
+                  return Column(
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          mushaf.nameArabic,
+                          style: TextStyle(
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? AppColors.primary : AppColors.darkBrown,
                           ),
-                          subtitle: Text(mushaf.type.contains('font') ? 'نص رقمي' : 'صور بجودة عالية'),
-                          leading: Icon(
-                            isSelected ? Icons.check_circle : Icons.circle_outlined,
-                            color: isSelected ? AppColors.primary : AppColors.greyMedium,
-                          ),
-                          trailing: needsDownload
-                            ? (isDownloadingThis 
-                                ? SizedBox(
-                                    width: 24, 
-                                    height: 24, 
-                                    child: CircularProgressIndicator(value: provider.downloadProgress)
-                                  )
-                                : IconButton(
-                                    icon: const Icon(Icons.download),
-                                    onPressed: provider.isDownloading 
-                                        ? null 
-                                        : () => provider.downloadMushaf(mushaf.identifier),
-                                  ))
-                            : null,
-                          onTap: needsDownload
-                            ? null // Cannot select if not downloaded
-                            : () {
-                                provider.setMushaf(mushaf.identifier);
-                                Navigator.pop(context);
-                              },
                         ),
-                        if (isDownloadingThis)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: LinearProgressIndicator(value: provider.downloadProgress),
-                          ),
-                      ],
-                    );
-                  },
-                ),
+                        subtitle: Text(mushaf.type.contains('font') ? 'نص رقمي (يعمل دائماً)' : 'خطوط طباعة (يحتاج تحميل)'),
+                        leading: Icon(
+                          isSelected ? Icons.check_circle : Icons.circle_outlined,
+                          color: isSelected ? AppColors.primary : AppColors.greyMedium,
+                        ),
+                        trailing: needsDownload
+                          ? (isDownloadingThis 
+                              ? SizedBox(
+                                  width: 24, 
+                                  height: 24, 
+                                  child: CircularProgressIndicator(value: provider.downloadProgress, strokeWidth: 2)
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.download),
+                                  onPressed: provider.isDownloading 
+                                      ? null 
+                                      : () => provider.downloadMushaf(mushaf.identifier),
+                                ))
+                          : null,
+                        onTap: needsDownload
+                          ? null // Cannot select if not downloaded
+                          : () {
+                              provider.setMushaf(mushaf.identifier);
+                              Navigator.pop(context);
+                            },
+                      ),
+                      if (isDownloadingThis)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: LinearProgressIndicator(value: provider.downloadProgress),
+                        ),
+                    ],
+                  );
+                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
