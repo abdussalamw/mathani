@@ -47,12 +47,20 @@ class MushafMetadataProvider extends ChangeNotifier {
       // 2. Load Metadata from DB
       var mushafs = await isar.mushafMetadatas.where().findAll();
 
-      // 3. Seed if empty (First Run)
-      // Check if our new mushaf exists, otherwise re-seed/update
+      // 3. Seed if empty (First Run) or ensure QCF exists
       final qcfExists = mushafs.any((m) => m.identifier == 'qcf2_v4_woff2');
       if (mushafs.isEmpty || !qcfExists) {
         await _seedDefaultMushafs(isar);
         mushafs = await isar.mushafMetadatas.where().findAll();
+      } else {
+        // Force update URL for existing QCF record (Migration fix)
+        final qcf = mushafs.firstWhere((m) => m.identifier == 'qcf2_v4_woff2');
+        if (qcf.baseUrl != 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip') {
+           await isar.writeTxn(() async {
+             qcf.baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip';
+             await isar.mushafMetadatas.put(qcf);
+           });
+        }
       }
 
       _availableMushafs = mushafs;
@@ -79,7 +87,7 @@ class MushafMetadataProvider extends ChangeNotifier {
         ..nameArabic = 'مصحف المدينة (QCF2 - V4)'
         ..nameEnglish = 'Madani (QCF2 V4 - WOFF2)'
         ..type = 'font_v2' // Distinguish from old font
-        ..baseUrl = 'https://github.com/my-org/quran-assets/raw/main/fonts/qcf2_v4.zip' // TODO: Replace with Real URL
+        ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip'
         ..isDownloaded = false,
 
       MushafMetadata()

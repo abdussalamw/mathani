@@ -124,4 +124,13 @@ class QuranRepository {
         .thenByAyahNumber()
         .findAll();
   }
+  // Get All Ayahs
+  Future<List<Ayah>> getAllAyahs() async {
+    final isar = await IsarService.instance.db;
+    return await isar.ayahs
+        .where()
+        .sortBySurahNumber()
+        .thenByAyahNumber()
+        .findAll();
+  }
 }

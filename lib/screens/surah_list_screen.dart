@@ -99,7 +99,7 @@ class _SurahListScreenState extends State<SurahListScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => MushafScreen(surah: surah),
+            builder: (context) => MushafScreen(initialSurahNumber: surah.number),
           ),
         );
       },
