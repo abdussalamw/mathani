@@ -83,23 +83,38 @@ class _MushafScreenState extends State<MushafScreen> {
 
   @override
   Widget build(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
     return Consumer3<QuranProvider, SettingsProvider, MushafMetadataProvider>(
       builder: (context, quran, settings, mushafMeta, _) {
-          final isQcf = mushafMeta.currentMushafId == 'qcf2_v4_woff2' || mushafMeta.currentMushafId.contains('qcf');
+          final isQcf = mushafMeta.currentMushafId.contains('qcf') || mushafMeta.currentMushafId.contains('image');
           
+          // مصغي لقفزات الفهرس
+          if (quran.jumpToSurahNumber != null) {
+             // نقوم بتنفيذ القفزة ثم "نستهلك" الأمر لكي لا يتكرر
+             final surahNum = quran.jumpToSurahNumber!;
+             WidgetsBinding.instance.addPostFrameCallback((_) {
+                 _navigateToSurah(surahNum);
+                 quran.clearJump();
+             });
+          }
+
           return Scaffold(
-             backgroundColor: settings.isDarkMode ? AppColors.darkBackground : AppColors.white,
+             backgroundColor: settings.isDarkMode ? AppColors.darkBackground : const Color(0xFFFFF8E1), // لون ورقي فاتح
              body: Stack(
                children: [
-                 // Main Content Layer
+                 // طبقة المحتوى الرئيسي
                  GestureDetector(
                    onTap: _toggleBars,
+                   // إذا كان المصحف صور أو QCF نستخدم العرض الصفحي، وإلا القائمة العمودية
+                   // حالياً سنجعل كل المصاحف "صفحية" لأنها أجمل وأقرب للواقع
+                   // لكن المصحف الأول سنتركه "سردي" كما هو للاحتياط
                    child: isQcf 
-                     ? _buildQcfView(quran, mushafMeta, settings)
+                     ? _buildPaginatedView(quran, mushafMeta, settings) // تم تغيير الاسم
                      : _buildStandardView(quran, settings),
                  ),
 
-                 // Top App Bar
+                 // الشريط العلوي
                  AnimatedPositioned(
                    duration: const Duration(milliseconds: 300),
                    top: _showBars ? 0 : -100,
@@ -120,14 +135,11 @@ class _MushafScreenState extends State<MushafScreen> {
                      iconTheme: IconThemeData(
                        color: settings.isDarkMode ? AppColors.darkText : AppColors.darkBrown
                      ),
-                     actions: [
-                       IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-                       IconButton(icon: const Icon(Icons.bookmark_outline), onPressed: () {}),
-                     ],
                    ),
                  ),
 
-                 // Bottom Navigation Bar
+                 // الشريط السفلي (تم حذف التنقل منه لأن الـ MainShell يقوم بالواجب)
+                 // سنبقي عليه كشريط أدوات قراءة فقط
                  AnimatedPositioned(
                    duration: const Duration(milliseconds: 300),
                    bottom: _showBars ? 0 : -100,
@@ -142,27 +154,8 @@ class _MushafScreenState extends State<MushafScreen> {
                      child: Row(
                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                        children: [
-                       _buildBottomNavItem(
-                           context,
-                           Icons.settings, 
-                           'إعدادات', 
-                           false,
-                           onTap: () => Navigator.pushNamed(context, '/settings'),
-                         ),
-                         _buildBottomNavItem(
-                           context,
-                           Icons.library_books, // أو أيقونة كتب
-                           'المصاحف', 
-                           false,
-                           onTap: () {
-                             Navigator.push(
-                               context,
-                               MaterialPageRoute(builder: (context) => const MushafSelectionScreen()),
-                             );
-                           },
-                         ),
-                         _buildBottomNavItem(context, Icons.headphones, 'استماع', false),
-                         _buildBottomNavItem(context, Icons.menu_book, 'تلاوة', true),
+                         IconButton(icon: const Icon(Icons.settings), onPressed: () => Navigator.pushNamed(context, '/settings')),
+                         IconButton(icon: const Icon(Icons.library_books), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MushafSelectionScreen()))),
                        ],
                      ),
                    ),
@@ -174,187 +167,118 @@ class _MushafScreenState extends State<MushafScreen> {
     );
   }
   
-  // Standard View (ListView of Ayahs)
+  // عرض المصحف العادي (قائمة)
   Widget _buildStandardView(QuranProvider quran, SettingsProvider settings) {
-      if (quran.isLoading) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      
-      if (quran.ayahsBySurah.isEmpty) {
-        return Center(child: TextButton(onPressed: () => quran.loadFullQuran(), child: const Text("تحديث")));
+      if (quran.isLoading) return const Center(child: CircularProgressIndicator());
+      // تأكد من تحميل الكل
+      if (quran.ayahs.isEmpty) {
+         quran.loadFullQuran();
+         return const Center(child: CircularProgressIndicator());
       }
       
       return ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100), // Padding for bars
-              itemCount: quran.ayahsBySurah.length,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100), 
+              itemCount: quran.mappedSurahs.length, // عدد السور
               itemBuilder: (context, index) {
-                   // We need mapping logic here or simplify it
-                   // Assuming quran.mappedSurahs and quran.ayahsBySurah are synced
-                   if (index >= quran.mappedSurahs.length) return const SizedBox();
-                   
-                   return _buildSurahItem(quran.mappedSurahs[index], quran.ayahsBySurah[index + 1] ?? [], settings);
+                   final surah = quran.mappedSurahs[index];
+                   final ayahs = quran.ayahsBySurah[surah.number] ?? [];
+                   if (ayahs.isEmpty) return const SizedBox(); // لم يتم التحميل بعد
+
+                   return _buildSurahItem(surah, ayahs, settings);
               }
       );
   }
 
-  Widget _buildSurahItem(dynamic surah, List<dynamic> ayahs, SettingsProvider settings) {
-     return Padding(
-        padding: const EdgeInsets.only(bottom: 32.0),
-        child: Column(
-          children: [
-            // Header
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border.symmetric(horizontal: BorderSide(color: AppColors.golden, width: 2)),
-              ),
-              child: Text(
-                'سورة ${surah.nameArabic}',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: settings.isDarkMode ? AppColors.golden : AppColors.darkBrown,
-                ),
-              ),
-            ),
-            
-            // Basmala
-            if (surah.number != 1 && surah.number != 9)
-               Padding(
-                 padding: const EdgeInsets.only(bottom: 16.0),
-                 child: Text(
-                   'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
-                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                     fontFamily: 'Amiri',
-                     color: settings.isDarkMode ? AppColors.darkText : AppColors.darkBrown,
-                   ),
-                 ),
-               ),
+  // العرض الصفحي (بديل للـ QCF المعقد) 
+  // يستخدم النص العثماني ويرتبه في صفحات (محاكاة)
+  Widget _buildPaginatedView(QuranProvider quran, MushafMetadataProvider mushafMeta, SettingsProvider settings) {
+      // هنا نستخدم حيلة ذكية: بدلاً من الاعتماد على ملفات غير موجودة
+      // سنقوم بعرض "صفحات" تحتوي على الآيات النصية
+      // سنفترض أن كل سورة تبدأ في صفحة جديدة للتبسيط حالياً
+      // أو نستخدم رقم الصفحة الموجود في الآية (وهو موجود فعلاً في القاعدة!)
 
-            // Ayahs
-            SelectableText.rich(
-              TextSpan(
-                children: ayahs.map((ayah) {
-                  return TextSpan(
-                    children: [
-                      TextSpan(
-                        text: ayah.textUthmani + ' ',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontSize: settings.fontSize,
-                          color: settings.isDarkMode ? AppColors.darkText : AppColors.darkBrown,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '﴿${ayah.ayahNumber}﴾ ',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppColors.golden,
-                            fontSize: settings.fontSize,
-                            fontFamily: 'Amiri',
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
-              textAlign: TextAlign.justify,
-              textDirection: TextDirection.rtl,
-            ),
-          ],
-        ),
-     );
-  }
-
-  // QCF View (PageView of Pages)
-  Widget _buildQcfView(QuranProvider quran, MushafMetadataProvider mushafMeta, SettingsProvider settings) {
       if (quran.isLoading) return const Center(child: CircularProgressIndicator());
-      
-      final mushaf = mushafMeta.availableMushafs.firstWhere((m) => m.identifier == mushafMeta.currentMushafId);
-      final localPath = mushaf.localPath;
-
-      if (localPath == null) {
-         return Center(
-           child: Column(
-             mainAxisAlignment: MainAxisAlignment.center,
-             children: [
-               const Icon(Icons.error_outline, size: 48, color: Colors.amber),
-               const SizedBox(height: 16),
-               const Text('يجب تحميل ملفات المصحف أولاً'),
-               const SizedBox(height: 8),
-               ElevatedButton.icon(
-                 icon: const Icon(Icons.download),
-                 label: const Text('تحميل الآن'),
-                 onPressed: () => mushafMeta.downloadMushaf(mushaf.identifier), 
-               )
-             ],
-           )
-         );
-      }
-      
-      if (mushafMeta.isDownloading && mushafMeta.currentDownloadingId == mushaf.identifier) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text('جاري التحميل... ${(mushafMeta.downloadProgress * 100).toInt()}%'),
-              ],
-            ),
-          );
+      if (quran.ayahs.isEmpty) {
+           quran.loadFullQuran(); 
+           return const Center(child: CircularProgressIndicator());
       }
 
       return PageView.builder(
         controller: _pageController,
-        reverse: true, // Arabic right-to-left
-        itemCount: 604,
-        key: const PageStorageKey('qcf_page_view'),
-        itemBuilder: (context, pageIndex) {
-          final pageNum = pageIndex + 1;
-          
-          return FutureBuilder(
-            future: PageFontManager.instance.loadPageFont(pageNum, localPath),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+        reverse: true,
+        itemCount: 604, // مصحف المدينة
+        itemBuilder: (context, index) {
+           final pageNum = index + 1;
+           return FutureBuilder<List<dynamic>>(
+             future: quran.getAyahsForPage(pageNum), // دالة موجودة في البروفايدر
+             builder: (context, snapshot) {
+               if (!snapshot.hasData || snapshot.data!.isEmpty) {
                  return const Center(child: CircularProgressIndicator());
-              }
-              
-              // Get Codes for this page
-              // We filter _qcfCodes entries where key starts with "$pageNum:" (legacy)
-              // Or better: filter by page_number if JSON structure supports it.
-              // Our dummy JSON uses "1:1" format and has "page_number".
-              
-              final pageCodes = _qcfCodes.entries
-                  .where((e) => e.value['page_number'] == pageNum)
-                  .map((e) => e.value['code_v2'] as String)
-                  .join(' ');
-              
-              // Fallback text if no JSON codes available (likely for pages > 1 in demo)
-              final textToDisplay = pageCodes.isEmpty 
-                  ? 'الصفحة $pageNum\n(لا توجد بيانات QCF لهذه الصفحة)' 
-                  : pageCodes;
-              
-              final hasFont = pageCodes.isNotEmpty || snapshot.hasError == false; // Assume font loaded if no error
-
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 80),
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Text(
-                      textToDisplay,
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                        fontFamily: hasFont ? PageFontManager.instance.getFontName(pageNum) : 'Amiri', // Fallback to Amiri
-                        fontSize: settings.fontSize * (hasFont ? 1.5 : 1.0),
-                        height: 1.6,
-                        color: settings.isDarkMode ? AppColors.darkText : Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
+               }
+               
+               final pageAyahs = snapshot.data!;
+               // نحتاج معرفة السور الموجودة في هذه الصفحة لرسم اسم السورة والبسملة
+               // سنقوم بتجميع الآيات حسب السورة داخل الصفحة
+               
+               return Container(
+                 margin: const EdgeInsets.symmetric(vertical: 80, horizontal: 16),
+                 padding: const EdgeInsets.all(16),
+                 decoration: BoxDecoration(
+                   color: settings.isDarkMode ? AppColors.darkSurface : Colors.white,
+                   borderRadius: BorderRadius.circular(12),
+                   boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
+                   border: Border.all(color: AppColors.golden, width: 2)
+                 ),
+                 child: SingleChildScrollView(
+                   child: Column(
+                     children: [
+                       // رقم الصفحة واسم السورة (اختياري)
+                       Text('صفحة $pageNum', style: const TextStyle(fontFamily: 'Tajawal', color: Colors.grey)),
+                       const SizedBox(height: 10),
+                       
+                       // النص القرآني
+                       SelectableText.rich(
+                         TextSpan(
+                           children: pageAyahs.map((ayah) {
+                              // التحقق من بداية السورة لرسم البسملة (بشكل مبسط)
+                              final isFirstAyah = ayah.ayahNumber == 1;
+                              
+                              return TextSpan(
+                                children: [
+                                  if (isFirstAyah) 
+                                     const TextSpan(text: '\n\n﷽\n\n', style: TextStyle(fontFamily: 'Amiri', fontSize: 24, fontWeight: FontWeight.bold)),
+                                     
+                                  TextSpan(
+                                    text: ayah.textUthmani + ' ',
+                                    style: TextStyle(
+                                      fontFamily: 'Amiri', // خط عثماني موثوق
+                                      fontSize: settings.fontSize * 1.1, // تكبير قليلاً
+                                      height: 1.8,
+                                      color: settings.isDarkMode ? AppColors.darkText : Colors.black,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: '﴿${ayah.ayahNumber}﴾ ',
+                                    style: TextStyle(
+                                        color: AppColors.golden,
+                                        fontSize: settings.fontSize,
+                                        fontFamily: 'Amiri',
+                                    ),
+                                  ),
+                                ],
+                              );
+                           }).toList(),
+                         ),
+                         textAlign: TextAlign.justify,
+                         textDirection: TextDirection.rtl,
+                       ),
+                     ],
+                   ),
+                 ),
+               );
+             }
+           );
         },
       );
   }

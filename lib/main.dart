@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'core/database/isar_service.dart';
 import 'core/database/collections.dart';
+import 'core/utils/navigation_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/quran_provider.dart';
 import 'providers/audio_provider.dart';
@@ -62,7 +63,8 @@ class MathaniApp extends StatelessWidget {
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
           return MaterialApp(
-            title: 'مثاني - القرآن الكريم',
+            navigatorKey: NavigationController.navigatorKey, // مفتاح التحكم بالتنقل
+            title: 'Mathani - مثاني - القرآن الكريم',
             debugShowCheckedModeBanner: false,
             
             // الثيم

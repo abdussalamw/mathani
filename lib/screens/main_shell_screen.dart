@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
+import '../core/utils/navigation_controller.dart';
 import 'surah_list_screen.dart';
 import 'settings_screen.dart';
 import 'mushaf_selection_screen.dart';
@@ -29,6 +30,15 @@ class _MainShellScreenState extends State<MainShellScreen> {
       const MushafScreen(),          // 2: القراءة (تلاوة)
       const SettingsScreen(),        // 3: الإعدادات
     ];
+    
+    // Listen to tab changes
+    NavigationController.mainTabNotifier.addListener(() {
+      if (mounted) {
+        setState(() {
+          _currentIndex = NavigationController.mainTabNotifier.value;
+        });
+      }
+    });
   }
 
   @override

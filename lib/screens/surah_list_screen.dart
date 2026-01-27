@@ -5,6 +5,7 @@ import '../core/constants/app_colors.dart';
 import '../core/database/collections.dart';
 import '../providers/quran_provider.dart';
 import 'mushaf_screen.dart';
+import '../core/utils/navigation_controller.dart';
 
 class SurahListScreen extends StatefulWidget {
   const SurahListScreen({Key? key}) : super(key: key);
@@ -96,12 +97,9 @@ class _SurahListScreenState extends State<SurahListScreen> {
   Widget _buildSurahCard(BuildContext context, Surah surah) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MushafScreen(initialSurahNumber: surah.number),
-          ),
-        );
+      onTap: () {
+        context.read<QuranProvider>().setJumpToSurah(surah.number);
+        NavigationController.switchTab(2);
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(

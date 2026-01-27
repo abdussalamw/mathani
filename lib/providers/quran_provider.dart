@@ -22,6 +22,19 @@ class QuranProvider extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
+  int? _jumpToSurahNumber;
+  int? get jumpToSurahNumber => _jumpToSurahNumber;
+
+  void setJumpToSurah(int number) {
+    _jumpToSurahNumber = number;
+    notifyListeners();
+  }
+
+  void clearJump() {
+    _jumpToSurahNumber = null;
+    // Don't notify to prevent loops
+  }
+
   // Load just list of Surahs (metadata)
   Future<void> loadSurahs() async {
     _isLoading = true;

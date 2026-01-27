@@ -105,13 +105,13 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          isSelected ? Icons.check : (mushaf.type.contains('font') ? Icons.text_fields : Icons.menu_book_rounded),
+                          isSelected ? Icons.check : ((mushaf.type ?? '').contains('font') ? Icons.text_fields : Icons.menu_book_rounded),
                           color: isSelected ? AppColors.primary : Colors.grey,
                           size: 28,
                         ),
                       ),
                       title: Text(
-                        mushaf.nameArabic,
+                        mushaf.nameArabic ?? 'مصحف',
                         style: const TextStyle(
                           fontFamily: 'Tajawal',
                           fontWeight: FontWeight.bold,
@@ -121,8 +121,8 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                       subtitle: Padding(
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
-                          mushaf.type.contains('font') 
-                              ? (mushaf.identifier.contains('qcf') ? 'خطوط الرسم العثماني (QCF2) الماركة' : 'نسخة رقمية خفيفة وسريعة')
+                          (mushaf.type ?? '').contains('font') 
+                              ? (mushaf.identifier != null && mushaf.identifier!.contains('qcf') ? 'خطوط الرسم العثماني (QCF2) الماركة' : 'نسخة رقمية خفيفة وسريعة')
                               : 'نسخة الصور (مصحف المدينة)',
                           style: TextStyle(
                             color: Colors.grey[600],
@@ -167,7 +167,7 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              onPressed: () => provider.downloadMushaf(mushaf.identifier),
+                              onPressed: () => provider.downloadMushaf(mushaf.identifier!),
                             )
                           else if (!needsDownload)
                             OutlinedButton(
@@ -178,8 +178,10 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: () {
-                                provider.setMushaf(mushaf.identifier);
-                                Navigator.pop(context);
+                                if (mushaf.identifier != null) {
+                                  provider.setMushaf(mushaf.identifier!);
+                                  Navigator.pop(context);
+                                }
                               },
                             ),
                         ],
