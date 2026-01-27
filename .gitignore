@@ -1,53 +1,67 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
 
-# IntelliJ related
+# IntelliJ
 *.iml
 *.ipr
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code
+.vscode/
 
-# Flutter/Dart/Pub related
-**/doc/api/
+# Android
+*.keystore
+*.jks
+local.properties
+.gradle/
+captures/
+gradle-wrapper.jar
+.externalNativeBuild
+.cxx/
+
+# iOS
 **/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/flutter_export_environment.sh
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.pbxuser
+*.xcuserstate
+xcuserdata/
 
-# Symbolication related
-app.*.symbols
+# Web
+/web/*.js
+/web/*.js_
 
-# Obfuscation related
-app.*.map.json
+# macOS
+.DS_Store
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# Exceptions
+!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 
-# Generated files
-lib/**/*.g.dart
-*.freezed.dart
+# Custom
+*.log
+*.tmp
+*~
+.env
+secrets.json
 
-# Source asset folder (Large files)
-sorse/
-qm_fonts/
+# Database
+*.isar
+*.isar.lock
+
+# Audio cache
+audio_cache/
