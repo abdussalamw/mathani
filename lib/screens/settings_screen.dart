@@ -87,38 +87,6 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // قسم المصحف (الذي كان فيه المشكلة)
-          _buildSectionTitle(context, 'المصحف الشريف'),
-          _buildSettingsGroup(
-            context,
-            children: [
-              Consumer<MushafMetadataProvider>(
-                builder: (context, mushafProvider, _) {
-                  final currentMushaf = mushafProvider.availableMushafs.firstWhere(
-                    (m) => m.identifier == mushafProvider.currentMushafId,
-                    orElse: () => mushafProvider.availableMushafs.first,
-                  );
-                  
-                  return _buildNavigationTile(
-                    context,
-                    icon: Icons.menu_book_rounded,
-                    color: AppColors.primary,
-                    title: 'طبعة المصحف',
-                    subtitle: currentMushaf.nameArabic,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const MushafSelectionScreen()),
-                      );
-                    },
-                  );
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
           // قسم الصوتيات والتلاوة
           _buildSectionTitle(context, 'التلاوة والاستماع'),
           _buildSettingsGroup(

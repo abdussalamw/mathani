@@ -38,36 +38,27 @@ class MushafMetadataProvider extends ChangeNotifier {
     try {
       final isar = await IsarService.instance.db;
 
-      // 1. Get current setting
+      // 1. Load Metadata from DB
+      var mushafs = await isar.mushafMetadatas.where().findAll();
+
+      // 2. Clear and Re-seed if empty or outdated (Ensures data exists)
+      if (mushafs.isEmpty) {
+        await _seedDefaultMushafs(isar);
+        mushafs = await isar.mushafMetadatas.where().findAll();
+      }
+
+      // 3. Get current setting
       final settings = await isar.userSettings.where().findFirst();
       if (settings != null) {
         _currentMushafId = settings.selectedMushafId;
-      }
-
-      // 2. Load Metadata from DB
-      var mushafs = await isar.mushafMetadatas.where().findAll();
-
-      // 3. Seed if empty (First Run) or ensure QCF exists
-      final qcfExists = mushafs.any((m) => m.identifier == 'qcf2_v4_woff2');
-      if (mushafs.isEmpty || !qcfExists) {
-        await _seedDefaultMushafs(isar);
-        mushafs = await isar.mushafMetadatas.where().findAll();
       } else {
-        // Force update URL for existing QCF record (Migration fix)
-        final qcf = mushafs.firstWhere((m) => m.identifier == 'qcf2_v4_woff2');
-        if (qcf.baseUrl != 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip') {
-           await isar.writeTxn(() async {
-             qcf.baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip';
-             await isar.mushafMetadatas.put(qcf);
-           });
-        }
+        _currentMushafId = 'madani_font_v1';
       }
 
       _availableMushafs = mushafs;
     } catch (e) {
       debugPrint('Error initializing MushafProvider: $e');
     } finally {
-      // Ensure loading is set to false
       _isLoading = false;
       notifyListeners();
     }

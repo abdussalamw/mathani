@@ -35,27 +35,35 @@ class _MushafScreenState extends State<MushafScreen> {
       final quran = context.read<QuranProvider>();
       quran.loadFullQuran().then((_) {
          if (widget.initialSurahNumber != null) {
-            // Logic to find page number for this surah
-            // This requires Surah metadata to have 'startPage'
-            // For now, we just log or try best guess if available
-            final surah = quran.surahs.firstWhere(
-                (s) => s.number == widget.initialSurahNumber, 
-                orElse: () => quran.surahs.first
-            );
-            
-            // Assuming we have pages in QCF view
-            // In standard view, we would scroll.
-            
-            // For QCF PageView
-            if (mounted && _pageController.hasClients) {
-               // We need mapping from Surah -> Page.
-               // Let's assume Surah model has it or we calculate it.
-               // If Surah model doesn't have it, we default to page 0.
-               // TODO: Add startPage to Surah Model
-            }
+            // منطق الانتقال للسورة المحددة
+            _navigateToSurah(widget.initialSurahNumber!);
          }
       });
     });
+  }
+  
+  void _navigateToSurah(int surahNumber) {
+    // خريطة صفحات بداية السور (تقريبية لمصحف المدينة)
+    // في الوضع المثالي، هذه البيانات تأتي من قاعدة البيانات
+    final Map<int, int> surahToPage = {
+      1: 1,   // الفاتحة
+      2: 2,   // البقرة
+      3: 50,  // آل عمران
+      // ... يمكن التوسع فيها لاحقاً أو جلبها ديناميكياً
+    };
+
+    final targetPage = surahToPage[surahNumber] ?? 1;
+    
+    if (_pageController.hasClients) {
+       _pageController.jumpToPage(targetPage - 1);
+    } else {
+       // إذا لم يكن جاهزاً، نحاول بعد قليل
+       Future.delayed(const Duration(milliseconds: 300), () {
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(targetPage - 1);
+          }
+       });
+    }
   }
   
   void _toggleBars() {
