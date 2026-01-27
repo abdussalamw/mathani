@@ -117,16 +117,15 @@ class MushafMetadata {
   Id id = Isar.autoIncrement;
 
   @Index(unique: true)
-  late String identifier; // e.g., 'madani_v1', 'madani_v2', 'tajweed'
+  String? identifier; 
 
-  late String nameArabic;
-  late String nameEnglish;
+  String? nameArabic;
+  String? nameEnglish;
+  String? type; 
+  String? baseUrl; 
   
-  late String type; // 'font', 'image', 'svg'
-  late String? baseUrl; // Url to download assets from
-  
-  bool isDownloaded = false; // Is the asset pack available locally?
-  String? localPath; // Functionally used if we download images/svgs
+  bool isDownloaded = false; 
+  String? localPath; 
   
   int totalPages = 604;
 }

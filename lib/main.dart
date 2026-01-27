@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/database/isar_service.dart';
+import 'core/database/collections.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/quran_provider.dart';
 import 'providers/audio_provider.dart';
@@ -25,8 +26,8 @@ void main() async {
   
   // تأكد من وجود إعدادات ابتدائية لضمان عمل الـ Providers
   await isar.writeTxn(() async {
-    final count = await isar.userSettings.count();
-    if (count == 0) await isar.userSettings.put(UserSettings()..selectedMushafId = 'madani_font_v1');
+    final count = await isar.collection<UserSettings>().count();
+    if (count == 0) await isar.collection<UserSettings>().put(UserSettings()..selectedMushafId = 'madani_font_v1');
   });
   
   // قفل الاتجاه على الوضع العمودي

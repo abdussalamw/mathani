@@ -9,8 +9,34 @@ import '../core/database/collections.dart';
 import '../core/database/isar_service.dart';
 
 class MushafMetadataProvider extends ChangeNotifier {
+  // القائمة الثابتة كـ Fallback في حال فشل الداتابيز
+  final List<MushafMetadata> _fallbackMushafs = [
+    MushafMetadata()
+      ..identifier = 'madani_font_v1'
+      ..nameArabic = 'مصحف المدينة (نص رقمي)'
+      ..nameEnglish = 'Madani (Font - V1)'
+      ..type = 'font'
+      ..isDownloaded = true, 
+      
+    MushafMetadata()
+      ..identifier = 'qcf2_v4_woff2'
+      ..nameArabic = 'مصحف المدينة (QCF2 - V4)'
+      ..nameEnglish = 'Madani (QCF2 V4)'
+      ..type = 'font_v2'
+      ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip'
+      ..isDownloaded = false,
+
+    MushafMetadata()
+      ..identifier = 'madani_images_15lines'
+      ..nameArabic = 'مصحف المدينة (صور)'
+      ..nameEnglish = 'Madani (Images)'
+      ..type = 'image'
+      ..baseUrl = 'https://android.quran.com/data/width_1024/page'
+      ..isDownloaded = false,
+  ];
+
   List<MushafMetadata> _availableMushafs = [];
-  List<MushafMetadata> get availableMushafs => _availableMushafs;
+  List<MushafMetadata> get availableMushafs => _availableMushafs.isNotEmpty ? _availableMushafs : _fallbackMushafs;
 
   String? _currentMushafId;
   String get currentMushafId => _currentMushafId ?? 'madani_font_v1';
@@ -38,101 +64,68 @@ class MushafMetadataProvider extends ChangeNotifier {
     try {
       final isar = await IsarService.instance.db;
       
-      // جلب البيانات صراحة
-      var mushafs = await isar.mushafMetadatas.where().findAll();
+      // جلب البيانات من الداتا بيز
+      var mushafs = await isar.collection<MushafMetadata>().where().findAll();
 
-      // التحقق من وجود المصاحف الأساسية (تجنب القائمة الفارغة أو الناقصة)
-      bool needsSeed = mushafs.isEmpty || 
-                       !mushafs.any((m) => m.identifier == 'madani_font_v1') ||
-                       !mushafs.any((m) => m.identifier == 'qcf2_v4_woff2');
-
-      if (needsSeed) {
+      // إذا كانت فارغة تماماً، نحاول زرعها
+      if (mushafs.isEmpty) {
         await _seedDefaultMushafs(isar);
-        mushafs = await isar.mushafMetadatas.where().findAll();
+        mushafs = await isar.collection<MushafMetadata>().where().findAll();
       }
 
-      _availableMushafs = List.from(mushafs); // استخدام نسخة جديدة لضمان التحديث
+      // تحديث القائمة في الذاكرة
+      if (mushafs.isNotEmpty) {
+        _availableMushafs = mushafs;
+      } else {
+        // إذا فشل كل شيء، نستخدم القائمة الثابتة
+        _availableMushafs = _fallbackMushafs;
+      }
 
-      final settings = await isar.userSettings.where().findFirst();
+      final settings = await isar.collection<UserSettings>().where().findFirst();
       if (settings != null) {
         _currentMushafId = settings.selectedMushafId;
       } else {
         _currentMushafId = 'madani_font_v1';
       }
     } catch (e) {
-      debugPrint('CRITICAL MushafProvider Error: $e');
+      debugPrint('MushafProvider Error: $e');
+      _availableMushafs = _fallbackMushafs; // الأمان أولاً
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // دالة قوية للمسح والإعادة
   Future<void> refresh() async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      final isar = await IsarService.instance.db;
-      await isar.writeTxn(() async {
-        await isar.mushafMetadatas.clear();
-      });
-      await _init();
-    } catch (e) {
-      debugPrint('Refresh Error: $e');
-    }
+    await _init();
   }
 
   Future<void> _seedDefaultMushafs(Isar isar) async {
-    final defaults = [
-      MushafMetadata()
-        ..identifier = 'madani_font_v1'
-        ..nameArabic = 'مصحف المدينة (نص رقمي)'
-        ..nameEnglish = 'Madani (Font - V1)'
-        ..type = 'font'
-        ..isDownloaded = true, 
-        
-      MushafMetadata()
-        ..identifier = 'qcf2_v4_woff2'
-        ..nameArabic = 'مصحف المدينة (QCF2 - V4)'
-        ..nameEnglish = 'Madani (QCF2 V4)'
-        ..type = 'font_v2'
-        ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip'
-        ..isDownloaded = false,
-
-      MushafMetadata()
-        ..identifier = 'madani_images_15lines'
-        ..nameArabic = 'مصحف المدينة (صور)'
-        ..nameEnglish = 'Madani (Images)'
-        ..type = 'image'
-        ..baseUrl = 'https://android.quran.com/data/width_1024/page'
-        ..isDownloaded = false,
-    ];
-
-    await isar.writeTxn(() async {
-      // حلب المصاحف وحساب الناقص منها فقط للتأكد
-      for (var def in defaults) {
-        final existing = await isar.mushafMetadatas.filter().identifierEqualTo(def.identifier).findFirst();
-        if (existing == null) {
-          await isar.mushafMetadatas.put(def);
+    try {
+      await isar.writeTxn(() async {
+        for (var mushaf in _fallbackMushafs) {
+           // نستخدم put لضمان الكتابة
+           await isar.collection<MushafMetadata>().put(mushaf);
         }
-      }
-    });
+      });
+    } catch (e) {
+      debugPrint('Seeding failed: $e');
+    }
   }
 
-  // بقية الدوال كما هي ...
   Future<void> setMushaf(String identifier) async {
     final isar = await IsarService.instance.db;
     await isar.writeTxn(() async {
-      final settings = await isar.userSettings.where().findFirst() ?? UserSettings();
+      final settings = await isar.collection<UserSettings>().where().findFirst() ?? UserSettings();
       settings.selectedMushafId = identifier;
-      await isar.userSettings.put(settings);
+      await isar.collection<UserSettings>().put(settings);
     });
     _currentMushafId = identifier;
     notifyListeners();
   }
 
   Future<void> downloadMushaf(String identifier) async {
-    final mushaf = _availableMushafs.firstWhere((m) => m.identifier == identifier);
+    final mushaf = availableMushafs.firstWhere((m) => m.identifier == identifier);
     if (mushaf.baseUrl == null || _isDownloading) return;
 
     _isDownloading = true;
@@ -165,13 +158,14 @@ class MushafMetadataProvider extends ChangeNotifier {
 
       final isar = await IsarService.instance.db;
       await isar.writeTxn(() async {
-        final mToUpdate = await isar.mushafMetadatas.filter().identifierEqualTo(identifier).findFirst();
+        final mToUpdate = await isar.collection<MushafMetadata>().filter().identifierEqualTo(identifier).findFirst();
         if (mToUpdate != null) {
           mToUpdate.isDownloaded = true;
           mToUpdate.localPath = targetDir.path;
-          await isar.mushafMetadatas.put(mToUpdate);
-          final index = _availableMushafs.indexWhere((m) => m.identifier == identifier);
-          if (index != -1) _availableMushafs[index] = mToUpdate;
+          await isar.collection<MushafMetadata>().put(mToUpdate);
+          
+          // تحديث القائمة فوراً
+          await _init();
         }
       });
     } catch (e) {
@@ -181,23 +175,5 @@ class MushafMetadataProvider extends ChangeNotifier {
       _currentDownloadingId = null;
       notifyListeners();
     }
-  }
-
-  Future<void> deleteMushaf(String identifier) async {
-    final isar = await IsarService.instance.db;
-    await isar.writeTxn(() async {
-      final mToUpdate = await isar.mushafMetadatas.filter().identifierEqualTo(identifier).findFirst();
-      if (mToUpdate != null) {
-        mToUpdate.isDownloaded = false;
-        mToUpdate.localPath = null;
-        await isar.mushafMetadatas.put(mToUpdate);
-        final dir = await getApplicationDocumentsDirectory();
-        final targetDir = Directory('${dir.path}/mushaf_assets/$identifier');
-        if (await targetDir.exists()) await targetDir.delete(recursive: true);
-        final index = _availableMushafs.indexWhere((m) => m.identifier == identifier);
-        if (index != -1) _availableMushafs[index] = mToUpdate;
-      }
-    });
-    notifyListeners();
   }
 }
