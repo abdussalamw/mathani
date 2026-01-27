@@ -4,29 +4,70 @@ import 'package:provider/provider.dart';
 import '../core/constants/app_colors.dart';
 import '../providers/mushaf_metadata_provider.dart';
 
-class MushafSelectionScreen extends StatelessWidget {
+class MushafSelectionScreen extends StatefulWidget {
   const MushafSelectionScreen({Key? key}) : super(key: key);
+
+  @override
+  State<MushafSelectionScreen> createState() => _MushafSelectionScreenState();
+}
+
+class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // محاولة تحديث البيانات عند فتح الصفحة إذا كانت القائمة فارغة
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<MushafMetadataProvider>();
+      if (provider.availableMushafs.isEmpty) {
+        provider.refresh();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'مكتبة المصاحف',
           style: TextStyle(
-            color: Theme.of(context).textTheme.bodyLarge?.color,
             fontFamily: 'Tajawal',
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: Theme.of(context).iconTheme.color),
       ),
       body: Consumer<MushafMetadataProvider>(
         builder: (context, provider, child) {
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+
+          if (provider.availableMushafs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text('لم يتم تحميل قائمة المصاحف بعد'),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => provider.refresh(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('إعادة محاولة التحميل'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
           return ListView.separated(
             padding: const EdgeInsets.all(20),
             itemCount: provider.availableMushafs.length,
@@ -42,8 +83,8 @@ class MushafSelectionScreen extends StatelessWidget {
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isSelected ? AppColors.primary : Colors.transparent,
-                    width: 2,
+                    color: isSelected ? AppColors.primary : Colors.grey.withOpacity(0.1),
+                    width: isSelected ? 2 : 1,
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -64,7 +105,7 @@ class MushafSelectionScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          isSelected ? Icons.check : Icons.menu_book_rounded,
+                          isSelected ? Icons.check : (mushaf.type.contains('font') ? Icons.text_fields : Icons.menu_book_rounded),
                           color: isSelected ? AppColors.primary : Colors.grey,
                           size: 28,
                         ),
@@ -81,8 +122,8 @@ class MushafSelectionScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
                           mushaf.type.contains('font') 
-                              ? 'نسخة رقمية خفيفة وسريعة (تعمل دائماً)' 
-                              : 'نسخة مطابقة لمصحف المدينة (QCF2) بجودة عالية',
+                              ? (mushaf.identifier.contains('qcf') ? 'خطوط الرسم العثماني (QCF2) الماركة' : 'نسخة رقمية خفيفة وسريعة')
+                              : 'نسخة الصور (مصحف المدينة)',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -90,8 +131,18 @@ class MushafSelectionScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    
-                    // شريط الإجراءات السفلي
+                    if (isDownloadingThis)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            LinearProgressIndicator(value: provider.downloadProgress),
+                            const SizedBox(height: 8),
+                            Text('جاري التحميل ${(provider.downloadProgress * 100).toInt()}%'),
+                            const SizedBox(height: 12),
+                          ],
+                        ),
+                      ),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.grey.withOpacity(0.05),
@@ -103,49 +154,32 @@ class MushafSelectionScreen extends StatelessWidget {
                         children: [
                           if (isSelected)
                             const Text(
-                              'مستخدم حالياً',
+                              'مستخدم حالياً ✅',
                               style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
                             )
-                          else if (isDownloadingThis)
-                             Expanded(
-                               child: Row(
-                                 children: [
-                                   SizedBox(
-                                     height: 20, 
-                                     width: 20, 
-                                     child: CircularProgressIndicator(strokeWidth: 2, value: provider.downloadProgress)
-                                   ),
-                                   const SizedBox(width: 12),
-                                   Text(
-                                     'جاري التحميل ${(provider.downloadProgress * 100).toInt()}%',
-                                     style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                   ),
-                                 ],
-                               ),
-                             )
-                          else if (needsDownload)
+                          else if (needsDownload && !isDownloadingThis)
                             ElevatedButton.icon(
                               icon: const Icon(Icons.download_rounded, size: 18),
-                              label: const Text('تحميل (55MB)'), // حجم تقريبي للوضوح
+                              label: const Text('تنزيل المصحف'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).primaryColor,
+                                backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: () => provider.downloadMushaf(mushaf.identifier),
                             )
-                          else
+                          else if (!needsDownload)
                             OutlinedButton(
-                              child: const Text('تفعيل'),
+                              child: const Text('تفعيل هذه النسخة'),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: Theme.of(context).primaryColor,
-                                side: BorderSide(color: Theme.of(context).primaryColor),
+                                foregroundColor: AppColors.primary,
+                                side: const BorderSide(color: AppColors.primary),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: () {
                                 provider.setMushaf(mushaf.identifier);
-                                Navigator.pop(context); // الرجوع للإعدادات
+                                Navigator.pop(context);
                               },
                             ),
                         ],

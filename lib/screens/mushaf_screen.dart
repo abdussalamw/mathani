@@ -8,6 +8,7 @@ import '../core/utils/page_font_manager.dart';
 import '../providers/mushaf_metadata_provider.dart';
 import '../providers/quran_provider.dart';
 import '../providers/settings_provider.dart';
+import 'mushaf_selection_screen.dart';
 
 class MushafScreen extends StatefulWidget {
   final int? initialSurahNumber;
@@ -133,14 +134,25 @@ class _MushafScreenState extends State<MushafScreen> {
                      child: Row(
                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                        children: [
-                         _buildBottomNavItem(
+                       _buildBottomNavItem(
                            context,
                            Icons.settings, 
                            'إعدادات', 
                            false,
                            onTap: () => Navigator.pushNamed(context, '/settings'),
                          ),
-                         _buildBottomNavItem(context, Icons.library_books, 'التفسير', false),
+                         _buildBottomNavItem(
+                           context,
+                           Icons.library_books, // أو أيقونة كتب
+                           'المصاحف', 
+                           false,
+                           onTap: () {
+                             Navigator.push(
+                               context,
+                               MaterialPageRoute(builder: (context) => const MushafSelectionScreen()),
+                             );
+                           },
+                         ),
                          _buildBottomNavItem(context, Icons.headphones, 'استماع', false),
                          _buildBottomNavItem(context, Icons.menu_book, 'تلاوة', true),
                        ],

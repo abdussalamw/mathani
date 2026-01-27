@@ -73,6 +73,10 @@ class MushafMetadataProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> refresh() async {
+    await _init();
+  }
+
   Future<void> _seedDefaultMushafs(Isar isar) async {
     final defaults = [
       MushafMetadata()

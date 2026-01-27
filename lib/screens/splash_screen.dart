@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen>
   void _navigateToHome() async {
     await Future.delayed(const Duration(seconds: 3));
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      Navigator.of(context).pushReplacementNamed('/surah-list');
     }
   }
   

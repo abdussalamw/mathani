@@ -13,7 +13,6 @@ import 'screens/mushaf_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/surah_list_screen.dart';
 import 'screens/settings_screen.dart';
-import 'screens/main_navbar_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,7 +80,6 @@ class MathaniApp extends StatelessWidget {
               '/mushaf': (context) => const MushafScreen(),
               '/surah-list': (context) => const SurahListScreen(),
               '/settings': (context) => const SettingsScreen(),
-              '/home': (context) => const MainNavBarScreen(),
             },
           );
         },
