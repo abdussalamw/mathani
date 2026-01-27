@@ -19,7 +19,15 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // تهيئة قاعدة البيانات
-  await IsarService.instance.init();
+  final isarService = IsarService.instance;
+  await isarService.init(); // التأكد من اكتمال الفتح قبل المتابعة
+  final isar = await isarService.db;
+  
+  // تأكد من وجود إعدادات ابتدائية لضمان عمل الـ Providers
+  await isar.writeTxn(() async {
+    final count = await isar.userSettings.count();
+    if (count == 0) await isar.userSettings.put(UserSettings()..selectedMushafId = 'madani_font_v1');
+  });
   
   // قفل الاتجاه على الوضع العمودي
   await SystemChrome.setPreferredOrientations([

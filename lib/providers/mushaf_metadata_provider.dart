@@ -38,18 +38,21 @@ class MushafMetadataProvider extends ChangeNotifier {
     try {
       final isar = await IsarService.instance.db;
       
-      // 1. جلب البيانات من الداتا بيز
+      // جلب البيانات صراحة
       var mushafs = await isar.mushafMetadatas.where().findAll();
 
-      // 2. إذا كانت فارغة، نزرعها ونحدث القائمة فوراً
-      if (mushafs.isEmpty) {
+      // التحقق من وجود المصاحف الأساسية (تجنب القائمة الفارغة أو الناقصة)
+      bool needsSeed = mushafs.isEmpty || 
+                       !mushafs.any((m) => m.identifier == 'madani_font_v1') ||
+                       !mushafs.any((m) => m.identifier == 'qcf2_v4_woff2');
+
+      if (needsSeed) {
         await _seedDefaultMushafs(isar);
         mushafs = await isar.mushafMetadatas.where().findAll();
       }
 
-      _availableMushafs = mushafs;
+      _availableMushafs = List.from(mushafs); // استخدام نسخة جديدة لضمان التحديث
 
-      // 3. جلب الإعدادات الحالية
       final settings = await isar.userSettings.where().findFirst();
       if (settings != null) {
         _currentMushafId = settings.selectedMushafId;
@@ -57,20 +60,26 @@ class MushafMetadataProvider extends ChangeNotifier {
         _currentMushafId = 'madani_font_v1';
       }
     } catch (e) {
-      debugPrint('Error MushafProvider: $e');
+      debugPrint('CRITICAL MushafProvider Error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
+  // دالة قوية للمسح والإعادة
   Future<void> refresh() async {
-    final isar = await IsarService.instance.db;
-    // مسح وزرع من جديد للتأكد
-    await isar.writeTxn(() async {
-      await isar.mushafMetadatas.clear();
-    });
-    await _init();
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final isar = await IsarService.instance.db;
+      await isar.writeTxn(() async {
+        await isar.mushafMetadatas.clear();
+      });
+      await _init();
+    } catch (e) {
+      debugPrint('Refresh Error: $e');
+    }
   }
 
   Future<void> _seedDefaultMushafs(Isar isar) async {
@@ -100,10 +109,17 @@ class MushafMetadataProvider extends ChangeNotifier {
     ];
 
     await isar.writeTxn(() async {
-      await isar.mushafMetadatas.putAll(defaults);
+      // حلب المصاحف وحساب الناقص منها فقط للتأكد
+      for (var def in defaults) {
+        final existing = await isar.mushafMetadatas.filter().identifierEqualTo(def.identifier).findFirst();
+        if (existing == null) {
+          await isar.mushafMetadatas.put(def);
+        }
+      }
     });
   }
 
+  // بقية الدوال كما هي ...
   Future<void> setMushaf(String identifier) async {
     final isar = await IsarService.instance.db;
     await isar.writeTxn(() async {
