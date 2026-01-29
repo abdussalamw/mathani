@@ -1,15 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/data/models/ayah.dart';
-import 'package:mathani/data/repositories/quran_repository.dart';
+import 'package:mathani/domain/repositories/quran_repository.dart';
+import 'package:mathani/domain/repositories/audio_repository.dart';
+import 'package:mathani/core/di/service_locator.dart';
 
 class QuranProvider with ChangeNotifier {
   final QuranRepository _repository;
+  final AudioRepository _audioRepository;
   
   // الحالة
   List<Surah> _surahs = [];
   List<Ayah> _currentAyahs = [];
   Surah? _currentSurah;
+  
+  // Audio State
+  int? _playingAyahId; 
+  bool _isPlaying = false;
   
   bool _isLoading = false;
   String? _errorMessage;
@@ -20,9 +27,12 @@ class QuranProvider with ChangeNotifier {
   Surah? get currentSurah => _currentSurah;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  int? get playingAyahId => _playingAyahId;
+  bool get isPlaying => _isPlaying;
   
-  QuranProvider({QuranRepository? repository})
-      : _repository = repository ?? QuranRepository();
+  QuranProvider({QuranRepository? repository, AudioRepository? audioRepository})
+      : _repository = repository ?? sl<QuranRepository>(),
+        _audioRepository = audioRepository ?? sl<AudioRepository>(); 
   
   // تحميل جميع السور
   Future<void> loadSurahs() async {
@@ -30,15 +40,20 @@ class QuranProvider with ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     
-    try {
-      _surahs = await _repository.getAllSurahs();
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'خطأ في تحميل السور: $e';
-      _isLoading = false;
-      notifyListeners();
-    }
+    final result = await _repository.getAllSurahs();
+    
+    result.fold(
+      (failure) {
+        _errorMessage = 'خطأ في تحميل السور: ${failure.message}';
+        _isLoading = false;
+        notifyListeners();
+      },
+      (surahs) {
+        _surahs = surahs;
+        _isLoading = false;
+        notifyListeners();
+      }
+    );
   }
   
   // تحميل سورة وآياتها
@@ -47,27 +62,88 @@ class QuranProvider with ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     
+    // Parallel fetching for efficiency
+    final surahResultFuture = _repository.getSurahByNumber(surahNumber);
+    final ayahsResultFuture = _repository.getAyahsForSurah(surahNumber); // Corrected method name
+    
+    final results = await Future.wait([surahResultFuture, ayahsResultFuture]);
+    
+    final surahResult = results[0] as dynamic; // casting needed due to dynamic list
+    final ayahsResult = results[1] as dynamic;
+    
+    // Check Surah Result
+    surahResult.fold(
+      (failure) {
+         _errorMessage = 'خطأ في تحميل السورة: ${failure.message}';
+         _isLoading = false;
+         notifyListeners();
+         return;
+      },
+      (surah) {
+         _currentSurah = surah;
+      }
+    );
+    
+    if (_errorMessage != null) return;
+    
+    // Check Ayahs Result
+    ayahsResult.fold(
+      (failure) {
+         _errorMessage = 'خطأ في تحميل الآيات: ${failure.message}';
+         _isLoading = false;
+         notifyListeners();
+      },
+      (ayahs) {
+         _currentAyahs = ayahs;
+         _isLoading = false;
+         notifyListeners();
+      }
+    );
+  }
+  
+  // الصوتيات
+  Future<void> playAyah(int surahNumber, int ayahNumber) async {
     try {
-      _currentSurah = await _repository.getSurahByNumber(surahNumber);
-      _currentAyahs = await _repository.getAyahsOfSurah(surahNumber);
-      _isLoading = false;
+      _playingAyahId = ayahNumber;
+      _isPlaying = true;
       notifyListeners();
+      
+      await _audioRepository.playAyah(surahNumber, ayahNumber);
     } catch (e) {
-      _errorMessage = 'خطأ في تحميل السورة: $e';
-      _isLoading = false;
+      debugPrint('Error playing audio: $e');
+      _isPlaying = false;
+      _playingAyahId = null;
       notifyListeners();
     }
   }
   
+  Future<void> stopAudio() async {
+    await _audioRepository.stop();
+    _isPlaying = false;
+    _playingAyahId = null;
+    notifyListeners();
+  }
+  
   // تحديث آخر قراءة
   Future<void> updateLastRead(int surahNumber, int ayahNumber) async {
-    await _repository.updateLastRead(surahNumber, ayahNumber);
-    notifyListeners();
+    final result = await _repository.updateLastRead(surahNumber, ayahNumber);
+    result.fold(
+      (l) => debugPrint('Error updating last read: ${l.message}'),
+      (r) => notifyListeners()
+    );
   }
   
   // إضافة/إزالة من المفضلة
   Future<void> toggleFavorite(int surahNumber) async {
-    await _repository.toggleFavorite(surahNumber);
-    await loadSurahs(); // إعادة تحميل للتحديث
+    final result = await _repository.toggleFavorite(surahNumber);
+    result.fold(
+      (l) => debugPrint('Error toggling favorite: ${l.message}'),
+      (r) => loadSurahs() // إعادة تحميل للتحديث
+    );
+  }
+
+  // تحديث للتنقل
+  void setJumpToSurah(int surahNumber) {
+    loadSurah(surahNumber);
   }
 }

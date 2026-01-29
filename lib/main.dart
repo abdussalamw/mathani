@@ -11,6 +11,7 @@ import 'core/services/fonts_downloader_service.dart';
 
 import 'presentation/providers/settings_provider.dart';
 import 'presentation/providers/quran_provider.dart';
+import 'presentation/providers/mushaf_metadata_provider.dart';
 import 'presentation/screens/splash/splash_screen.dart';
 import 'presentation/screens/home/main_shell_screen.dart';
 import 'presentation/screens/mushaf/mushaf_screen.dart';
@@ -29,7 +30,7 @@ void main() async {
   final fontsService = FontsDownloaderService.instance;
   final areFontsDownloaded = await fontsService.areFontsDownloaded();
   
-  final isar = await IsarService.instance.db;
+  final isar = IsarService.instance.isar;
   
   // إعداد افتراضي
   await isar.writeTxn(() async {
@@ -67,6 +68,7 @@ class MathaniApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => QuranProvider()),
+        ChangeNotifierProvider(create: (_) => MushafMetadataProvider()),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settings, _) {

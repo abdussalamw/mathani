@@ -6,14 +6,14 @@ import '../../core/database/collections.dart' as model;
 import '../../core/database/isar_service.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/entities/user_settings.dart';
-import '../../domain/core/errors/failures.dart';
+import '../../core/errors/failures.dart';
 import '../mappers/settings_mapper.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<Either<Failure, UserSettings>> getSettings() async {
     try {
-      final isar = await IsarService.instance.db;
+      final isar = IsarService.instance.isar;
       final settings = await isar.collection<model.UserSettings>().where().findFirst();
       
       if (settings != null) {
@@ -29,7 +29,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<Either<Failure, void>> saveSettings(UserSettings settings) async {
     try {
-      final isar = await IsarService.instance.db;
+      final isar = IsarService.instance.isar;
       await isar.writeTxn(() async {
         final currentSettings = await isar.collection<model.UserSettings>().where().findFirst() ?? model.UserSettings();
         

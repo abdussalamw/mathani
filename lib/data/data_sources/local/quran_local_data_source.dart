@@ -4,7 +4,7 @@ import '../../core/database/collections.dart';
 
 class QuranLocalDataSource {
   Future<List<Surah>> getSurahs() async {
-    final isar = await IsarService.instance.db;
+    final isar = IsarService.instance.isar;
     return await isar.collection<Surah>().where().findAll();
   }
 }

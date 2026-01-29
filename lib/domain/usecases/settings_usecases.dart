@@ -1,7 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 import '../repositories/settings_repository.dart';
 import '../entities/user_settings.dart';
-import '../core/errors/failures.dart';
+import 'package:mathani/core/errors/failures.dart';
 
 class GetSettingsUseCase {
   final SettingsRepository repository;

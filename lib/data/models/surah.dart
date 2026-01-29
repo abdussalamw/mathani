@@ -32,6 +32,7 @@ class Surah {
   // From JSON (من API)
   factory Surah.fromJson(Map<String, dynamic> json) {
     return Surah()
+      ..id = json['number'] // Set ID explicitly to ensure upsert
       ..number = json['number']
       ..nameArabic = json['name']
       ..nameEnglish = json['englishName']
@@ -51,4 +52,14 @@ class Surah {
       'numberOfAyahs': numberOfAyahs,
     };
   }
+  // Helpers for UI compatibility
+  @ignore
+  int get juzNumber => juzStart ?? 1;
+  
+  @ignore
+  RevelationType get revelation => revelationType == 'Meccan' 
+      ? RevelationType.meccan 
+      : RevelationType.medinan;
 }
+
+enum RevelationType { meccan, medinan }

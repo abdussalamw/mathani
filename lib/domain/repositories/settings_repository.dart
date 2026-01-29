@@ -1,6 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import '../entities/user_settings.dart';
-import '../core/errors/failures.dart';
+import 'package:mathani/core/errors/failures.dart';
 
 abstract class SettingsRepository {
   Future<Either<Failure, UserSettings>> getSettings();

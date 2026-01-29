@@ -1,7 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 
 import '../../domain/repositories/metadata_repository.dart';
-import '../../domain/core/errors/failures.dart';
+import 'package:mathani/core/errors/failures.dart';
 import '../data_sources/local/metadata_local_data_source.dart';
 
 class MetadataRepositoryImpl implements MetadataRepository {

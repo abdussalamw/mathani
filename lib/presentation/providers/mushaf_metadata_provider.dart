@@ -1,4 +1,3 @@
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
@@ -6,7 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
 import '../../core/network/api_client.dart';
-import '../../core/database/collections.dart';
+import '../../core/database/collections.dart' as db_models; // Alias
 import '../../core/database/isar_service.dart';
 import '../../core/di/service_locator.dart';
 import '../../domain/usecases/settings_usecases.dart';
@@ -17,15 +16,17 @@ class MushafMetadataProvider extends ChangeNotifier {
   final SaveSettingsUseCase _saveSettingsUseCase = sl<SaveSettingsUseCase>();
   
   // القائمة الثابتة كـ Fallback في حال فشل الداتابيز
-  final List<MushafMetadata> _fallbackMushafs = [
-    MushafMetadata()
+  final List<db_models.MushafMetadata> _fallbackMushafs = [
+    db_models.MushafMetadata()
+      ..id = db_models.fastHash('madani_font_v1')
       ..identifier = 'madani_font_v1'
       ..nameArabic = 'مصحف المدينة (نص رقمي)'
       ..nameEnglish = 'Madani (Font - V1)'
       ..type = 'font'
       ..isDownloaded = true, 
       
-    MushafMetadata()
+    db_models.MushafMetadata()
+      ..id = db_models.fastHash('qcf2_v4_woff2')
       ..identifier = 'qcf2_v4_woff2'
       ..nameArabic = 'مصحف المدينة (QCF2 - V4)'
       ..nameEnglish = 'Madani (QCF2 V4)'
@@ -33,7 +34,8 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip'
       ..isDownloaded = false,
 
-    MushafMetadata()
+    db_models.MushafMetadata()
+      ..id = db_models.fastHash('madani_images_15lines')
       ..identifier = 'madani_images_15lines'
       ..nameArabic = 'مصحف المدينة (صور)'
       ..nameEnglish = 'Madani (Images)'
@@ -42,8 +44,8 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..isDownloaded = false,
   ];
 
-  List<MushafMetadata> _availableMushafs = [];
-  List<MushafMetadata> get availableMushafs => _availableMushafs.isNotEmpty ? _availableMushafs : _fallbackMushafs;
+  List<db_models.MushafMetadata> _availableMushafs = [];
+  List<db_models.MushafMetadata> get availableMushafs => _availableMushafs.isNotEmpty ? _availableMushafs : _fallbackMushafs;
 
   String? _currentMushafId;
   String get currentMushafId => _currentMushafId ?? 'madani_font_v1';
@@ -69,15 +71,15 @@ class MushafMetadataProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final isar = await IsarService.instance.db;
+      final isar = IsarService.instance.isar; // Fix getter
       
       // جلب البيانات من الداتا بيز
-      var mushafs = await isar.collection<MushafMetadata>().where().findAll();
+      var mushafs = await isar.collection<db_models.MushafMetadata>().where().findAll(); // Use alias
 
       // إذا كانت فارغة تماماً، نحاول زرعها
       if (mushafs.isEmpty) {
         await _seedDefaultMushafs(isar);
-        mushafs = await isar.collection<MushafMetadata>().where().findAll();
+        mushafs = await isar.collection<db_models.MushafMetadata>().where().findAll();
       }
 
       // تحديث القائمة في الذاكرة
@@ -111,7 +113,7 @@ class MushafMetadataProvider extends ChangeNotifier {
       await isar.writeTxn(() async {
         for (var mushaf in _fallbackMushafs) {
            // نستخدم put لضمان الكتابة
-           await isar.collection<MushafMetadata>().put(mushaf);
+           await isar.collection<db_models.MushafMetadata>().put(mushaf);
         }
       });
     } catch (e) {
@@ -123,7 +125,11 @@ class MushafMetadataProvider extends ChangeNotifier {
     final result = await _getSettingsUseCase();
     
     // We get current settings, modify them, and save
-    final currentSettings = result.getRight().getOrElse(() => UserSettings.defaults());
+    final currentSettings = result.fold(
+      (l) => UserSettings.defaults(), 
+      (r) => r
+    ); // Fix getOrElse by using fold
+    
     final newSettings = currentSettings.copyWith(selectedMushafId: identifier);
     
     await _saveSettingsUseCase(newSettings);
@@ -169,13 +175,13 @@ class MushafMetadataProvider extends ChangeNotifier {
       }
       File(zipPath).deleteSync();
 
-      final isar = await IsarService.instance.db;
+      final isar = IsarService.instance.isar; // Fix getter
       await isar.writeTxn(() async {
-        final mToUpdate = await isar.collection<MushafMetadata>().filter().identifierEqualTo(identifier).findFirst();
+        final mToUpdate = await isar.collection<db_models.MushafMetadata>().filter().identifierEqualTo(identifier).findFirst(); // Use alias
         if (mToUpdate != null) {
           mToUpdate.isDownloaded = true;
           mToUpdate.localPath = targetDir.path;
-          await isar.collection<MushafMetadata>().put(mToUpdate);
+          await isar.collection<db_models.MushafMetadata>().put(mToUpdate);
           
           // تحديث القائمة فوراً
           await _init();

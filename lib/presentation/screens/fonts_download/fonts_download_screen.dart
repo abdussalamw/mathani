@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mathani_quran/core/services/fonts_downloader_service.dart';
-import 'package:mathani_quran/core/constants/app_colors.dart';
+import 'package:mathani/core/services/fonts_downloader_service.dart';
+import 'package:mathani/core/constants/app_colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class FontsDownloadScreen extends StatefulWidget {

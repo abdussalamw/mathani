@@ -1,6 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import '../repositories/metadata_repository.dart';
-import '../core/errors/failures.dart';
+import 'package:mathani/core/errors/failures.dart';
 
 class GetSurahPageMapUseCase {
   final MetadataRepository repository;

@@ -1,19 +1,41 @@
 import '../../domain/repositories/audio_repository.dart';
+import '../../core/services/audio_service.dart';
 
 class AudioRepositoryImpl implements AudioRepository {
+  final AudioService _audioService = AudioService.instance;
+  
+  // Base URL for audio (Alafasy 128kbps as an example source)
+  // https://everyayah.com/data/Alafasy_128kbps/001001.mp3
+  final String _baseUrl = 'https://everyayah.com/data/Alafasy_128kbps';
+  
   @override
   Future<void> playAyah(int surah, int ayah) async {
-    // Logic to play audio
+    final String surahStr = surah.toString().padLeft(3, '0');
+    final String ayahStr = ayah.toString().padLeft(3, '0');
+    final String url = '$_baseUrl/$surahStr$ayahStr.mp3';
+    
+    try {
+      await _audioService.stop(); // Stop previous
+      await _audioService.setUrl(url);
+      await _audioService.play();
+    } catch (e) {
+      print('Failed to play ayah: $e');
+      throw Exception('Failed to play audio');
+    }
   }
   
   @override
   Future<void> stop() async {
-    // Logic to stop
+    await _audioService.stop();
   }
 
   @override
-  Future<void> pause() async {}
+  Future<void> pause() async {
+    await _audioService.pause();
+  }
 
   @override
-  Future<void> resume() async {}
+  Future<void> resume() async {
+    await _audioService.play();
+  }
 }
