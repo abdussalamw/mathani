@@ -1,13 +1,17 @@
-class Tafsir {
-  final int id;
-  final String name;
-  final String author;
-  final String language;
+import 'package:isar/isar.dart';
 
-  Tafsir({
-    required this.id,
-    required this.name,
-    required this.author,
-    required this.language,
-  });
+part 'tafsir.g.dart';
+
+@collection
+class Tafsir {
+  Id id = Isar.autoIncrement;
+
+  @Index()
+  late int surahNumber;
+  
+  @Index()
+  late int ayahNumber;
+
+  late String tafsirName; // e.g., 'muyassar', 'saadi'
+  late String text;
 }

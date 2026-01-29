@@ -1,37 +1,15 @@
-
 import 'package:isar/isar.dart';
+
+// Export separate models
+export '../../data/models/surah.dart';
+export '../../data/models/ayah.dart';
+export '../../data/models/tafsir.dart';
+export '../../data/models/juz.dart';
 
 part 'collections.g.dart';
 
 @collection
-class Surah {
-  Id id = Isar.autoIncrement;
-
-  @Index()
-  late int number;
-
-  late String nameArabic;
-  late String nameEnglish;
-  
-  @Enumerated(EnumType.ordinal)
-  late RevelationType revelation;
-  
-  late int numberOfAyahs;
-  late int juzNumber; // Start juz
-  late int page; // Start page
-
-  bool isFavorite = false;
-  int? lastReadAyah;
-  DateTime? lastReadTime;
-}
-
-enum RevelationType {
-  meccan,
-  medinan,
-}
-
-@collection
-class Ayah {
+class AudioCache {
   Id id = Isar.autoIncrement;
 
   @Index()
@@ -40,31 +18,57 @@ class Ayah {
   @Index()
   late int ayahNumber;
 
-  late String textUthmani; // Drawing
-  late String textSimple; // Searchable
-
-  late int page;
-  late int juz;
-  late int hizbQuarter;
-
-  bool isBookmarked = false;
-  bool isFavorite = false;
-  int repeatCount = 0;
-  String? notes;
+  late String reciter;
+  late String localPath;
+  late int fileSize;
+  late DateTime downloadedAt;
 }
 
 @collection
-class Tafsir {
+class UserSettings {
   Id id = Isar.autoIncrement;
 
-  @Index()
-  late int surahNumber;
+  double fontSize = 28.0;
+  String fontFamily = 'Amiri';
   
-  @Index()
-  late int ayahNumber;
+  bool isDarkMode = false;
+  bool autoScroll = false;
+  
+  String defaultTafsir = 'muyassar';
+  String defaultReciter = 'minshawi_murattal';
+  
+  String selectedMushafId = 'madani_font_v1'; 
+}
 
-  late String tafsirName; // e.g., 'muyassar', 'saadi'
-  late String text;
+@collection
+class ReadingProgress {
+  Id id = Isar.autoIncrement;
+
+  late DateTime date;
+  
+  int pagesRead = 0;
+  int ayahsRead = 0;
+  
+  int timeSpent = 0; // in seconds
+  double completionPercentage = 0.0;
+}
+
+@collection
+class MushafMetadata {
+  Id id = Isar.autoIncrement;
+
+  @Index(unique: true)
+  String? identifier; 
+
+  String? nameArabic;
+  String? nameEnglish;
+  String? type; 
+  String? baseUrl; 
+  
+  bool isDownloaded = false; 
+  String? localPath; 
+  
+  int totalPages = 604;
 }
 
 @collection

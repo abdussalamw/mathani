@@ -1,7 +1,16 @@
-class Juz {
-  final int number;
-  final int startPage;
-  final int endPage;
+import 'package:isar/isar.dart';
 
-  Juz({required this.number, required this.startPage, required this.endPage});
+part 'juz.g.dart';
+
+@collection
+class Juz {
+  Id id = Isar.autoIncrement;
+  
+  @Index()
+  late int number;
+  
+  late int startSurah;
+  late int startAyah;
+  late int endSurah;
+  late int endAyah;
 }

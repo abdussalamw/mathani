@@ -1,37 +1,40 @@
-
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
-import 'collections.dart';
+import 'package:mathani/data/models/surah.dart';
+import 'package:mathani/data/models/ayah.dart';
 
 class IsarService {
-  static final IsarService instance = IsarService._();
-  late Future<Isar> db;
-
-  IsarService._() {
-    db = openDB();
-  }
-
+  static final IsarService _instance = IsarService._internal();
+  static IsarService get instance => _instance;
+  
+  late Isar _isar;
+  Isar get isar => _isar;
+  
+  IsarService._internal();
+  
+  // تهيئة قاعدة البيانات
   Future<void> init() async {
-    await db;
+    final dir = await getApplicationDocumentsDirectory();
+    
+    _isar = await Isar.open(
+      [
+        SurahSchema,
+        AyahSchema,
+      ],
+      directory: dir.path,
+      inspector: true, // للتطوير فقط
+    );
   }
-
-  Future<Isar> openDB() async {
-    if (Isar.instanceNames.isEmpty) {
-      final dir = await getApplicationDocumentsDirectory();
-      return await Isar.open(
-        [
-          SurahSchema,
-          AyahSchema,
-          TafsirSchema,
-          AudioCacheSchema,
-          UserSettingsSchema,
-          ReadingProgressSchema,
-          MushafMetadataSchema,
-        ],
-        directory: dir.path,
-        inspector: true,
-      );
-    }
-    return Future.value(Isar.getInstance());
+  
+  // إغلاق قاعدة البيانات
+  Future<void> close() async {
+    await _isar.close();
+  }
+  
+  // مسح جميع البيانات (للتطوير)
+  Future<void> clearAll() async {
+    await _isar.writeTxn(() async {
+      await _isar.clear();
+    });
   }
 }
