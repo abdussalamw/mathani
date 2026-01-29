@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:mathani/core/services/fonts_downloader_service.dart';
 import 'package:mathani/core/constants/app_colors.dart';
+import 'package:mathani/presentation/providers/mushaf_metadata_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class FontsDownloadScreen extends StatefulWidget {
@@ -54,6 +56,15 @@ class _FontsDownloadScreenState extends State<FontsDownloadScreen> {
         });
       },
     );
+    
+    // تحديث MushafMetadata بعد النجاح
+    if (success && mounted) {
+      final mushafProvider = Provider.of<MushafMetadataProvider>(
+        context, 
+        listen: false
+      );
+      await mushafProvider.syncWithDownloadedFonts();
+    }
     
     setState(() {
       _isDownloading = false;

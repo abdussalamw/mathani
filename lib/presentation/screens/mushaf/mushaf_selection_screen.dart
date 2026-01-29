@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/fonts_downloader_service.dart';
 import '../../providers/mushaf_metadata_provider.dart';
 
 class MushafSelectionScreen extends StatefulWidget {
@@ -76,7 +77,9 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
               final mushaf = provider.availableMushafs[index];
               final isSelected = mushaf.identifier == provider.currentMushafId;
               final isDownloadingThis = provider.isDownloading && provider.currentDownloadingId == mushaf.identifier;
-              final needsDownload = !mushaf.isDownloaded && mushaf.baseUrl != null;
+              // تحقق خاص لـ qcf2 - إذا لم يكن محملاً يحتاج تحميل
+              final isQcf2 = mushaf.identifier == 'qcf2_v4_woff2';
+              final needsDownload = !mushaf.isDownloaded && (mushaf.baseUrl != null || isQcf2);
               
               return Container(
                 decoration: BoxDecoration(
@@ -167,7 +170,48 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              onPressed: () => provider.downloadMushaf(mushaf.identifier!),
+                              onPressed: () async {
+                                if (mushaf.identifier == 'qcf2_v4_woff2') {
+                                  // استخدام FontsDownloaderService
+                                  final fontsService = FontsDownloaderService.instance;
+                                  
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (ctx) => const AlertDialog(
+                                      title: Text('جاري التحميل...'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          CircularProgressIndicator(),
+                                          SizedBox(height: 16),
+                                          Text('يرجى الانتظار...'),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                  
+                                  final success = await fontsService.downloadFonts(
+                                    onProgress: (progress) {},
+                                    onStatusUpdate: (message) {},
+                                  );
+                                  
+                                  if (success && context.mounted) {
+                                    await provider.syncWithDownloadedFonts();
+                                  }
+                                  
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                    
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(success ? 'تم التحميل بنجاح' : 'فشل التحميل'),
+                                        backgroundColor: success ? Colors.green : Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
                             )
                           else if (!needsDownload)
                             OutlinedButton(

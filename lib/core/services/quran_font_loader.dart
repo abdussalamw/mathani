@@ -15,26 +15,35 @@ class QuranFontLoader {
   /// تحميل خط QCF2 لصفحة معينة
   Future<String?> loadFontForPage(int pageNumber) async {
     try {
+      print('🔍 محاولة تحميل خط للصفحة: $pageNumber');
+      
       // الحصول على مسار الخط
       final fontPath = await FontsDownloaderService.instance
           .getQCF2FontPath(pageNumber);
       
+      print('📁 مسار الخط: $fontPath');
+      
       final fontFile = File(fontPath);
       
       if (!await fontFile.exists()) {
-        print('الخط غير موجود للصفحة $pageNumber');
+        print('❌ الخط غير موجود للصفحة $pageNumber في المسار: $fontPath');
         return null;
       }
       
+      print('✅ الخط موجود! جاري التحميل...');
+      
       // قراءة الخط وتسجيله
       final fontData = await fontFile.readAsBytes();
-      final fontLoader = FontLoader('QCF_P${pageNumber.toString().padLeft(3, '0')}');
+      final fontFamilyName = 'QCF_P${pageNumber.toString().padLeft(3, '0')}';
+      final fontLoader = FontLoader(fontFamilyName);
       fontLoader.addFont(Future.value(ByteData.view(fontData.buffer)));
       await fontLoader.load();
       
-      return 'QCF_P${pageNumber.toString().padLeft(3, '0')}';
+      print('✅ تم تحميل الخط بنجاح: $fontFamilyName');
+      
+      return fontFamilyName;
     } catch (e) {
-      print('خطأ في تحميل الخط للصفحة $pageNumber: $e');
+      print('❌ خطأ في تحميل الخط للصفحة $pageNumber: $e');
       return null;
     }
   }

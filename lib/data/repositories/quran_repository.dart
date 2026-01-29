@@ -1,20 +1,20 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:isar/isar.dart';
 import 'package:mathani/core/database/isar_service.dart';
-import 'package:mathani/core/network/api_client.dart';
+import 'package:mathani/data/datasources/quran_local_data_source.dart';
 import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/data/models/ayah.dart';
 import 'package:mathani/domain/repositories/quran_repository.dart';
 import 'package:mathani/core/errors/failures.dart';
 
 class QuranRepositoryImpl implements QuranRepository {
-  final ApiClient _apiClient;
+  final QuranLocalDataSource _localDataSource;
   final Isar _isar;
   
   QuranRepositoryImpl({
-    ApiClient? apiClient,
+    QuranLocalDataSource? localDataSource,
     Isar? isar,
-  })  : _apiClient = apiClient ?? ApiClient(),
+  })  : _localDataSource = localDataSource ?? QuranLocalDataSource.instance,
         _isar = isar ?? IsarService.instance.isar;
   
   @override
@@ -27,9 +27,8 @@ class QuranRepositoryImpl implements QuranRepository {
         return Right(localSurahs);
       }
       
-      // إن لم تكن موجودة، جلب من API
-      final surahsData = await _apiClient.fetchAllSurahs();
-      final surahs = surahsData.map((json) => Surah.fromJson(json)).toList();
+      // جلب من assets المحلية
+      final surahs = await _localDataSource.loadAllSurahs();
       
       // حفظ في قاعدة البيانات
       await _isar.writeTxn(() async {
@@ -38,7 +37,7 @@ class QuranRepositoryImpl implements QuranRepository {
       
       return Right(surahs);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(CacheFailure(e.toString()));
     }
   }
   
@@ -68,13 +67,8 @@ class QuranRepositoryImpl implements QuranRepository {
         return Right(localAyahs);
       }
       
-      // جلب من API
-      final surahData = await _apiClient.fetchSurah(surahNumber);
-      final ayahsJson = surahData['ayahs'] as List;
-      
-      final ayahs = ayahsJson
-          .map((json) => Ayah.fromJson(json, surahNumber))
-          .toList();
+      // جلب من assets المحلية
+      final ayahs = await _localDataSource.loadAyahsForSurah(surahNumber);
       
       // حفظ في قاعدة البيانات
       await _isar.writeTxn(() async {
@@ -83,7 +77,7 @@ class QuranRepositoryImpl implements QuranRepository {
       
       return Right(ayahs);
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(CacheFailure(e.toString()));
     }
   }
   

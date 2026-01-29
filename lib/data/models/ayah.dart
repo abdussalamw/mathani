@@ -16,8 +16,8 @@ class Ayah {
   String? textUthmani;        // الرسم العثماني (إن وُجد)
   
   // للتنقل
-  late int juz;
-  late int page;
+  int juz = 1;
+  int page = 1;
   int? hizbQuarter;
   int? manzil;
   
@@ -33,12 +33,12 @@ class Ayah {
   factory Ayah.fromJson(Map<String, dynamic> json, int surahNum) {
     return Ayah()
       ..surahNumber = surahNum
-      ..ayahNumber = json['numberInSurah']
-      ..text = json['text']
-      ..juz = json['juz']
-      ..page = json['page']
-      ..hizbQuarter = json['hizbQuarter']
-      ..manzil = json['manzil'];
+      ..ayahNumber = int.tryParse(json['numberInSurah']?.toString() ?? json['verseNumber']?.toString() ?? '1') ?? 1
+      ..text = json['text']?.toString() ?? ''
+      ..juz = int.tryParse(json['juz']?.toString() ?? '1') ?? 1
+      ..page = int.tryParse(json['page']?.toString() ?? '1') ?? 1
+      ..hizbQuarter = int.tryParse(json['hizbQuarter']?.toString() ?? '')
+      ..manzil = int.tryParse(json['manzil']?.toString() ?? '');
   }
   
   // الرقم الإجمالي في المصحف

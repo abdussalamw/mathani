@@ -10,6 +10,7 @@ import '../../core/database/isar_service.dart';
 import '../../core/di/service_locator.dart';
 import '../../domain/usecases/settings_usecases.dart';
 import '../../domain/entities/user_settings.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MushafMetadataProvider extends ChangeNotifier {
   final GetSettingsUseCase _getSettingsUseCase = sl<GetSettingsUseCase>();
@@ -31,8 +32,9 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..nameArabic = 'مصحف المدينة (QCF2 - V4)'
       ..nameEnglish = 'Madani (QCF2 V4)'
       ..type = 'font_v2'
-      ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip'
-      ..isDownloaded = false,
+      ..baseUrl = null  // الخطوط مضمنة في assets
+      ..localPath = 'assets/fonts/qcf2'  // مسار الخطوط المحلية
+      ..isDownloaded = true,  // الخطوط مضمنة مسبقاً
 
     db_models.MushafMetadata()
       ..id = db_models.fastHash('madani_images_15lines')
@@ -71,14 +73,35 @@ class MushafMetadataProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final isar = IsarService.instance.isar; // Fix getter
+      final isar = IsarService.instance.isar;
+      final prefs = await SharedPreferences.getInstance();
+      final areFontsDownloaded = prefs.getBool('fonts_downloaded') ?? false;
       
       // جلب البيانات من الداتا بيز
-      var mushafs = await isar.collection<db_models.MushafMetadata>().where().findAll(); // Use alias
+      var mushafs = await isar.collection<db_models.MushafMetadata>().where().findAll();
 
       // إذا كانت فارغة تماماً، نحاول زرعها
       if (mushafs.isEmpty) {
         await _seedDefaultMushafs(isar);
+        mushafs = await isar.collection<db_models.MushafMetadata>().where().findAll();
+      }
+      
+      // مزامنة حالة التحميل مع SharedPreferences
+      if (areFontsDownloaded) {
+        await isar.writeTxn(() async {
+          final qcf2 = await isar.collection<db_models.MushafMetadata>()
+            .filter()
+            .identifierEqualTo('qcf2_v4_woff2')
+            .findFirst();
+          
+          if (qcf2 != null && !qcf2.isDownloaded) {
+            final appDir = await getApplicationDocumentsDirectory();
+            qcf2.isDownloaded = true;
+            qcf2.localPath = '${appDir.path}/fonts';
+            await isar.collection<db_models.MushafMetadata>().put(qcf2);
+          }
+        });
+        // إعادة جلب البيانات بعد التحديث
         mushafs = await isar.collection<db_models.MushafMetadata>().where().findAll();
       }
 
@@ -138,61 +161,31 @@ class MushafMetadataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> downloadMushaf(String identifier) async {
-    final mushaf = availableMushafs.firstWhere((m) => m.identifier == identifier);
-    if (mushaf.baseUrl == null || _isDownloading) return;
-
-    _isDownloading = true;
-    _currentDownloadingId = identifier;
-    _downloadProgress = 0;
-    notifyListeners();
-
+  Future<void> syncWithDownloadedFonts() async {
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final targetDir = Directory('${dir.path}/mushaf_assets/$identifier');
-      if (!await targetDir.exists()) await targetDir.create(recursive: true);
+      final prefs = await SharedPreferences.getInstance();
+      final areFontsDownloaded = prefs.getBool('fonts_downloaded') ?? false;
       
-      final zipPath = '${targetDir.path}/assets.zip';
-      
-      // Using direct Dio for download as ApiClient usually wraps requests, 
-      // but we can instantiate a fresh Dio or use the one from client if exposed.
-      // Ideally ApiClient should have a download method.
-      // For now, let's keep it simple but ensure error handling.
-      await Dio().download(mushaf.baseUrl!, zipPath, onReceiveProgress: (received, total) {
-        if (total != -1) {
-          _downloadProgress = received / total;
-          notifyListeners();
-        }
-      });
-
-      final bytes = File(zipPath).readAsBytesSync();
-      final archive = ZipDecoder().decodeBytes(bytes);
-      for (final file in archive) {
-        if (file.isFile) {
-          final data = file.content as List<int>;
-          File('${targetDir.path}/${file.name}')..createSync(recursive: true)..writeAsBytesSync(data);
-        }
-      }
-      File(zipPath).deleteSync();
-
-      final isar = IsarService.instance.isar; // Fix getter
-      await isar.writeTxn(() async {
-        final mToUpdate = await isar.collection<db_models.MushafMetadata>().filter().identifierEqualTo(identifier).findFirst(); // Use alias
-        if (mToUpdate != null) {
-          mToUpdate.isDownloaded = true;
-          mToUpdate.localPath = targetDir.path;
-          await isar.collection<db_models.MushafMetadata>().put(mToUpdate);
+      if (areFontsDownloaded) {
+        final isar = IsarService.instance.isar;
+        await isar.writeTxn(() async {
+          final qcf2 = await isar.collection<db_models.MushafMetadata>()
+            .filter()
+            .identifierEqualTo('qcf2_v4_woff2')
+            .findFirst();
           
-          // تحديث القائمة فوراً
-          await _init();
-        }
-      });
+          if (qcf2 != null) {
+            final appDir = await getApplicationDocumentsDirectory();
+            qcf2.isDownloaded = true;
+            qcf2.localPath = '${appDir.path}/fonts';
+            await isar.collection<db_models.MushafMetadata>().put(qcf2);
+          }
+        });
+        
+        await _init();
+      }
     } catch (e) {
-      debugPrint("Download Error: $e");
-    } finally {
-      _isDownloading = false;
-      _currentDownloadingId = null;
-      notifyListeners();
+      debugPrint('Sync error: $e');
     }
   }
 }

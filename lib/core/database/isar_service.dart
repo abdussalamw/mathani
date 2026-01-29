@@ -2,6 +2,7 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/data/models/ayah.dart';
+import 'package:mathani/core/database/collections.dart';
 
 class IsarService {
   static final IsarService _instance = IsarService._internal();
@@ -20,6 +21,10 @@ class IsarService {
       [
         SurahSchema,
         AyahSchema,
+        UserSettingsSchema,
+        MushafMetadataSchema,
+        AudioCacheSchema,
+        ReadingProgressSchema,
       ],
       directory: dir.path,
       inspector: true, // للتطوير فقط

@@ -13,9 +13,9 @@ class FontsDownloaderService {
   
   final Dio _dio = Dio();
   
-  // رابط الـ Release من GitHub
+  // رابط الـ Release من GitHub - الرابط الصحيح
   static const String fontsReleaseUrl = 
-      'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/fonts.zip';
+      'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_fonts_qfc4.zip';
   
   // مفتاح التخزين للتحقق من التحميل
   static const String _fontsDownloadedKey = 'fonts_downloaded';
