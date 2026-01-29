@@ -8,8 +8,14 @@ import 'package:archive/archive.dart';
 import '../../core/network/api_client.dart';
 import '../../core/database/collections.dart';
 import '../../core/database/isar_service.dart';
+import '../../core/di/service_locator.dart';
+import '../../domain/usecases/settings_usecases.dart';
+import '../../domain/entities/user_settings.dart';
 
 class MushafMetadataProvider extends ChangeNotifier {
+  final GetSettingsUseCase _getSettingsUseCase = sl<GetSettingsUseCase>();
+  final SaveSettingsUseCase _saveSettingsUseCase = sl<SaveSettingsUseCase>();
+  
   // القائمة الثابتة كـ Fallback في حال فشل الداتابيز
   final List<MushafMetadata> _fallbackMushafs = [
     MushafMetadata()
@@ -82,12 +88,11 @@ class MushafMetadataProvider extends ChangeNotifier {
         _availableMushafs = _fallbackMushafs;
       }
 
-      final settings = await isar.collection<UserSettings>().where().findFirst();
-      if (settings != null) {
-        _currentMushafId = settings.selectedMushafId;
-      } else {
-        _currentMushafId = 'madani_font_v1';
-      }
+      final result = await _getSettingsUseCase();
+      result.fold(
+        (failure) => _currentMushafId = 'madani_font_v1',
+        (settings) => _currentMushafId = settings.selectedMushafId,
+      );
     } catch (e) {
       debugPrint('MushafProvider Error: $e');
       _availableMushafs = _fallbackMushafs; // الأمان أولاً
@@ -115,12 +120,14 @@ class MushafMetadataProvider extends ChangeNotifier {
   }
 
   Future<void> setMushaf(String identifier) async {
-    final isar = await IsarService.instance.db;
-    await isar.writeTxn(() async {
-      final settings = await isar.collection<UserSettings>().where().findFirst() ?? UserSettings();
-      settings.selectedMushafId = identifier;
-      await isar.collection<UserSettings>().put(settings);
-    });
+    final result = await _getSettingsUseCase();
+    
+    // We get current settings, modify them, and save
+    final currentSettings = result.getRight().getOrElse(() => UserSettings.defaults());
+    final newSettings = currentSettings.copyWith(selectedMushafId: identifier);
+    
+    await _saveSettingsUseCase(newSettings);
+    
     _currentMushafId = identifier;
     notifyListeners();
   }

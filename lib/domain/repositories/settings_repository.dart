@@ -1,6 +1,8 @@
-import '../../core/database/collections.dart';
+import 'package:fpdart/fpdart.dart';
+import '../entities/user_settings.dart';
+import '../core/errors/failures.dart';
 
 abstract class SettingsRepository {
-  Future<UserSettings?> getSettings();
-  Future<void> saveSettings(UserSettings settings);
+  Future<Either<Failure, UserSettings>> getSettings();
+  Future<Either<Failure, void>> saveSettings(UserSettings settings);
 }

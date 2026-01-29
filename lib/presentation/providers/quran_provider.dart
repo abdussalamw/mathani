@@ -1,15 +1,21 @@
 
 import 'package:flutter/material.dart';
-import '../../core/database/collections.dart';
-import '../../domain/repositories/quran_repository.dart'; // Abstract
-import '../../data/repositories/quran_repository.dart'; // Implementation
+import '../../core/di/service_locator.dart';
+import '../../domain/usecases/get_all_surahs_usecase.dart';
+import '../../domain/usecases/get_ayahs_usecase.dart';
+import '../../domain/entities/surah.dart';
+import '../../domain/entities/ayah.dart';
 
 class QuranProvider extends ChangeNotifier {
-  final QuranRepository _repository = QuranRepositoryImpl();
-  
+  // UseCases Injected from ServiceLocator
+  final GetAllSurahsUseCase _getAllSurahsUseCase = sl<GetAllSurahsUseCase>();
+  final GetAllAyahsUseCase _getAllAyahsUseCase = sl<GetAllAyahsUseCase>();
+  final GetAyahsForSurahUseCase _getAyahsForSurahUseCase = sl<GetAyahsForSurahUseCase>();
+  final GetAyahsForPageUseCase _getAyahsForPageUseCase = sl<GetAyahsForPageUseCase>();
+
   List<Surah> _surahs = [];
   List<Surah> get surahs => _surahs;
-  List<Surah> get mappedSurahs => _surahs; // Alias for compatibility
+  List<Surah> get mappedSurahs => _surahs; 
   
   List<Ayah> _allAyahs = [];
   List<Ayah> get ayahs => _allAyahs;
@@ -33,74 +39,91 @@ class QuranProvider extends ChangeNotifier {
 
   void clearJump() {
     _jumpToSurahNumber = null;
-    // Don't notify to prevent loops
   }
 
-  // Load just list of Surahs (metadata)
   Future<void> loadSurahs() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    try {
-      _surahs = await _repository.getAllSurahs();
-    } catch (e) {
-      _errorMessage = 'فشل في تحميل بيانات السور.';
-      debugPrint('Error loading surahs: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    final result = await _getAllSurahsUseCase();
+    result.fold(
+      (failure) {
+        _errorMessage = failure.message; // or map failure type
+        debugPrint('Error loading surahs: ${_errorMessage}');
+      },
+      (surahs) {
+        _surahs = surahs;
+      },
+    );
+
+    _isLoading = false;
+    notifyListeners();
   }
 
-  // Load Full Quran (Surahs + Ayahs)
   Future<void> loadFullQuran() async {
-    // If already loaded, don't reload
     if (_allAyahs.isNotEmpty && _surahs.isNotEmpty) return;
 
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    try {
-      // 1. Ensure Surahs are loaded
-      if (_surahs.isEmpty) {
-        _surahs = await _repository.getAllSurahs();
-      }
+    // 1. Ensure Surahs
+    if (_surahs.isEmpty) {
+      final surahResult = await _getAllSurahsUseCase();
+      surahResult.fold(
+        (failure) => _errorMessage = failure.message,
+        (data) => _surahs = data,
+      );
+    }
 
-      // 2. Load all Ayahs
-      _allAyahs = await _repository.getAllAyahs();
-      
-      // 3. Group Ayahs by Surah
-      _ayahsBySurah = {};
-      for (var ayah in _allAyahs) {
-        if (!_ayahsBySurah.containsKey(ayah.surahNumber)) {
-          _ayahsBySurah[ayah.surahNumber] = [];
-        }
-        _ayahsBySurah[ayah.surahNumber]!.add(ayah);
-      }
-      
-    } catch (e) {
-      _errorMessage = 'فشل في تحميل النص القرآني الكامل.';
-      debugPrint('Error loading full quran: $e');
-    } finally {
+    if (_errorMessage != null) {
       _isLoading = false;
       notifyListeners();
+      return;
     }
+
+    // 2. Load Ayahs
+    final ayahsResult = await _getAllAyahsUseCase();
+    ayahsResult.fold(
+      (failure) => _errorMessage = failure.message,
+      (data) {
+        _allAyahs = data;
+        _ayahsBySurah = {};
+        for (var ayah in _allAyahs) {
+          if (!_ayahsBySurah.containsKey(ayah.surahNumber)) {
+            _ayahsBySurah[ayah.surahNumber] = [];
+          }
+          _ayahsBySurah[ayah.surahNumber]!.add(ayah);
+        }
+      },
+    );
+
+    _isLoading = false;
+    notifyListeners();
   }
 
-  Future<List<Ayah>> getAyahsForSurah(int surahNumber) {
+  Future<List<Ayah>> getAyahsForSurah(int surahNumber) async {
     if (_ayahsBySurah.containsKey(surahNumber)) {
-      return Future.value(_ayahsBySurah[surahNumber]);
+      return _ayahsBySurah[surahNumber]!;
     }
-    return _repository.getAyahsForSurah(surahNumber);
+    
+    final result = await _getAyahsForSurahUseCase(surahNumber);
+    return result.fold(
+      (failure) => [], // Return empty list on error for now
+      (data) => data,
+    );
   }
   
-  Future<List<Ayah>> getAyahsForPage(int pageNumber) {
-    // Optimization: Filter from memory if loaded
+  Future<List<Ayah>> getAyahsForPage(int pageNumber) async {
     if (_allAyahs.isNotEmpty) {
-      return Future.value(_allAyahs.where((a) => a.page == pageNumber).toList());
+      return _allAyahs.where((a) => a.page == pageNumber).toList();
     }
-    return _repository.getAyahsForPage(pageNumber);
+    
+    final result = await _getAyahsForPageUseCase(pageNumber);
+    return result.fold(
+      (failure) => [],
+      (data) => data,
+    );
   }
 }

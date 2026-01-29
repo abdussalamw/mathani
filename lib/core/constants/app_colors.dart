@@ -8,10 +8,16 @@ class AppColors {
   static const Color darkBrown = Color(0xFF2C1810); // نصوص القرآن
   static const Color white = Color(0xFFFFFFFF);
   static const Color cream = Color(0xFFFDF6E3);
+  static const Color backgroundLight = Color(0xFFFDF6E3); // alias
+  static const Color cardLight = Color(0xFFFFFFFF); // alias
+  
+  static const Color secondary = Color(0xFFD4AF37); // ذهبي كبديل
   
   // الوضع الليلي
   static const Color darkBackground = Color(0xFF1A1A1A);
+  static const Color backgroundDark = Color(0xFF1A1A1A); // alias
   static const Color darkSurface = Color(0xFF2D2D2D);
+  static const Color cardDark = Color(0xFF2D2D2D); // alias
   static const Color darkText = Color(0xFFE8E8E8);
   
   // ألوان إضافية

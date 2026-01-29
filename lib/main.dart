@@ -5,6 +5,7 @@ import 'package:isar/isar.dart';
 import 'app.dart';
 import 'core/database/isar_service.dart';
 import 'core/database/collections.dart';
+import 'core/di/service_locator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,10 @@ void main() async {
   // تهيئة قاعدة البيانات
   final isarService = IsarService.instance;
   await isarService.init();
+  
+  // تهيئة حقن التبعيات
+  await initServiceLocator();
+  
   final isar = await isarService.db;
   
   // إعداد افتراضي

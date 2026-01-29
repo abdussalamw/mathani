@@ -10,8 +10,11 @@ import '../../providers/mushaf_metadata_provider.dart';
 import '../../providers/quran_provider.dart';
 import '../../providers/settings_provider.dart';
 import 'mushaf_selection_screen.dart';
+import 'widgets/ayah_widget.dart';
 import 'widgets/surah_header.dart';
 import 'widgets/basmala_widget.dart';
+import '../../../core/di/service_locator.dart';
+import '../../../domain/usecases/get_metadata_usecase.dart';
 
 class MushafScreen extends StatefulWidget {
   final int? initialSurahNumber;
@@ -27,11 +30,14 @@ class _MushafScreenState extends State<MushafScreen> {
   late PageController _pageController;
   Map<String, dynamic> _qcfCodes = {};
 
+  Map<int, int> _surahToPage = {};
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
     _loadQcfCodes();
+    _loadSurahPageMap();
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final quran = context.read<QuranProvider>();
@@ -42,25 +48,19 @@ class _MushafScreenState extends State<MushafScreen> {
       });
     });
   }
+
+  Future<void> _loadSurahPageMap() async {
+    final useCase = sl<GetSurahPageMapUseCase>();
+    final result = await useCase();
+    result.fold(
+      (failure) => debugPrint('Error loading surah map: ${failure.message}'),
+      (map) => setState(() => _surahToPage = map),
+    );
+  }
   
   void _navigateToSurah(int surahNumber) {
-    // خريطة صفحات بداية السور (تقريبية لمصحف المدينة)
-    final Map<int, int> surahToPage = {
-      1: 1, 2: 2, 3: 50, 4: 77, 5: 106, 6: 128, 7: 151, 8: 177, 9: 187, 10: 208,
-      11: 221, 12: 235, 13: 249, 14: 255, 15: 262, 16: 267, 17: 282, 18: 293, 19: 305, 20: 312,
-      21: 322, 22: 332, 23: 342, 24: 350, 25: 359, 26: 367, 27: 377, 28: 385, 29: 396, 30: 404,
-      31: 411, 32: 415, 33: 418, 34: 428, 35: 434, 36: 440, 37: 446, 38: 453, 39: 458, 40: 467,
-      41: 477, 42: 483, 43: 489, 44: 496, 45: 499, 46: 502, 47: 507, 48: 511, 49: 515, 50: 518,
-      51: 520, 52: 523, 53: 526, 54: 528, 55: 531, 56: 534, 57: 537, 58: 542, 59: 545, 60: 549,
-      61: 551, 62: 553, 63: 554, 64: 556, 65: 558, 66: 560, 67: 562, 68: 564, 69: 566, 70: 568,
-      71: 570, 72: 572, 73: 574, 74: 575, 75: 577, 76: 578, 77: 580, 78: 582, 79: 583, 80: 585,
-      81: 586, 82: 587, 83: 587, 84: 589, 85: 590, 86: 591, 87: 591, 88: 592, 89: 593, 90: 594,
-      91: 595, 92: 595, 93: 596, 94: 596, 95: 597, 96: 597, 97: 598, 98: 598, 99: 599, 100: 599,
-      101: 600, 102: 600, 103: 601, 104: 601, 105: 601, 106: 602, 107: 602, 108: 602, 109: 603, 110: 603,
-      111: 603, 112: 604, 113: 604, 114: 604
-    };
-
-    final targetPage = surahToPage[surahNumber] ?? 1;
+    // استخدام الخريطة المحملة من JSON
+    final targetPage = _surahToPage[surahNumber] ?? 1;
     
     if (_pageController.hasClients) {
        _pageController.jumpToPage(targetPage - 1);
@@ -321,27 +321,10 @@ class _MushafScreenState extends State<MushafScreen> {
             SelectableText.rich(
               TextSpan(
                 children: ayahs.map((ayah) {
-                  return TextSpan(
-                    children: [
-                      TextSpan(
-                        text: ayah.textUthmani + ' ',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontFamily: 'HafsSmart', // الخط الجديد
-                          fontSize: settings.fontSize * 1.25,
-                          height: 1.9,
-                          color: settings.isDarkMode ? AppColors.darkText : AppColors.darkBrown,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '﴿${ayah.ayahNumber}﴾ ',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppColors.golden,
-                            fontSize: settings.fontSize,
-                            fontFamily: 'HafsSmart', // الخط الجديد
-                        ),
-                      ),
-                    ],
-                  );
+                  return AyahWidget(
+                    number: ayah.ayahNumber,
+                    text: ayah.textUthmani,
+                  ).buildSpan(context);
                 }).toList(),
               ),
               textAlign: TextAlign.justify,
