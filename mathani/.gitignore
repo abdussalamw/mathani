@@ -42,12 +42,26 @@ gradle-wrapper.jar
 *.xcuserstate
 xcuserdata/
 
-# Mac
+# Web
+/web/*.js
+/web/*.js_
+
+# macOS
 .DS_Store
+
+# Exceptions
+!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 
 # Custom
 *.log
 *.tmp
+*~
+.env
 secrets.json
+
+# Database
 *.isar
 *.isar.lock
+
+# Audio cache
+audio_cache/
