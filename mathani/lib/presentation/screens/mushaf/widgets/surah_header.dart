@@ -21,7 +21,7 @@ class SurahHeader extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppColors.golden.withOpacity(0.05),
+            AppColors.golden05,
             Colors.transparent,
           ],
         ),

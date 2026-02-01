@@ -65,3 +65,8 @@ secrets.json
 
 # Audio cache
 audio_cache/
+
+# Large files
+*.zip
+*.gz
+scripts/*.csv

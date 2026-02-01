@@ -2,23 +2,23 @@ import 'dart:convert';
 import 'dart:io';
 
 void main() async {
-  print('Starting data merge...');
+  stdout.writeln('Starting data merge...');
 
   // 1. Load Simple JSON
   final simpleFile = File('assets/data/quran_simple.json');
   if (!await simpleFile.exists()) {
-    print('Error: quran_simple.json not found');
+    stderr.writeln('Error: quran_simple.json not found');
     exit(1);
   }
   
   final simpleContent = await simpleFile.readAsString();
   final List<dynamic> chapters = json.decode(simpleContent);
-  print('Loaded ${chapters.length} chapters from simple JSON');
+  stdout.writeln('Loaded ${chapters.length} chapters from simple JSON');
 
   // 2. Load CSV and build Page Map
   final csvFile = File('assets/data/TB_Glyph.csv');
   if (!await csvFile.exists()) {
-    print('Error: TB_Glyph.csv not found');
+    stderr.writeln('Error: TB_Glyph.csv not found');
     exit(1);
   }
 
@@ -26,7 +26,7 @@ void main() async {
   final Map<int, Map<int, int>> pageMap = {};
   
   final lines = await csvFile.readAsLines();
-  print('Loaded CSV with ${lines.length} lines');
+  stdout.writeln('Loaded CSV with ${lines.length} lines');
 
   // Skip header
   for (var i = 1; i < lines.length; i++) {
@@ -61,7 +61,7 @@ void main() async {
        }
     }
   }
-  print('Mapped pages for ${pageMap.length} surahs');
+  stdout.writeln('Mapped pages for ${pageMap.length} surahs');
 
   // 3. Merge Data
   final List<Map<String, dynamic>> advancedData = [];
@@ -113,5 +113,5 @@ void main() async {
   // 4. Save
   final outputFile = File('assets/data/quran_advanced.json');
   await outputFile.writeAsString(json.encode(advancedData));
-  print('Successfully saved quran_advanced.json');
+  stdout.writeln('Successfully saved quran_advanced.json');
 }

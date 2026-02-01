@@ -2,7 +2,7 @@ import '../../domain/repositories/audio_repository.dart';
 import '../../core/services/audio_service.dart';
 
 class AudioRepositoryImpl implements AudioRepository {
-  final AudioService _audioService = AudioService.instance;
+  final AudioService _audioService = AudioService();
   
   // Base URL for audio (Alafasy 128kbps as an example source)
   // https://everyayah.com/data/Alafasy_128kbps/001001.mp3
@@ -15,12 +15,9 @@ class AudioRepositoryImpl implements AudioRepository {
     final String url = '$_baseUrl/$surahStr$ayahStr.mp3';
     
     try {
-      await _audioService.stop(); // Stop previous
-      await _audioService.setUrl(url);
-      await _audioService.play();
+      await _audioService.play(url);
     } catch (e) {
-      print('Failed to play ayah: $e');
-      throw Exception('Failed to play audio');
+      throw Exception('Failed to play audio: $e');
     }
   }
   
@@ -36,6 +33,6 @@ class AudioRepositoryImpl implements AudioRepository {
 
   @override
   Future<void> resume() async {
-    await _audioService.play();
+    await _audioService.resume();
   }
 }

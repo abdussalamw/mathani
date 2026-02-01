@@ -7,14 +7,14 @@ class Surah {
   Id id = Isar.autoIncrement;
   
   @Index(unique: true)
-  late int number;
+  int number = 1;
   
-  late String nameArabic;
-  late String nameEnglish;
-  late String nameEnglishTranslation;
-  late String revelationType; // Meccan or Medinan
+  String nameArabic = '';
+  String nameEnglish = '';
+  String nameEnglishTranslation = '';
+  String revelationType = 'Meccan'; // Meccan or Medinan
   
-  late int numberOfAyahs;
+  int numberOfAyahs = 0;
   
   // للتنقل
   int? juzStart;
@@ -32,13 +32,13 @@ class Surah {
   // From JSON (من API)
   factory Surah.fromJson(Map<String, dynamic> json) {
     return Surah()
-      ..id = json['number'] // Set ID explicitly to ensure upsert
-      ..number = json['number']
-      ..nameArabic = json['name']
-      ..nameEnglish = json['englishName']
-      ..nameEnglishTranslation = json['englishNameTranslation'] ?? ''
-      ..revelationType = json['revelationType']
-      ..numberOfAyahs = json['numberOfAyahs'];
+      ..id = int.tryParse(json['number']?.toString() ?? '1') ?? 1
+      ..number = int.tryParse(json['number']?.toString() ?? '1') ?? 1
+      ..nameArabic = json['name']?.toString() ?? ''
+      ..nameEnglish = json['englishName']?.toString() ?? ''
+      ..nameEnglishTranslation = json['englishNameTranslation']?.toString() ?? ''
+      ..revelationType = json['revelationType']?.toString() ?? 'Meccan'
+      ..numberOfAyahs = int.tryParse(json['numberOfAyahs']?.toString() ?? '0') ?? 0;
   }
   
   // To JSON

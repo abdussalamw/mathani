@@ -19,6 +19,18 @@ class AppColors {
   static const Color darkSurface = Color(0xFF2D2D2D);
   static const Color cardDark = Color(0xFF2D2D2D); // alias
   static const Color darkText = Color(0xFFE8E8E8);
+
+  // Translucent colors (Replacement for .withOpacity to allow const)
+  static const Color primary10 = Color(0x1AE30613); // 10%
+  static const Color golden05 = Color(0x0DD4AF37); // 5%
+  static const Color golden20 = Color(0x33D4AF37); // 20%
+  static const Color golden30 = Color(0x4DD4AF37); // 30%
+  static const Color black02 = Color(0x05000000); // 2%
+  static const Color black05 = Color(0x0D000000); // 5%
+  static const Color black10 = Color(0x1A000000); // 10%
+  static const Color grey10 = Color(0x1A9E9E9E); // 10%
+  static const Color grey05 = Color(0x0D9E9E9E); // 5%
+  static const Color darkBrown70 = Color(0xB22C1810); // 70%
   
   // ألوان إضافية
   static const Color success = Color(0xFF4CAF50);

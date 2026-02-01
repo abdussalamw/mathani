@@ -5,8 +5,13 @@ import '../../../core/constants/app_colors.dart';
 
 import '../surah_list/surah_list_screen.dart';
 import '../settings/settings_screen.dart';
-import '../mushaf/mushaf_selection_screen.dart';
 import '../mushaf/mushaf_screen.dart';
+import '../tafsir/tafsir_screen.dart'; 
+import '../audio_player/audio_player_screen.dart'; 
+import '../bookmarks/bookmarks_screen.dart'; 
+import '../../providers/ui_provider.dart';
+import '../../widgets/audio_minibar.dart';
+import 'package:provider/provider.dart';
 
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({Key? key}) : super(key: key);
@@ -16,69 +21,204 @@ class MainShellScreen extends StatefulWidget {
 }
 
 class _MainShellScreenState extends State<MainShellScreen> {
-  int _currentIndex = 0;
-
-  // سيتم تخزين الصفحات هنا للحفاظ على حالتها
-  late List<Widget> _screens;
-
-  @override
-  void initState() {
-    super.initState();
-    _screens = [
-      const SurahListScreen(),       // 0: الفهرس
-      const MushafSelectionScreen(), // 1: المصاحف
-      const MushafScreen(),          // 2: القراءة (تلاوة)
-      const SettingsScreen(),        // 3: الإعدادات
-    ];
-    
-
-  }
-
+  // bool _isPlayingAudio = false; // We can remove this if handled by providers
+  
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+    return Consumer<UiProvider>(
+      builder: (context, uiProvider, child) {
+        return Scaffold(
+          body: IndexedStack(
+            index: _getCurrentScreenIndex(uiProvider),
+            children: const [
+              SurahListScreen(),       // 0: الفهرس
+              BookmarksScreen(),       // 1: العلامات
+              MushafScreen(),          // 2: المصحف (Starts at Page 1)
+              AudioPlayerScreen(),     // 3: الاستماع
+              TafsirScreen(),          // 4: التفسير
+              SettingsScreen(),        // 5: الإعدادات
+            ],
+          ),
+          bottomNavigationBar: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AudioMinibar(),
+              _buildBottomBar(uiProvider),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  int _getCurrentScreenIndex(UiProvider uiProvider) {
+    final index = uiProvider.currentTabIndex;
+    final showingTafsir = uiProvider.showingTafsir;
+    
+    switch (index) {
+      case 0: return 0; // Index
+      case 1: return 1; // Bookmarks
+      case 2: return showingTafsir ? 4 : 2; // Mushaf or Tafsir
+      case 3: return 3; // Audio
+      case 4: return 5; // Settings
+      default: return 2;
+    }
+  }
+
+  Widget _buildBottomBar(UiProvider uiProvider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentIndex = uiProvider.currentTabIndex;
+    final showingTafsir = uiProvider.showingTafsir;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2C2416) : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(color: Colors.black12, blurRadius: 10, offset: const Offset(0, -2))
-          ],
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              // 1. الفهرس (البحث)
+              _buildNavItem(
+                icon: Icons.search,
+                label: 'الفهرس',
+                isSelected: currentIndex == 0,
+                onTap: () => uiProvider.setTabIndex(0),
+              ),
+
+              // 2. العلامات
+              _buildNavItem(
+                icon: Icons.bookmark_outline_rounded,
+                label: 'العلامات',
+                isSelected: currentIndex == 1,
+                onTap: () => uiProvider.setTabIndex(1),
+              ),
+              
+              // 3. تلاوة/تفسير (الوسط - الرئيسية)
+              _buildMainButton(
+                icon: showingTafsir ? Icons.menu_book : Icons.book,
+                label: showingTafsir ? 'تلاوة' : 'تفسير',
+                onTap: () => uiProvider.toggleTafsir(),
+              ),
+
+              // 4. استماع
+              _buildNavItem(
+                icon: Icons.headphones_outlined,
+                label: 'استماع',
+                isSelected: currentIndex == 3,
+                onTap: () => uiProvider.setTabIndex(3),
+              ),
+              
+              // 5. الإعدادات
+              _buildNavItem(
+                icon: Icons.settings_outlined,
+                label: 'الإعدادات',
+                isSelected: currentIndex == 4,
+                onTap: () => uiProvider.setTabIndex(4),
+              ),
+            ],
+          ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: Colors.grey,
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          selectedLabelStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
-          unselectedLabelStyle: const TextStyle(fontFamily: 'Tajawal'),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.format_list_bulleted_rounded),
-              label: 'الفهرس',
+      ),
+    );
+  }
+
+
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? AppColors.primary : Colors.grey,
+                size: 24,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 11,
+                  color: isSelected ? AppColors.primary : Colors.grey,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary,
+                AppColors.golden,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.library_books),
-              label: 'المصاحف',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.menu_book_rounded),
-              label: 'تلاوة',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              label: 'الإعدادات',
-            ),
-          ],
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: Colors.white,
+                size: 28,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

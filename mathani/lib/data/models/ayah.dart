@@ -7,12 +7,12 @@ class Ayah {
   Id id = Isar.autoIncrement;
   
   @Index(composite: [CompositeIndex('ayahNumber')])
-  late int surahNumber;
+  int surahNumber = 1;
   
-  late int ayahNumber;
+  int ayahNumber = 1;
   
   // النص القرآني
-  late String text;           // النص البسيط
+  String text = '';           // النص البسيط
   String? textUthmani;        // الرسم العثماني (إن وُجد)
   
   // للتنقل
@@ -37,8 +37,8 @@ class Ayah {
       ..text = json['text']?.toString() ?? ''
       ..juz = int.tryParse(json['juz']?.toString() ?? '1') ?? 1
       ..page = int.tryParse(json['page']?.toString() ?? '1') ?? 1
-      ..hizbQuarter = int.tryParse(json['hizbQuarter']?.toString() ?? '')
-      ..manzil = int.tryParse(json['manzil']?.toString() ?? '');
+      ..hizbQuarter = int.tryParse(json['hizbQuarter']?.toString() ?? '0')
+      ..manzil = int.tryParse(json['manzil']?.toString() ?? '0');
   }
   
   // الرقم الإجمالي في المصحف

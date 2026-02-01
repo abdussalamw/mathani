@@ -1,11 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/database/collections.dart';
-import '../../providers/quran_provider.dart';
-import '../mushaf/mushaf_screen.dart';
-
+import 'package:mathani/core/constants/app_colors.dart';
+import 'package:mathani/data/models/surah.dart';
+import 'package:mathani/presentation/providers/quran_provider.dart';
+import 'package:mathani/presentation/screens/mushaf/mushaf_screen.dart';
 
 class SurahListScreen extends StatefulWidget {
   const SurahListScreen({Key? key}) : super(key: key);
@@ -15,186 +13,280 @@ class SurahListScreen extends StatefulWidget {
 }
 
 class _SurahListScreenState extends State<SurahListScreen> {
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController(); // Controller for better management
+
   @override
   void initState() {
     super.initState();
-    // Load data once when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<QuranProvider>().loadSurahs();
     });
   }
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'فهرس السور',
-          style: Theme.of(context).textTheme.headlineMedium,
+          style: TextStyle(
+            fontFamily: 'Tajawal',
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // Search functionality to be implemented
-            },
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        // No back button needed if it's a tab, but if pushed, it shows auto.
+      ),
+      body: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              style: const TextStyle(fontFamily: 'Tajawal'),
+              textDirection: TextDirection.rtl,
+              decoration: InputDecoration(
+                hintText: 'ابحث باسم السورة أو رقمها...',
+                hintStyle: TextStyle(
+                  fontFamily: 'Tajawal',
+                  color: Colors.grey[500],
+                  fontSize: 14,
+                ),
+                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                suffixIcon: _searchQuery.isNotEmpty 
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        setState(() {
+                          _searchQuery = '';
+                          _searchController.clear();
+                        });
+                      },
+                    )
+                  : null,
+                filled: true,
+                fillColor: isDark ? const Color(0xFF2C2416) : Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          ),
+          
+          // Surah List
+          Expanded(
+            child: Consumer<QuranProvider>(
+              builder: (context, provider, child) {
+                if (provider.isLoading) {
+                  return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+                }
+
+                if (provider.errorMessage != null) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48, color: Colors.amber),
+                        const SizedBox(height: 16),
+                        Text(
+                          provider.errorMessage!,
+                          style: const TextStyle(fontFamily: 'Tajawal'),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => provider.loadSurahs(),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('إعادة المحاولة'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                if (provider.surahs.isEmpty) {
+                  return const Center(child: Text('لا توجد بيانات', style: TextStyle(fontFamily: 'Tajawal')));
+                }
+
+                final filteredSurahs = _getFilteredSurahs(provider.surahs);
+
+                if (filteredSurahs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'لا توجد نتائج للبحث',
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.only(bottom: 100), // Increased padding for BottomBar
+                    itemCount: filteredSurahs.length,
+                    separatorBuilder: (context, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final surah = filteredSurahs[index];
+                      return _buildSurahTile(context, surah, isDark);
+                    },
+                  ),
+                );
+              },
+            ),
           ),
         ],
-      ),
-      body: Consumer<QuranProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-          }
-
-          if (provider.errorMessage != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: AppColors.golden),
-                  const SizedBox(height: 16),
-                  Text(
-                    provider.errorMessage!,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => provider.loadSurahs(),
-                    child: const Text('إعادة المحاولة'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (provider.surahs.isEmpty) {
-            return const Center(child: Text('لا توجد بيانات'));
-          }
-
-          return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.85, // Adjusted for card height
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: provider.surahs.length,
-            itemBuilder: (context, index) {
-              final surah = provider.surahs[index];
-              return _buildSurahCard(context, surah);
-            },
-          );
-        },
       ),
     );
   }
 
-  Widget _buildSurahCard(BuildContext context, Surah surah) {
+  Widget _buildSurahTile(BuildContext context, Surah surah, bool isDark) {
     return InkWell(
       onTap: () {
-        context.read<QuranProvider>().setJumpToSurah(surah.number);
-        // Navigation Logic to be implemented via BottomNav or Route
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MushafScreen(initialPage: surah.page ?? 1),
+          ),
+        );
       },
-      borderRadius: BorderRadius.circular(16),
       child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardTheme.color,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.golden.withOpacity(0.2)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Stack(
+        color: isDark ? const Color(0xFF231E18) : Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
           children: [
-            // Background Icon Faded
-            Positioned(
-              left: -10,
-              bottom: -10,
-              child: Opacity(
-                opacity: 0.05,
-                child: Icon(
-                  Icons.menu_book,
-                  size: 100,
+            // Number container
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                // Removed risky AssetImage
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.golden.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+                color: isDark ? const Color(0xFF2C2416) : Colors.grey[100],
+              ),
+              child: Text(
+                '${surah.number}',
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                   color: AppColors.primary,
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
+            const SizedBox(width: 16),
+            
+            // Name
+            Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${surah.number}',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        surah.revelation == RevelationType.meccan 
-                            ? Icons.mosque // Use distinct icon if available, or color
-                            : Icons.location_city,
-                        size: 16,
-                        color: AppColors.golden,
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
                   Text(
-                    surah.nameArabic,
-                    style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 22),
-                    textAlign: TextAlign.center,
+                    'سورة ${surah.nameArabic}',
+                    style: TextStyle(
+                      fontFamily: 'Amiri', // خط عربي جميل للعناوين
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                   ),
-                  const SizedBox(height: 4),
                   Text(
                     surah.nameEnglish,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 12),
-                    textAlign: TextAlign.center,
-                  ),
-                  const Spacer(),
-                  const Divider(height: 1),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${surah.numberOfAyahs} آية',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
-                      ),
-                      Text(
-                        'جزء ${surah.juzNumber}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
-                      ),
-                    ],
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
                   ),
                 ],
               ),
             ),
+            
+            // Info
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  surah.revelationType == "Meccan" ? "مكية" : "مدنية",
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${surah.numberOfAyahs} آيات',
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 11,
+                    color: AppColors.golden,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
           ],
         ),
       ),
     );
+  }
+  String _normalizeArabic(String text) {
+    return text
+        .replaceAll('أ', 'ا')
+        .replaceAll('إ', 'ا')
+        .replaceAll('آ', 'ا')
+        .replaceAll('ى', 'ي')
+        .replaceAll('ة', 'ه')
+        .replaceAll(RegExp(r'[\u064B-\u065F]'), ''); // Remove Tashkeel
+  }
+
+  List<Surah> _getFilteredSurahs(List<Surah> surahs) {
+    if (_searchQuery.isEmpty) return surahs;
+    
+    final normalizedQuery = _normalizeArabic(_searchQuery);
+    
+    return surahs.where((surah) {
+      final normalizedName = _normalizeArabic(surah.nameArabic);
+      return normalizedName.contains(normalizedQuery) ||
+             surah.nameEnglish.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             surah.number.toString() == _searchQuery;
+    }).toList();
   }
 }

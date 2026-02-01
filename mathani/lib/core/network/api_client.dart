@@ -4,6 +4,8 @@ import 'package:mathani/core/constants/api_constants.dart';
 class ApiClient {
   late final Dio _dio;
   
+  Dio get dio => _dio; // Public getter for dio instance
+  
   ApiClient() {
     _dio = Dio(
       BaseOptions(

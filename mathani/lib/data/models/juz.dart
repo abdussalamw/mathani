@@ -7,10 +7,10 @@ class Juz {
   Id id = Isar.autoIncrement;
   
   @Index()
-  late int number;
+  int number = 1;
   
-  late int startSurah;
-  late int startAyah;
-  late int endSurah;
-  late int endAyah;
+  int startSurah = 1;
+  int startAyah = 1;
+  int endSurah = 1;
+  int endAyah = 1;
 }

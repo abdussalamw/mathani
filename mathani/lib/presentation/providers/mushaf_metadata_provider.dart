@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 
 import 'package:path_provider/path_provider.dart';
@@ -71,6 +72,15 @@ class MushafMetadataProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Skip Isar on Web
+      if (kIsWeb) {
+        _availableMushafs = _fallbackMushafs;
+        _currentMushafId = 'madani_font_v1';
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
       final isar = IsarService.instance.isar;
       final prefs = await SharedPreferences.getInstance();
       final areFontsDownloaded = prefs.getBool('fonts_downloaded') ?? false;
@@ -118,7 +128,8 @@ class MushafMetadataProvider extends ChangeNotifier {
       );
     } catch (e) {
       debugPrint('MushafProvider Error: $e');
-      _availableMushafs = _fallbackMushafs; // الأمان أولاً
+      _availableMushafs = _fallbackMushafs;
+      _currentMushafId = 'madani_font_v1';
     } finally {
       _isLoading = false;
       notifyListeners();

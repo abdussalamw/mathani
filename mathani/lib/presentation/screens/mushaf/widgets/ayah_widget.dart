@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/data/models/ayah.dart';
-import '../../../../core/constants/app_colors.dart';
-
 import 'package:mathani/presentation/providers/quran_provider.dart';
-import 'package:mathani/core/constants/app_colors.dart';
+import '../../../../core/constants/app_colors.dart';
 
 class AyahWidget extends StatelessWidget {
   final Ayah ayah;
@@ -41,7 +39,7 @@ class AyahWidget extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: isPlaying 
-                  ? AppColors.golden.withOpacity(0.2)
+                  ? AppColors.golden20
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
               border: isPlaying

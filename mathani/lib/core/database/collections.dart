@@ -13,15 +13,15 @@ class AudioCache {
   Id id = Isar.autoIncrement;
 
   @Index()
-  late int surahNumber;
+  int surahNumber = 1;
   
   @Index()
-  late int ayahNumber;
+  int ayahNumber = 1;
 
-  late String reciter;
-  late String localPath;
-  late int fileSize;
-  late DateTime downloadedAt;
+  String reciter = '';
+  String localPath = '';
+  int fileSize = 0;
+  DateTime downloadedAt = DateTime.now();
 }
 
 @collection
@@ -44,7 +44,7 @@ class UserSettings {
 class ReadingProgress {
   Id id = Isar.autoIncrement;
 
-  late DateTime date;
+  DateTime date = DateTime.now();
   
   int pagesRead = 0;
   int ayahsRead = 0;
@@ -71,6 +71,20 @@ class MushafMetadata {
   int totalPages = 604;
 }
 
+@collection
+class Bookmark {
+  Id id = Isar.autoIncrement;
+
+  @Index()
+  int surahNumber = 1;
+  
+  @Index()
+  int ayahNumber = 1;
+
+  DateTime createdAt = DateTime.now();
+  String? note;
+}
+
 // Helper enum for Mushaf Types logic (not stored directly)
 enum MushafTypeEnum {
   font,
@@ -78,18 +92,13 @@ enum MushafTypeEnum {
   svg
 }
 
-/// FNV-1a 64bit hash algorithm optimized for Dart Strings
+/// FNV-1a 32-bit hash algorithm compatible with Web (JavaScript)
 int fastHash(String string) {
-  var hash = 0xcbf29ce484222325;
-
-  var i = 0;
-  while (i < string.length) {
-    final codeUnit = string.codeUnitAt(i++);
-    hash ^= codeUnit >> 8;
-    hash *= 0x100000001b3;
-    hash ^= codeUnit & 0xFF;
-    hash *= 0x100000001b3;
+  var hash = 0x811c9dc5;
+  for (var i = 0; i < string.length; i++) {
+    hash ^= string.codeUnitAt(i);
+    hash *= 0x01000193;
+    hash &= 0xFFFFFFFF;
   }
-
   return hash;
 }

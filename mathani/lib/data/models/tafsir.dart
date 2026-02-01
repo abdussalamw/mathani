@@ -7,11 +7,11 @@ class Tafsir {
   Id id = Isar.autoIncrement;
 
   @Index()
-  late int surahNumber;
+  int surahNumber = 1;
   
   @Index()
-  late int ayahNumber;
+  int ayahNumber = 1;
 
-  late String tafsirName; // e.g., 'muyassar', 'saadi'
-  late String text;
+  String tafsirName = ''; // e.g., 'muyassar', 'saadi'
+  String text = '';
 }

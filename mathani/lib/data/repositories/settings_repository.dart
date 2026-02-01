@@ -3,7 +3,6 @@ import 'package:isar/isar.dart';
 import 'package:fpdart/fpdart.dart';
 
 import '../../core/database/collections.dart' as model;
-import '../../core/database/isar_service.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/entities/user_settings.dart';
 import '../../core/errors/failures.dart';

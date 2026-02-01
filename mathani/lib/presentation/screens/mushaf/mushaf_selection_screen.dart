@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
-
+import '../../../core/database/collections.dart'; // Import required for MushafMetadata model
 import '../../providers/mushaf_metadata_provider.dart';
 
 class MushafSelectionScreen extends StatefulWidget {
@@ -86,12 +86,12 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isSelected ? AppColors.primary : Colors.grey.withOpacity(0.1),
+                    color: isSelected ? AppColors.primary : AppColors.grey10,
                     width: isSelected ? 2 : 1,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: AppColors.black05,
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -104,7 +104,7 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                       leading: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                          color: isSelected ? AppColors.primary10 : AppColors.grey10,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -148,7 +148,7 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                       ),
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.05),
+                        color: AppColors.grey05,
                         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

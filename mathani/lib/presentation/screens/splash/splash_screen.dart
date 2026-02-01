@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../data/services/qcf4_font_downloader.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -44,8 +45,17 @@ class _SplashScreenState extends State<SplashScreen>
   
   void _navigateToHome() async {
     await Future.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+    
+    // Check if fonts are available
+    final fontsReady = await QCF4FontDownloader.areAllFontsAvailable();
+    
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      if (fontsReady) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/initial_download');
+      }
     }
   }
   
@@ -67,41 +77,43 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // الشعار
+                // الأيقونة
                 Container(
                   width: 150,
                   height: 150,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.golden.withOpacity(0.3),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'مَثَانِي',
-                      style: TextStyle(
-                        fontFamily: 'Amiri',
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.darkBrown,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.golden30,
+                        blurRadius: 30,
+                        spreadRadius: 10,
                       ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/icons/icon.jpg',
+                      fit: BoxFit.cover,
                     ),
                   ),
                 ),
                 
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
                 
-                // الوصف
-                Text(
-                  'القرآن الكريم',
-                  style: TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 20,
-                    color: AppColors.darkBrown.withOpacity(0.7),
+                // الآية القرآنية
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    'اللَّهُ نَزَّلَ أَحْسَنَ الْحَدِيثِ كِتَابًا مُّتَشَابِهًا مَّثَانِيَ',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Amiri',
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkBrown,
+                      height: 1.8,
+                    ),
                   ),
                 ),
                 

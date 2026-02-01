@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   
   # قاعدة البيانات (أساسي)
   isar: ^3.1.0
@@ -24,9 +26,10 @@ dependencies:
   
   # الواجهة (أساسي)
   google_fonts: ^6.1.0
+  flutter_svg: ^2.0.7
   
   # الأدوات (أساسي)
-  intl: ^0.18.1
+  intl: ^0.20.2
   archive: ^3.6.1 # Essential for Mushaf Zip
   
   # Architecture & Core (Added for Phase 3)
@@ -35,6 +38,8 @@ dependencies:
   equatable: ^2.0.5
   shared_preferences: ^2.5.4
   just_audio: ^0.10.5
+  wakelock_plus: ^1.1.0
+  package_info_plus: ^8.0.0 # Force older version compatible with Kotlin 1.9
 
 dev_dependencies:
   flutter_test:
@@ -49,16 +54,20 @@ dev_dependencies:
 flutter_icons:
   android: true
   ios: false
-  image_path: "icon.png"
+  image_path: "assets/icons/icon.jpg"
 
 flutter:
+  generate: true
   uses-material-design: true
   
   assets:
-    - assets/fonts/qcf2/
+    - assets/icons/
     - assets/fonts/amiri/
     - assets/fonts/tajawal/
-    - assets/data/ # Essential for Metadata
+    - assets/data/quran_glyphs.json
+    - assets/data/quran_metadata.json
+    - assets/data/quran_madani.json
+    - assets/data/quran_advanced.json
 
   fonts:
     - family: Amiri
@@ -67,6 +76,7 @@ flutter:
     
     - family: Tajawal
       fonts:
-        - asset: assets/fonts/tajawal/Tajawal-Regular.ttf
         - asset: assets/fonts/tajawal/Tajawal-Bold.ttf
           weight: 700
+
+

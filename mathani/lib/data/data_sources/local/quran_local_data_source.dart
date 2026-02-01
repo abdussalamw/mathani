@@ -30,13 +30,19 @@ class QuranLocalDataSource {
     for (var item in data) {
       if (item is! Map<String, dynamic>) continue;
       
+      int startPage = 1;
+      if (item['verses'] != null && (item['verses'] is List) && (item['verses'] as List).isNotEmpty) {
+        startPage = item['verses'][0]['page'] ?? 1;
+      }
+
       surahs.add(Surah()
         ..number = item['id'] as int
         ..nameArabic = item['name'] as String
         ..nameEnglish = item['transliteration'] as String
-        ..nameEnglishTranslation = item['transliteration'] as String
+        ..nameEnglishTranslation = item['transliteration'] as String // fallback
         ..numberOfAyahs = item['total_verses'] as int
         ..revelationType = item['type'] as String
+        ..page = startPage
       );
     }
     
