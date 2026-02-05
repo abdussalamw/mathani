@@ -45,28 +45,9 @@ class _TafsirScreenState extends State<TafsirScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
-      appBar: AppBar(
-        title: const Text(
-          'التفسير',
-          style: TextStyle(
-            fontFamily: 'Tajawal',
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {},
-            tooltip: 'مشاركة',
-          ),
-        ],
-      ),
-      body: Column(
+    return Container(
+      color: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
+      child: Column(
         children: [
           // Content Area
           Expanded(

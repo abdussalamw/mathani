@@ -8,6 +8,11 @@ import 'package:mathani/presentation/providers/audio_provider.dart';
 import 'package:mathani/presentation/providers/bookmark_provider.dart';
 import 'package:mathani/presentation/providers/ui_provider.dart';
 import 'package:provider/provider.dart';
+import '../../providers/mushaf_metadata_provider.dart';
+import '../../providers/quran_provider.dart';
+import '../../providers/settings_provider.dart';
+import '../surah_list/surah_list_screen.dart';
+import 'package:flutter/services.dart';
 
 class MushafScreen extends StatefulWidget {
   final int initialPage;
@@ -118,6 +123,21 @@ class _MushafScreenState extends State<MushafScreen> {
   int? _selectedSurah;
   int? _selectedAyah;
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateSystemUI();
+  }
+
+  void _updateSystemUI() {
+    final uiProvider = context.read<UiProvider>();
+    if (uiProvider.isImmersiveMode) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
   void _onAyahSelected(int surah, int ayah) {
     setState(() {
       _selectedSurah = surah;
@@ -169,11 +189,28 @@ class _MushafScreenState extends State<MushafScreen> {
                 color: AppColors.primary,
                 onTap: () {
                   Navigator.pop(context);
-                  context.read<AudioProvider>().playAyah(_selectedSurah!, _selectedAyah!);
+                  final shouldCache = context.read<SettingsProvider>().downloadWhilePlaying;
+                  
+                  // Get total ayahs for auto-advance
+                  int? totalAyahs;
+                  try {
+                    final quran = context.read<QuranProvider>();
+                    if (quran.surahs.isNotEmpty) {
+                      final surahObj = quran.surahs.firstWhere((s) => s.number == _selectedSurah);
+                      totalAyahs = surahObj.numberOfAyahs;
+                    }
+                  } catch (_) {}
+
+                  context.read<AudioProvider>().playAyah(
+                    _selectedSurah!, 
+                    _selectedAyah!, 
+                    shouldCache: shouldCache,
+                    totalAyahsInSurah: totalAyahs
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(
                      const SnackBar(
                        content: Text(
-                         'جاري تشغيل التلاوة (عبد الباسط عبد الصمد)...',
+                         'جاري تشغيل التلاوة...',
                          style: TextStyle(fontFamily: 'Tajawal'),
                        ),
                        duration: Duration(seconds: 2),
@@ -389,16 +426,15 @@ class _MushafScreenState extends State<MushafScreen> {
       );
     }
     
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1A1410) : const Color(0xFFFFFDF5),
-      body: SafeArea(
-        child: Column(
+    return Container(
+      color: isDark ? const Color(0xFF1A1410) : const Color(0xFFFFFDF5),
+      child: Column(
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () {
-                  // Toggle bars visibility logic if exists
-                },
+                 onTap: () {
+                   // This wrapper catching is old, sub-gestures handle it now
+                 },
                 child: Directionality(
                   textDirection: TextDirection.rtl,
                   child: PageView.builder(
@@ -411,80 +447,36 @@ class _MushafScreenState extends State<MushafScreen> {
                       });
                     },
                     itemBuilder: (context, index) {
-                      return MushafPageWidget(
-                        page: _pages![index],
-                        selectedSurah: _selectedSurah,
-                        selectedAyah: _selectedAyah,
-                        onAyahSelected: _onAyahSelected,
+                      return GestureDetector(
+                        behavior: HitTestBehavior.translucent, // Allow taps to pass through if not handled? Or catch empty space?
+                        // If we use translucent, and child handles it, child wins.
+                        // If child doesn't handle it (empty space), this catches it.
+                        onTap: () {
+                           debugPrint("MushafScreen Background Tapped -> Toggle Immersive");
+                           uiProvider.toggleImmersiveMode();
+                           _updateSystemUI();
+                        },
+                        child: Consumer<MushafMetadataProvider>(
+                          builder: (context, mushafProvider, child) {
+                            final isDigital = mushafProvider.currentMushafType == 'digital';
+                            return MushafPageWidget(
+                              page: _pages![index],
+                              selectedSurah: _selectedSurah,
+                              selectedAyah: _selectedAyah,
+                              onAyahSelected: _onAyahSelected,
+                              showInfo: !uiProvider.isImmersiveMode,
+                              isDigital: isDigital,
+                            );
+                          },
+                        ),
                       );
                     },
                   ),
                 ),
               ),
             ),
-            
-            // Bottom Info Bar (Page Number & Navigation)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isDark 
-                    ? const Color(0xFF2C2416) 
-                    : Colors.white,
-                boxShadow: const [
-                   BoxShadow(
-                    color: AppColors.black10,
-                    blurRadius: 4,
-                    offset: Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // الصفحة السابقة (لليسار في العربية) - Arrow Left Visual but Right Action
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios),
-                    onPressed: _currentPage < (_pages?.length ?? 604)
-                        ? () {
-                            _pageController.nextPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          }
-                        : null,
-                    tooltip: 'الصفحة التالية',
-                  ),
-                  
-                  // معلومات الصفحة
-                  Text(
-                    'صفحة $_currentPage من ${_pages!.length}',
-                    style: TextStyle(
-                      fontFamily: 'Tajawal',
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
-                  ),
-                  
-                  // الصفحة التالية (لليمين في العربية)
-                  IconButton(
-                    icon: const Icon(Icons.arrow_forward_ios),
-                    onPressed: _currentPage > 1
-                        ? () {
-                            _pageController.previousPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          }
-                        : null,
-                    tooltip: 'الصفحة السابقة',
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
-      ),
     );
   }
 }

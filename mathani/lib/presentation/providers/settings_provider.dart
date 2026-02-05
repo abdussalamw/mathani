@@ -5,8 +5,9 @@ class SettingsProvider with ChangeNotifier {
   bool _isDarkMode = false;
   double _fontSize = 24.0;
   String _fontFamily = 'Amiri';
-  String _defaultReciter = 'minshawi_murattal';
+  String _defaultReciter = 'Minshawi_Murattal_128kbps';
   String _defaultTafsir = 'muyassar';
+  bool _downloadWhilePlaying = true;
   
   // Getters
   bool get isDarkMode => _isDarkMode;
@@ -14,6 +15,7 @@ class SettingsProvider with ChangeNotifier {
   String get fontFamily => _fontFamily;
   String get defaultReciter => _defaultReciter;
   String get defaultTafsir => _defaultTafsir;
+  bool get downloadWhilePlaying => _downloadWhilePlaying;
   
   SettingsProvider() {
     _loadSettings();
@@ -25,8 +27,9 @@ class SettingsProvider with ChangeNotifier {
     _isDarkMode = prefs.getBool('isDarkMode') ?? false;
     _fontSize = prefs.getDouble('fontSize') ?? 24.0;
     _fontFamily = prefs.getString('fontFamily') ?? 'Amiri';
-    _defaultReciter = prefs.getString('defaultReciter') ?? 'minshawi_murattal';
+    _defaultReciter = prefs.getString('defaultReciter') ?? 'Minshawi_Murattal_128kbps';
     _defaultTafsir = prefs.getString('defaultTafsir') ?? 'muyassar';
+    _downloadWhilePlaying = prefs.getBool('downloadWhilePlaying') ?? true;
     notifyListeners();
   }
   
@@ -70,6 +73,13 @@ class SettingsProvider with ChangeNotifier {
     _defaultTafsir = val;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('defaultTafsir', val);
+    notifyListeners();
+  }
+  
+  Future<void> toggleDownloadWhilePlaying() async {
+    _downloadWhilePlaying = !_downloadWhilePlaying;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('downloadWhilePlaying', _downloadWhilePlaying);
     notifyListeners();
   }
 }

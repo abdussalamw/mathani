@@ -177,7 +177,27 @@ class QuranRepositoryImpl implements QuranRepository {
 
   @override
   Future<Either<Failure, List<Ayah>>> getAyahsForPage(int pageNumber) async {
-    // Not implemented yet
-    return const Right([]);
+    try {
+      if (kIsWeb) {
+        final ayahs = await _localDataSource.loadAyahsForPage(pageNumber);
+        return Right(ayahs);
+      }
+
+      // Check Database first
+      final localAyahs = await _isar.ayahs
+          .filter()
+          .pageEqualTo(pageNumber)
+          .findAll();
+      
+      if (localAyahs.isNotEmpty) {
+        return Right(localAyahs);
+      }
+      
+      // Fallback
+      final ayahs = await _localDataSource.loadAyahsForPage(pageNumber);
+      return Right(ayahs);
+    } catch (e) {
+      return Left(CacheFailure(e.toString()));
+    }
   }
 }

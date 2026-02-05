@@ -13,21 +13,9 @@ class BookmarksScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
-      appBar: AppBar(
-        title: const Text(
-          'العلامات المرجعية',
-          style: TextStyle(
-            fontFamily: 'Tajawal',
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Consumer<BookmarkProvider>(
+    return Container(
+      color: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
+      child: Consumer<BookmarkProvider>(
         builder: (context, bookmarkProvider, child) {
           final bookmarks = bookmarkProvider.bookmarks;
 

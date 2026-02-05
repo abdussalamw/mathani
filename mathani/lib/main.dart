@@ -154,6 +154,8 @@ class MathaniApp extends StatelessWidget {
           return MaterialApp(
             title: 'مثاني - القرآن الكريم',
             debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
             themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
             
             // Localization Setup

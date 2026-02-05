@@ -20,16 +20,16 @@ class MushafMetadataProvider extends ChangeNotifier {
     db_models.MushafMetadata()
       ..id = db_models.fastHash('madani_font_v1')
       ..identifier = 'madani_font_v1'
-      ..nameArabic = 'مصحف المدينة (نص رقمي)'
-      ..nameEnglish = 'Madani (Font - V1)'
-      ..type = 'font'
+      ..nameArabic = 'المصحف الإلكتروني (نص رقمي)'
+      ..nameEnglish = 'Digital Mushaf (System Text)'
+      ..type = 'digital'
       ..isDownloaded = true, 
       
     db_models.MushafMetadata()
       ..id = db_models.fastHash('qcf2_v4_woff2')
       ..identifier = 'qcf2_v4_woff2'
-      ..nameArabic = 'مصحف المدينة (QCF2 - V4)'
-      ..nameEnglish = 'Madani (QCF2 V4)'
+      ..nameArabic = 'مصحف المدينة - الرسم الجديد'
+      ..nameEnglish = 'Madani Mushaf - New Script'
       ..type = 'font_v2'
       ..baseUrl = null  // الخطوط مضمنة في assets
       ..localPath = 'assets/fonts/qcf2'  // مسار الخطوط المحلية
@@ -50,6 +50,20 @@ class MushafMetadataProvider extends ChangeNotifier {
 
   String? _currentMushafId;
   String get currentMushafId => _currentMushafId ?? 'madani_font_v1';
+  
+  String get currentMushafType {
+    if (_currentMushafId == null) return 'digital';
+    
+    // Find in available list
+    try {
+      final mushaf = _availableMushafs.firstWhere(
+        (m) => m.identifier == _currentMushafId
+      );
+      return mushaf.type ?? 'digital';
+    } catch (_) {
+      return 'digital';
+    }
+  }
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;

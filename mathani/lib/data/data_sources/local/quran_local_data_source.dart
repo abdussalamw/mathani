@@ -78,4 +78,31 @@ class QuranLocalDataSource {
     
     return ayahs;
   }
+  
+  /// جلب آيات صفحة معينة
+  Future<List<Ayah>> loadAyahsForPage(int pageNumber) async {
+    final data = await _loadData();
+    final List<Ayah> pageAyahs = [];
+    
+    for (var surahItem in data) {
+      if (surahItem['verses'] is List) {
+        final verses = surahItem['verses'] as List;
+        for (var verse in verses) {
+          if (verse['page'] == pageNumber) {
+            pageAyahs.add(Ayah()
+              ..surahNumber = surahItem['id'] as int
+              ..ayahNumber = verse['id'] as int
+              ..text = verse['text'] as String
+              ..juz = verse['juz'] as int
+              ..page = verse['page'] as int
+            );
+          }
+        }
+      }
+    }
+    
+    // Sort by Surah then Ayah to be safe?
+    // Usually they are in order.
+    return pageAyahs;
+  }
 }

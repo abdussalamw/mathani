@@ -68,6 +68,7 @@ flutter:
     - assets/data/quran_metadata.json
     - assets/data/quran_madani.json
     - assets/data/quran_advanced.json
+    - assets/images/
 
   fonts:
     - family: Amiri

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/presentation/providers/quran_provider.dart';
+import 'package:mathani/presentation/providers/ui_provider.dart';
 import 'package:mathani/presentation/screens/mushaf/mushaf_screen.dart';
 
 class SurahListScreen extends StatefulWidget {
@@ -36,22 +37,9 @@ class _SurahListScreenState extends State<SurahListScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
-      appBar: AppBar(
-        title: const Text(
-          'فهرس السور',
-          style: TextStyle(
-            fontFamily: 'Tajawal',
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        // No back button needed if it's a tab, but if pushed, it shows auto.
-      ),
-      body: Column(
+    return Container(
+      color: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
+      child: Column(
         children: [
           // Search Bar
           Padding(
@@ -171,12 +159,7 @@ class _SurahListScreenState extends State<SurahListScreen> {
   Widget _buildSurahTile(BuildContext context, Surah surah, bool isDark) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MushafScreen(initialPage: surah.page ?? 1),
-          ),
-        );
+        context.read<UiProvider>().jumpToSurah(surah.number);
       },
       child: Container(
         color: isDark ? const Color(0xFF231E18) : Colors.white,

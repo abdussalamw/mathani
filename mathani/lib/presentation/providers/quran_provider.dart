@@ -2,21 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/data/models/ayah.dart';
 import 'package:mathani/domain/repositories/quran_repository.dart';
-import 'package:mathani/domain/repositories/audio_repository.dart';
 import 'package:mathani/core/di/service_locator.dart';
 
 class QuranProvider with ChangeNotifier {
   final QuranRepository _repository;
-  final AudioRepository _audioRepository;
   
   // الحالة
   List<Surah> _surahs = [];
   List<Ayah> _currentAyahs = [];
   Surah? _currentSurah;
-  
-  // Audio State
-  int? _playingAyahId; 
-  bool _isPlaying = false;
   
   bool _isLoading = false;
   String? _errorMessage;
@@ -27,12 +21,9 @@ class QuranProvider with ChangeNotifier {
   Surah? get currentSurah => _currentSurah;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  int? get playingAyahId => _playingAyahId;
-  bool get isPlaying => _isPlaying;
-  
-  QuranProvider({QuranRepository? repository, AudioRepository? audioRepository})
-      : _repository = repository ?? sl<QuranRepository>(),
-        _audioRepository = audioRepository ?? sl<AudioRepository>(); 
+
+  QuranProvider({QuranRepository? repository})
+      : _repository = repository ?? sl<QuranRepository>(); 
   
   // تحميل جميع السور
   Future<void> loadSurahs() async {
@@ -101,29 +92,6 @@ class QuranProvider with ChangeNotifier {
     );
   }
   
-  // الصوتيات
-  Future<void> playAyah(int surahNumber, int ayahNumber) async {
-    try {
-      _playingAyahId = ayahNumber;
-      _isPlaying = true;
-      notifyListeners();
-      
-      await _audioRepository.playAyah(surahNumber, ayahNumber);
-    } catch (e) {
-      debugPrint('Error playing audio: $e');
-      _isPlaying = false;
-      _playingAyahId = null;
-      notifyListeners();
-    }
-  }
-  
-  Future<void> stopAudio() async {
-    await _audioRepository.stop();
-    _isPlaying = false;
-    _playingAyahId = null;
-    notifyListeners();
-  }
-  
   // تحديث آخر قراءة
   Future<void> updateLastRead(int surahNumber, int ayahNumber) async {
     final result = await _repository.updateLastRead(surahNumber, ayahNumber);
@@ -145,5 +113,17 @@ class QuranProvider with ChangeNotifier {
   // تحديث للتنقل
   void setJumpToSurah(int surahNumber) {
     loadSurah(surahNumber);
+  }
+
+  // لجلب آيات صفحة كاملة (للمصحف الرقمي)
+  Future<List<Ayah>> getAyahsForPage(int pageNumber) async {
+    final result = await _repository.getAyahsForPage(pageNumber);
+    return result.fold(
+      (l) {
+        debugPrint('Error loading page ayahs: ${l.message}');
+        return [];
+      },
+      (r) => r
+    );
   }
 }

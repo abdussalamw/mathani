@@ -28,6 +28,19 @@ class _MainShellScreenState extends State<MainShellScreen> {
     return Consumer<UiProvider>(
       builder: (context, uiProvider, child) {
         return Scaffold(
+          extendBody: true, // Allow body to extend behind BottomNavigationBar
+          extendBodyBehindAppBar: true, // Allow body to extend behind AppBar
+          appBar: (uiProvider.isImmersiveMode || uiProvider.currentTabIndex == 2) 
+            ? null 
+            : AppBar(
+                title: Text(
+                  _getScreenTitle(uiProvider),
+                  style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                ),
+                centerTitle: true,
+                backgroundColor: uiProvider.isImmersiveMode ? Colors.transparent : (Theme.of(context).brightness == Brightness.dark ? const Color(0xCC2C2416) : const Color(0xCCFFFFFF)), // Transparent or semi-transparent
+                elevation: 0,
+              ),
           body: IndexedStack(
             index: _getCurrentScreenIndex(uiProvider),
             children: const [
@@ -39,12 +52,18 @@ class _MainShellScreenState extends State<MainShellScreen> {
               SettingsScreen(),        // 5: الإعدادات
             ],
           ),
-          bottomNavigationBar: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AudioMinibar(),
-              _buildBottomBar(uiProvider),
-            ],
+          bottomNavigationBar: AnimatedSlide(
+            duration: const Duration(milliseconds: 300),
+            offset: uiProvider.isImmersiveMode ? const Offset(0, 1) : Offset.zero,
+            child: uiProvider.isImmersiveMode 
+              ? const SizedBox.shrink() 
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AudioMinibar(),
+                    _buildBottomBar(uiProvider),
+                  ],
+                ),
           ),
         );
       },
@@ -62,6 +81,16 @@ class _MainShellScreenState extends State<MainShellScreen> {
       case 3: return 3; // Audio
       case 4: return 5; // Settings
       default: return 2;
+    }
+  }
+
+  String _getScreenTitle(UiProvider uiProvider) {
+    switch (uiProvider.currentTabIndex) {
+      case 0: return 'فهرس السور';
+      case 1: return 'العلامات المرجعية';
+      case 3: return 'الاستماع والتلاوة';
+      case 4: return 'إعدادات التطبيق';
+      default: return 'مثاني';
     }
   }
 
@@ -105,8 +134,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
               
               // 3. تلاوة/تفسير (الوسط - الرئيسية)
               _buildMainButton(
-                icon: showingTafsir ? Icons.menu_book : Icons.book,
-                label: showingTafsir ? 'تلاوة' : 'تفسير',
+                icon: showingTafsir ? Icons.menu_book : Icons.auto_stories,
+                label: showingTafsir ? 'المصحف' : 'تفسير',
                 onTap: () => uiProvider.toggleTafsir(),
               ),
 
@@ -176,11 +205,13 @@ class _MainShellScreenState extends State<MainShellScreen> {
     required VoidCallback onTap,
   }) {
     return Expanded(
+      flex: 1, // Make sure it fits
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -193,9 +224,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: AppColors.primary.withValues(alpha: 0.4),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -205,14 +236,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
               Icon(
                 icon,
                 color: Colors.white,
-                size: 28,
+                size: 24,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 label,
                 style: const TextStyle(
                   fontFamily: 'Tajawal',
-                  fontSize: 12,
+                  fontSize: 10, // Slightly smaller font to fit larger icon/padding
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/data/models/ayah.dart';
 import 'package:mathani/presentation/providers/quran_provider.dart';
+import 'package:mathani/presentation/providers/audio_provider.dart';
+import 'package:mathani/presentation/providers/settings_provider.dart';
 import '../../../../core/constants/app_colors.dart';
 
 class AyahWidget extends StatelessWidget {
@@ -16,59 +18,69 @@ class AyahWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<QuranProvider>(
-      builder: (context, quranProvider, _) {
-        final isPlaying = quranProvider.playingAyahId == ayah.ayahNumber && quranProvider.isPlaying;
+    return Consumer3<QuranProvider, AudioProvider, SettingsProvider>(
+      builder: (context, quranProvider, audioProvider, settingsProvider, _) {
+        // Check if this ayah is currently playing
+        final isPlaying = audioProvider.isPlaying && 
+                          audioProvider.currentSurah == ayah.page && // Note: verifying valid Surah ID usually corresponds to page in some models, but let's check currentSurah from provider
+                          audioProvider.currentAyah == ayah.ayahNumber;
         
+        // Better matching: assume ayah.page is actually surah number based on previous code usage
+        // or check quranProvider.currentSurah?.number
+        final currentSurahNum = quranProvider.currentSurah?.number ?? ayah.page; 
+        
+        final isActuallyPlaying = audioProvider.isPlaying &&
+                                  audioProvider.currentSurah == currentSurahNum &&
+                                  audioProvider.currentAyah == ayah.ayahNumber;
+
         return GestureDetector(
-          onTap: onTap ?? () {
-             // Play audio on tap
-             quranProvider.playAyah(ayah.page, ayah.ayahNumber); 
-             // Note: 'page' field in Ayah model might not always be Surah Number. 
-             // We need Surah Number. Ayah model usually has surahNumber? or we pass it contextually.
-             // Let's assume for now we might need to fix how we pass Surah Number if it's missing from Ayah model.
-             // Checking Ayah model structure...
-             // For safety, let's look at how QuranProvider plays it.
-             // Actually, the provider currently has 'currentSurah'. We can use that.
-             if (quranProvider.currentSurah != null) {
-               quranProvider.playAyah(quranProvider.currentSurah!.number, ayah.ayahNumber);
-             }
+          onTap: () {
+             // Find Surah to get total ayahs
+             int? totalAyahs;
+             try {
+               final surahObj = quranProvider.surahs.firstWhere((s) => s.number == currentSurahNum);
+               totalAyahs = surahObj.numberOfAyahs;
+             } catch (_) {}
+
+             audioProvider.playAyah(
+               currentSurahNum, 
+               ayah.ayahNumber,
+               shouldCache: settingsProvider.downloadWhilePlaying,
+               totalAyahsInSurah: totalAyahs
+             );
           },
           child: Container(
             margin: const EdgeInsets.symmetric(vertical: 4),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: isPlaying 
-                  ? AppColors.golden20
+              color: isActuallyPlaying 
+                  ? AppColors.golden.withValues(alpha: 0.2)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
-              border: isPlaying
+              border: isActuallyPlaying
                   ? Border.all(color: AppColors.golden, width: 2)
                   : null,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // النص القرآني
-                // النص القرآني
                 Text(
                   ayah.text,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontFamily: 'Amiri', // أو KFGQPC HAFS إذا كان متوفراً
+                    fontFamily: 'Amiri',
                     fontSize: 26,
                     height: 1.8,
-                    color: isPlaying ? AppColors.darkBrown : Colors.black87,
+                    color: isActuallyPlaying ? AppColors.darkBrown : Colors.black87,
                   ),
                 ),
                 
                 const SizedBox(height: 8),
                 
-                // رقم الآية وزر التشغيل الصغير
                 Row(
                   children: [
                      _buildAyahNumber(),
-                     if (isPlaying) ...[
+                     if (isActuallyPlaying) ...[
                        const SizedBox(width: 8),
                        const Icon(Icons.volume_up, size: 16, color: AppColors.golden),
                      ],
@@ -105,7 +117,6 @@ class AyahWidget extends StatelessWidget {
     );
   }
   
-  // تحويل الأرقام للعربية
   String _convertToArabicNumbers(int number) {
     const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     if (number == 0) return arabicNumerals[0];

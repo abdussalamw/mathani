@@ -11,6 +11,9 @@ class PageLineWidget extends StatelessWidget {
   final int? selectedSurah;
   final int? selectedAyah;
   
+  final bool isDigital;
+  final List<String>? digitalWords;
+  
   const PageLineWidget({
     Key? key,
     required this.line,
@@ -19,19 +22,113 @@ class PageLineWidget extends StatelessWidget {
     this.onAyahSelected,
     this.selectedSurah,
     this.selectedAyah,
+    this.isDigital = false,
+    this.digitalWords,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // If Digital Mode with available words mapping, we behave like the standard layout but with digital text.
+    if (isDigital) {
+       if (digitalWords == null) return Container(); // Fallback if data not ready
+       
+       int wordIndex = 0;
+       
+       return Directionality(
+        textDirection: TextDirection.rtl,
+        child: SizedBox(
+          width: double.infinity,
+          child: FittedBox(
+            fit: BoxFit.scaleDown, // Prevent overflow if text is too wide
+            child: Row(
+              mainAxisAlignment: _getLineAlignment(line), 
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: line.glyphs.map((glyph) {
+                 // Determine Text Content
+                 String text = '';
+                 // Font Style Defaults
+                 String fontFamily = 'Amiri'; // Standard Digital Font
+                 double fontSize = 22; 
+                 Color? color;
+                 
+                 if (glyph.isWord) {
+                   if (wordIndex < digitalWords!.length) {
+                     text = digitalWords![wordIndex];
+                     wordIndex++;
+                   } else {
+                     text = '???';
+                   }
+                   // If text is empty or null, skip?
+                   if (text.isEmpty) return const SizedBox();
+                   
+                 } else if (glyph.isAyahEnd) {
+                   text = '\uFD3E${glyph.ayah?.toString() ?? ''}\uFD3F'; // Or similar bracket
+                   fontFamily = 'Amiri';
+                   color = AppColors.golden;
+                 } else if (glyph.isBasmala || glyph.isSurahName) {
+                   // For now, simple text, or mapped specific text if passed
+                   if (glyph.isBasmala) {
+                      text = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ';
+                      fontSize = 24;
+                   } else if (glyph.isSurahName) {
+                      text = 'سورة'; // We might need the name, but usually Surah Name is its own Frame.
+                   }
+                 } else {
+                   return const SizedBox(); // Skip pauses/sajdahs in digital for now or handle them
+                 }
+
+                 final isSelected = selectedSurah != null && 
+                                     selectedAyah != null &&
+                                     glyph.surah == selectedSurah && 
+                                     glyph.ayah == selectedAyah;
+
+                 Widget child = Container(
+                    decoration: isSelected ? BoxDecoration(
+                      color: AppColors.golden.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(4),
+                    ) : null,
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        fontFamily: fontFamily,
+                        fontSize: fontSize,
+                        color: color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                      ),
+                    ),
+                 );
+                 
+                 // Intearaction
+                 if (glyph.surah != null && glyph.ayah != null) {
+                    return GestureDetector(
+                      onTap: () => onAyahSelected?.call(glyph.surah!, glyph.ayah!),
+                      child: child,
+                    );
+                 }
+                 return child;
+              }).toList(),
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Original Rendering for QCF Fonts ...
     return Directionality(
       textDirection: TextDirection.rtl,
+      // Reverted to 1000 as per user request (v1.14 state)
       child: SizedBox(
-        width: double.infinity,
-        child: Row(
-          mainAxisAlignment: _getLineAlignment(line),
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: line.glyphs.map((glyph) {
+        width: 1000, 
+        child: FittedBox(
+          fit: BoxFit.scaleDown, // Safeguard against overflow with larger fonts
+          child: SizedBox(
+            width: 1000, 
+            child: Row(
+              mainAxisAlignment: _getLineAlignment(line),
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: line.glyphs.map((glyph) {
             // تصحيح البسملة إذا كانت فارغة
             String code = glyph.code;
             if (glyph.isBasmala && (code.isEmpty || code.length > 2)) { 
@@ -44,17 +141,22 @@ class PageLineWidget extends StatelessWidget {
                                    glyph.surah == selectedSurah && 
                                    glyph.ayah == selectedAyah; // Fixed logic to require both
             
-            Widget child = Text(
-              code,
-              style: TextStyle(
-                fontFamily: _getFontFamily(glyph),
-                fontSize: _getGlyphSize(glyph),
-                color: _getGlyphColor(glyph, context),
-                height: 1.0, 
-                letterSpacing: 0,
-                backgroundColor: isSelected ? AppColors.golden.withValues(alpha: 0.3) : null,
+            Widget child = Container(
+              decoration: isSelected ? BoxDecoration(
+                color: AppColors.golden.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ) : null,
+              child: Text(
+                code,
+                style: TextStyle(
+                  fontFamily: _getFontFamily(glyph),
+                  fontSize: _getGlyphSize(glyph),
+                  color: _getGlyphColor(glyph, context),
+                  height: 1.0, 
+                  letterSpacing: 0,
+                ),
+                textDirection: TextDirection.rtl,
               ),
-              textDirection: TextDirection.rtl,
             );
             
             // Wrap in interaction if it's a verse part
@@ -75,6 +177,8 @@ class PageLineWidget extends StatelessWidget {
             );
           }).toList(),
         ),
+      ),
+      ),
       ),
     );
   }
@@ -97,13 +201,13 @@ class PageLineWidget extends StatelessWidget {
   
   double _getGlyphSize(Glyph glyph) {
     if (glyph.isBasmala || glyph.isSurahName) {
-      return 42.0; // Increased from 28.0
+      return 65.0; // Increased significantly
     } else if (glyph.isAyahEnd) {
-      return 32.0; // Increased from 22.0
+      return 50.0; // Increased
     } else if (glyph.isPause || glyph.isSajdah) {
-      return 30.0; // Increased from 20.0
+      return 48.0; // Increased
     }
-    return 36.0; // Increased from 24.0
+    return 56.0; // Increased from 44.0 to 56.0 for better visibility
   }
   
   Color _getGlyphColor(Glyph glyph, BuildContext context) {
@@ -123,23 +227,18 @@ class PageLineWidget extends StatelessWidget {
   }
 
   MainAxisAlignment _getLineAlignment(PageLine line) {
-    final isSpecialLine = line.glyphs.any((g) => g.isBasmala || g.isSurahName);
-    if (isSpecialLine) {
+    // Special lines (Headers) are always centered
+    if (line.glyphs.any((g) => g.isBasmala || g.isSurahName)) {
       return MainAxisAlignment.center;
     }
 
-    final endsWithAyah = line.glyphs.isNotEmpty && (line.glyphs.last.isAyahEnd || line.glyphs.last.code == '\u06DD');
-    final textGlyphsCount = line.glyphs.where((g) => !g.isAyahEnd && !g.isPause).length;
-    
-    // Short lines (like in Page 604 or end of Surahs) look better Center-aligned
-    if (endsWithAyah) {
-      if (textGlyphsCount < 35) {
-        return MainAxisAlignment.center; // Changed from start to center
-      }
-    }
-    
-    // Very short lines in general
-    if (textGlyphsCount < 15) {
+    // Count meaningful words
+    final wordCount = line.glyphs.where((g) => g.isWord).length;
+
+    // Use MainAxisAlignment.spaceBetween for almost all lines to justify them to edges.
+    // Only use Center if the line is EXTREMELY short (e.g. end of Surah with 1-2 words).
+    // The previous threshold of 15/35 was way too high, causing all lines to center and create margins.
+    if (wordCount < 6) { 
       return MainAxisAlignment.center;
     }
 

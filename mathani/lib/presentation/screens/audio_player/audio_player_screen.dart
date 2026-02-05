@@ -10,30 +10,9 @@ class AudioPlayerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
-      appBar: AppBar(
-        title: const Text(
-          'الاستماع والتلاوة',
-          style: TextStyle(
-            fontFamily: 'Tajawal',
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: () {
-              // History logic
-            },
-            tooltip: 'السجل',
-          ),
-        ],
-      ),
-      body: Consumer<AudioProvider>(
+    return Container(
+      color: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
+      child: Consumer<AudioProvider>(
         builder: (context, audio, child) {
           return SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),

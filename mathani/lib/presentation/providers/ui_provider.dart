@@ -4,6 +4,7 @@ class UiProvider with ChangeNotifier {
   int _currentTabIndex = 2; // Default to Mushaf (middle index is now 2)
   int? _pageToJump;
   bool _showingTafsir = false;
+  bool _isImmersiveMode = false;
 
   static const Map<int, int> surahToPage = {
     1: 1, 2: 2, 3: 50, 4: 77, 5: 106, 6: 128, 7: 151, 8: 177, 9: 187, 10: 208,
@@ -23,11 +24,13 @@ class UiProvider with ChangeNotifier {
   int get currentTabIndex => _currentTabIndex;
   int? get pageToJump => _pageToJump;
   bool get showingTafsir => _showingTafsir;
+  bool get isImmersiveMode => _isImmersiveMode;
   
   void setTabIndex(int index) {
     _currentTabIndex = index;
     if (index != 2) {
        _showingTafsir = false;
+       _isImmersiveMode = false;
     }
     notifyListeners();
   }
@@ -56,6 +59,11 @@ class UiProvider with ChangeNotifier {
     }
   }
   
+  void toggleImmersiveMode() {
+    _isImmersiveMode = !_isImmersiveMode;
+    notifyListeners();
+  }
+
   void consumeJump() {
     _pageToJump = null;
   }
