@@ -1,0 +1,92 @@
+import 'package:flutter/material.dart';
+import 'package:mathani/core/constants/app_colors.dart';
+import 'package:mathani/presentation/screens/surah_list/surah_list_screen.dart';
+import 'package:mathani/presentation/screens/bookmarks/bookmarks_screen.dart';
+import 'package:mathani/presentation/screens/index/widgets/juz_tab_view.dart';
+
+/// الشاشة الرئيسية للفهرس مع 3 تبويبات
+class IndexScreen extends StatefulWidget {
+  const IndexScreen({Key? key}) : super(key: key);
+
+  @override
+  State<IndexScreen> createState() => _IndexScreenState();
+}
+
+class _IndexScreenState extends State<IndexScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      color: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
+      child: Column(
+        children: [
+          // TabBar
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2C2416) : Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: AppColors.golden,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 16,
+                  fontWeight: FontWeight.normal,
+                ),
+                tabs: const [
+                  Tab(text: 'السور'),
+                  Tab(text: 'الأجزاء'),
+                  Tab(text: 'العلامات'),
+                ],
+              ),
+            ),
+          ),
+
+          // TabBarView
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: const [
+                SurahListScreen(),
+                JuzTabView(),
+                BookmarksScreen(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

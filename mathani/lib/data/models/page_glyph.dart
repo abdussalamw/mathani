@@ -101,6 +101,6 @@ class Glyph {
   bool get isAyahEnd => type == 2;
   bool get isPause => type == 3;
   bool get isSajdah => type == 4;
-  bool get isBasmala => type == 6;
-  bool get isSurahName => type == 8;
+  bool get isBasmala => type == 8; // Type 8 is Basmala (Empty code logic)
+  bool get isSurahName => type == 6; // Type 6 is Surah Name (Has value \uf1xx)
 }

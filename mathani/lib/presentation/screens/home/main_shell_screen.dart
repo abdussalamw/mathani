@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 
-import '../surah_list/surah_list_screen.dart';
+import '../index/index_screen.dart';
 import '../settings/settings_screen.dart';
 import '../mushaf/mushaf_screen.dart';
 import '../tafsir/tafsir_screen.dart'; 
@@ -44,7 +44,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
           body: IndexedStack(
             index: _getCurrentScreenIndex(uiProvider),
             children: const [
-              SurahListScreen(),       // 0: الفهرس
+              IndexScreen(),           // 0: الفهرس
               BookmarksScreen(),       // 1: العلامات
               MushafScreen(),          // 2: المصحف (Starts at Page 1)
               AudioPlayerScreen(),     // 3: الاستماع

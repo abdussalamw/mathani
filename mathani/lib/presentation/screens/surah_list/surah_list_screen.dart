@@ -48,7 +48,6 @@ class _SurahListScreenState extends State<SurahListScreen> {
               controller: _searchController,
               onChanged: (value) => setState(() => _searchQuery = value),
               style: const TextStyle(fontFamily: 'Tajawal'),
-              textDirection: TextDirection.rtl,
               decoration: InputDecoration(
                 hintText: 'ابحث باسم السورة أو رقمها...',
                 hintStyle: TextStyle(
@@ -157,13 +156,18 @@ class _SurahListScreenState extends State<SurahListScreen> {
   }
 
   Widget _buildSurahTile(BuildContext context, Surah surah, bool isDark) {
+    // رقم السورة → Unicode للخط QCF4_BSML
+    final int surahCodePoint = 0xF100 + (surah.number - 1);
+    final String surahGlyph = String.fromCharCode(surahCodePoint);
+    
     return InkWell(
       onTap: () {
         context.read<UiProvider>().jumpToSurah(surah.number);
       },
       child: Container(
+        height: 60, // تصغير من 80px
         color: isDark ? const Color(0xFF231E18) : Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
             // Number container
@@ -176,7 +180,7 @@ class _SurahListScreenState extends State<SurahListScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: AppColors.golden.withValues(alpha: 0.5),
-                  width: 1,
+                  width: 2,
                 ),
                 color: isDark ? const Color(0xFF2C2416) : Colors.grey[100],
               ),
@@ -190,61 +194,38 @@ class _SurahListScreenState extends State<SurahListScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             
-            // Name
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'سورة ${surah.nameArabic}',
-                    style: TextStyle(
-                      fontFamily: 'Amiri', // خط عربي جميل للعناوين
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  Text(
-                    surah.nameEnglish,
-                    style: TextStyle(
-                      fontFamily: 'Tajawal',
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
+            // Name (QCF4_BSML) - على اليسار
+            Text(
+              surahGlyph,
+              style: const TextStyle(
+                fontFamily: 'QCF4_BSML',
+                fontSize: 22,
+                color: AppColors.primary,
+                height: 1.2,
               ),
             ),
             
-            // Info
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  surah.revelationType == "Meccan" ? "مكية" : "مدنية",
-                  style: TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+            const SizedBox(width: 12),
+            
+            // Info - على اليمين
+            Expanded(
+              child: Text(
+                '${surah.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${surah.numberOfAyahs} آية',
+                style: TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 12,
+                  color: Colors.grey[600],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${surah.numberOfAyahs} آيات',
-                  style: TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 11,
-                    color: AppColors.golden,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+                textAlign: TextAlign.right,
+              ),
             ),
             
             const SizedBox(width: 8),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            
+            // Arrow
+            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
           ],
         ),
       ),

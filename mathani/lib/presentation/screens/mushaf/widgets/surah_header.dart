@@ -95,7 +95,7 @@ class SurahHeader extends StatelessWidget {
     return Text(
       'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
       style: const TextStyle(
-        fontFamily: 'Amiri',
+        fontFamily: 'KFGQPC_HAFS',
         fontSize: 24,
         color: AppColors.darkBrown,
         fontWeight: FontWeight.w600,

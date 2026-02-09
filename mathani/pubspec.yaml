@@ -80,4 +80,12 @@ flutter:
         - asset: assets/fonts/tajawal/Tajawal-Bold.ttf
           weight: 700
 
+    - family: QCF4_BSML
+      fonts:
+        - asset: assets/fonts/QCF4_BSML.woff
+
+    - family: KFGQPC_HAFS
+      fonts:
+        - asset: assets/fonts/KFGQPC_HAFS.ttf
+
 

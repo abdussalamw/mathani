@@ -68,7 +68,7 @@ class AyahWidget extends StatelessWidget {
                   ayah.text,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontFamily: 'Amiri',
+                    fontFamily: 'KFGQPC_HAFS',
                     fontSize: 26,
                     height: 1.8,
                     color: isActuallyPlaying ? AppColors.darkBrown : Colors.black87,
@@ -107,7 +107,7 @@ class AyahWidget extends StatelessWidget {
         child: Text(
           _convertToArabicNumbers(ayah.ayahNumber),
           style: const TextStyle(
-            fontFamily: 'Amiri',
+            fontFamily: 'KFGQPC_HAFS',
             fontSize: 16,
             color: AppColors.golden,
             fontWeight: FontWeight.bold,

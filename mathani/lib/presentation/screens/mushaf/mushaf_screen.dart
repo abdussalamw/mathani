@@ -13,6 +13,7 @@ import '../../providers/quran_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../surah_list/surah_list_screen.dart';
 import 'package:flutter/services.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class MushafScreen extends StatefulWidget {
   final int initialPage;
@@ -40,6 +41,8 @@ class _MushafScreenState extends State<MushafScreen> {
     _currentPage = widget.initialPage;
     _pageController = PageController(initialPage: widget.initialPage - 1);
     _loadPages();
+    // Keep screen on while reading
+    WakelockPlus.enable();
   }
   
   Future<void> _loadPages() async {
@@ -306,6 +309,8 @@ class _MushafScreenState extends State<MushafScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    // Allow screen to turn off when leaving Mushaf
+    WakelockPlus.disable();
     super.dispose();
   }
   
@@ -448,11 +453,9 @@ class _MushafScreenState extends State<MushafScreen> {
                     },
                     itemBuilder: (context, index) {
                       return GestureDetector(
-                        behavior: HitTestBehavior.translucent, // Allow taps to pass through if not handled? Or catch empty space?
-                        // If we use translucent, and child handles it, child wins.
-                        // If child doesn't handle it (empty space), this catches it.
+                        behavior: HitTestBehavior.translucent, 
                         onTap: () {
-                           debugPrint("MushafScreen Background Tapped -> Toggle Immersive");
+                           // Toggle immersive mode for bottom bar and system UI
                            uiProvider.toggleImmersiveMode();
                            _updateSystemUI();
                         },
@@ -464,7 +467,7 @@ class _MushafScreenState extends State<MushafScreen> {
                               selectedSurah: _selectedSurah,
                               selectedAyah: _selectedAyah,
                               onAyahSelected: _onAyahSelected,
-                              showInfo: !uiProvider.isImmersiveMode,
+                              showInfo: true, // Always show top bar (Sticky)
                               isDigital: isDigital,
                             );
                           },

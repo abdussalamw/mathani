@@ -6,8 +6,22 @@ import 'package:mathani/presentation/providers/quran_provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:intl/intl.dart';
 
-class BookmarksScreen extends StatelessWidget {
+class BookmarksScreen extends StatefulWidget {
   const BookmarksScreen({Key? key}) : super(key: key);
+
+  @override
+  State<BookmarksScreen> createState() => _BookmarksScreenState();
+}
+
+class _BookmarksScreenState extends State<BookmarksScreen> {
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,9 +29,58 @@ class BookmarksScreen extends StatelessWidget {
     
     return Container(
       color: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
-      child: Consumer<BookmarkProvider>(
-        builder: (context, bookmarkProvider, child) {
-          final bookmarks = bookmarkProvider.bookmarks;
+      child: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              style: const TextStyle(fontFamily: 'Tajawal'),
+              decoration: InputDecoration(
+                hintText: 'ابحث في العلامات...',
+                hintStyle: TextStyle(
+                  fontFamily: 'Tajawal',
+                  color: Colors.grey[500],
+                  fontSize: 14,
+                ),
+                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchQuery = '';
+                            _searchController.clear();
+                          });
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: isDark ? const Color(0xFF2C2416) : Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          ),
+          
+          // Bookmarks List
+          Expanded(
+            child: Consumer<BookmarkProvider>(
+              builder: (context, bookmarkProvider, child) {
+                final allBookmarks = bookmarkProvider.bookmarks;
+                
+                // Filter bookmarks based on search query
+                final bookmarks = _searchQuery.isEmpty
+                    ? allBookmarks
+                    : allBookmarks.where((bookmark) {
+                        return bookmark.surahNumber.toString().contains(_searchQuery) ||
+                               bookmark.ayahNumber.toString().contains(_searchQuery);
+                      }).toList();
 
           if (bookmarks.isEmpty) {
             return Center(
@@ -146,7 +209,10 @@ class BookmarksScreen extends StatelessWidget {
               );
             },
           );
-        },
+          },
+        ),
+      ),
+        ],
       ),
     );
   }

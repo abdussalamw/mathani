@@ -129,17 +129,50 @@ class PageLineWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: line.glyphs.map((glyph) {
-            // تصحيح البسملة إذا كانت فارغة
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            // استخدام الأكواد الأصلية من البيانات
             String code = glyph.code;
-            if (glyph.isBasmala && (code.isEmpty || code.length > 2)) { 
-               code = '\uFDFD'; // ﷽
+            
+            // البسملة (Type 8): نعرضها كـ 4 كلمات منفصلة
+            if (glyph.isBasmala) {
+               // حالة خاصة لسورة التوبة (لا بسملة فيها)
+              if (glyph.surah == 9) {
+                return const SizedBox.shrink();
+              }
+              // سورة الفاتحة (1) - غالباً لا توجد بسملة منفصلة لأنها آية 1
+              if (glyph.surah == 1) {
+                 // إذا وجدت، لا بأس بعرضها
+              }
+              
+               // بسم الله الرحمن الرحيم
+               // اللون أسود في الوضع الفاتح
+               final basmalaColor = isDark ? Colors.white : Colors.black;
+              
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('\uFAD5', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 65.0, color: basmalaColor)), // بسم
+                  const SizedBox(width: 4),
+                  Text('\uFAD6', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 65.0, color: basmalaColor)), // الله
+                  const SizedBox(width: 4),
+                  Text('\uFAD7', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 65.0, color: basmalaColor)), // الرحمن
+                  const SizedBox(width: 4),
+                  Text('\uFAD8', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 65.0, color: basmalaColor)), // الرحيم
+                ],
+              );
+            }
+            // اسم السورة (Type 6): نعرض الكود الأصلي (\uf1xx)
+            else if (glyph.isSurahName) {
+              // الكود موجود أصلاً في البيانات (\uf100 - \uf171)
+              // لا نحتاج لتوليده!
+              // سيتم عرضه باستخدام Text widget أدناه
             }
             
             // Check selection
             final bool isSelected = selectedSurah != null && 
                                    selectedAyah != null &&
                                    glyph.surah == selectedSurah && 
-                                   glyph.ayah == selectedAyah; // Fixed logic to require both
+                                   glyph.ayah == selectedAyah;
             
             Widget child = Container(
               decoration: isSelected ? BoxDecoration(
@@ -163,22 +196,22 @@ class PageLineWidget extends StatelessWidget {
             if ((glyph.isWord || glyph.isAyahEnd) && glyph.surah != null && glyph.ayah != null) {
               return GestureDetector(
                 onTap: () => onAyahSelected?.call(glyph.surah!, glyph.ayah!),
-                behavior: HitTestBehavior.translucent, // Catch taps even on transparent areas
+                behavior: HitTestBehavior.translucent,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 1.0), // Reduced to 1.0 to minimize height and allow wider fit
+                  padding: const EdgeInsets.symmetric(vertical: 1.0),
                   child: child,
                 ),
               );
             }
             
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 1.0), // Reduced to 1.0
+              padding: const EdgeInsets.symmetric(vertical: 1.0),
               child: child,
             );
           }).toList(),
         ),
       ),
-      ),
+        ),
       ),
     );
   }
@@ -199,32 +232,42 @@ class PageLineWidget extends StatelessWidget {
     return 'QCF_P003';
   }
   
-  double _getGlyphSize(Glyph glyph) {
-    if (glyph.isBasmala || glyph.isSurahName) {
-      return 65.0; // Increased significantly
-    } else if (glyph.isAyahEnd) {
-      return 50.0; // Increased
-    } else if (glyph.isPause || glyph.isSajdah) {
-      return 48.0; // Increased
-    }
-    return 56.0; // Increased from 44.0 to 56.0 for better visibility
-  }
+   double _getGlyphSize(Glyph glyph) {
+     if (glyph.isBasmala || glyph.isSurahName) {
+       return 65.0; // Increased significantly
+     } else if (glyph.isAyahEnd) {
+       return 50.0; // Increased
+     } else if (glyph.isSajdah) {
+       return 48.0; // Increased
+     }
+     return 56.0; // Increased from 44.0 to 56.0 for better visibility
+   }
   
   Color _getGlyphColor(Glyph glyph, BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    if (glyph.isBasmala || glyph.isSurahName) {
-      return isDark ? Colors.green.shade300 : Colors.green.shade700;
-    } else if (glyph.isAyahEnd) {
-      return isDark ? Colors.amber.shade300 : Colors.amber.shade700;
-    } else if (glyph.isPause) {
-      return isDark ? Colors.orange.shade300 : Colors.orange.shade700;
-    } else if (glyph.isSajdah) {
-      return isDark ? Colors.purple.shade300 : Colors.purple.shade700;
-    }
-    
-    return isDark ? Colors.white : const Color(0xFF2C1810);
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  // اسم السورة: أحمر (Primary)
+  if (glyph.isSurahName) {
+    return AppColors.primary;
   }
+  // البسملة: أسود في الوضع الفاتح
+  // ملاحظة: اللون هنا يستخدم فقط إذا لم يتم استخدام الـ Row المخصص أعلاه
+  // ولكن بما أننا نستخدم Row مخصص للبسملة، هذا الكود لن يؤثر عليها غالباً
+  else if (glyph.isBasmala) {
+     return isDark ? Colors.white : Colors.black;
+  }
+  // أرقام الآيات: أحمر وذهبي
+  else if (glyph.isAyahEnd) {
+    return isDark ? AppColors.golden : AppColors.primary;
+  } 
+  // تم حذف كود isPause
+  else if (glyph.isSajdah) {
+    return isDark ? Colors.purple.shade300 : Colors.purple.shade700;
+  }
+  
+  // اللون الأساسي: أسود في الوضع الفاتح
+  return isDark ? Colors.white : Colors.black;
+}
 
   MainAxisAlignment _getLineAlignment(PageLine line) {
     // Special lines (Headers) are always centered
