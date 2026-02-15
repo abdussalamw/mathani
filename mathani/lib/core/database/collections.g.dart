@@ -3275,33 +3275,43 @@ const MushafMetadataSchema = CollectionSchema(
       name: r'identifier',
       type: IsarType.string,
     ),
-    r'isDownloaded': PropertySchema(
+    r'imageExtension': PropertySchema(
       id: 2,
+      name: r'imageExtension',
+      type: IsarType.string,
+    ),
+    r'isDownloaded': PropertySchema(
+      id: 3,
       name: r'isDownloaded',
       type: IsarType.bool,
     ),
     r'localPath': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'localPath',
       type: IsarType.string,
     ),
     r'nameArabic': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'nameArabic',
       type: IsarType.string,
     ),
     r'nameEnglish': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'nameEnglish',
       type: IsarType.string,
     ),
+    r'pageCount': PropertySchema(
+      id: 7,
+      name: r'pageCount',
+      type: IsarType.long,
+    ),
     r'totalPages': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'totalPages',
       type: IsarType.long,
     ),
     r'type': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'type',
       type: IsarType.string,
     )
@@ -3353,6 +3363,12 @@ int _mushafMetadataEstimateSize(
     }
   }
   {
+    final value = object.imageExtension;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.localPath;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -3387,12 +3403,14 @@ void _mushafMetadataSerialize(
 ) {
   writer.writeString(offsets[0], object.baseUrl);
   writer.writeString(offsets[1], object.identifier);
-  writer.writeBool(offsets[2], object.isDownloaded);
-  writer.writeString(offsets[3], object.localPath);
-  writer.writeString(offsets[4], object.nameArabic);
-  writer.writeString(offsets[5], object.nameEnglish);
-  writer.writeLong(offsets[6], object.totalPages);
-  writer.writeString(offsets[7], object.type);
+  writer.writeString(offsets[2], object.imageExtension);
+  writer.writeBool(offsets[3], object.isDownloaded);
+  writer.writeString(offsets[4], object.localPath);
+  writer.writeString(offsets[5], object.nameArabic);
+  writer.writeString(offsets[6], object.nameEnglish);
+  writer.writeLong(offsets[7], object.pageCount);
+  writer.writeLong(offsets[8], object.totalPages);
+  writer.writeString(offsets[9], object.type);
 }
 
 MushafMetadata _mushafMetadataDeserialize(
@@ -3405,12 +3423,14 @@ MushafMetadata _mushafMetadataDeserialize(
   object.baseUrl = reader.readStringOrNull(offsets[0]);
   object.id = id;
   object.identifier = reader.readStringOrNull(offsets[1]);
-  object.isDownloaded = reader.readBool(offsets[2]);
-  object.localPath = reader.readStringOrNull(offsets[3]);
-  object.nameArabic = reader.readStringOrNull(offsets[4]);
-  object.nameEnglish = reader.readStringOrNull(offsets[5]);
-  object.totalPages = reader.readLong(offsets[6]);
-  object.type = reader.readStringOrNull(offsets[7]);
+  object.imageExtension = reader.readStringOrNull(offsets[2]);
+  object.isDownloaded = reader.readBool(offsets[3]);
+  object.localPath = reader.readStringOrNull(offsets[4]);
+  object.nameArabic = reader.readStringOrNull(offsets[5]);
+  object.nameEnglish = reader.readStringOrNull(offsets[6]);
+  object.pageCount = reader.readLong(offsets[7]);
+  object.totalPages = reader.readLong(offsets[8]);
+  object.type = reader.readStringOrNull(offsets[9]);
   return object;
 }
 
@@ -3426,16 +3446,20 @@ P _mushafMetadataDeserializeProp<P>(
     case 1:
       return (reader.readStringOrNull(offset)) as P;
     case 2:
-      return (reader.readBool(offset)) as P;
-    case 3:
       return (reader.readStringOrNull(offset)) as P;
+    case 3:
+      return (reader.readBool(offset)) as P;
     case 4:
       return (reader.readStringOrNull(offset)) as P;
     case 5:
       return (reader.readStringOrNull(offset)) as P;
     case 6:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
+      return (reader.readLong(offset)) as P;
+    case 9:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -4025,6 +4049,160 @@ extension MushafMetadataQueryFilter
   }
 
   QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'imageExtension',
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'imageExtension',
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imageExtension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'imageExtension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'imageExtension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'imageExtension',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'imageExtension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'imageExtension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'imageExtension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'imageExtension',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imageExtension',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      imageExtensionIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'imageExtension',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
       isDownloadedEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -4497,6 +4675,62 @@ extension MushafMetadataQueryFilter
   }
 
   QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      pageCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'pageCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      pageCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'pageCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      pageCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'pageCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
+      pageCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'pageCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterFilterCondition>
       totalPagesEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -4743,6 +4977,20 @@ extension MushafMetadataQuerySortBy
   }
 
   QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy>
+      sortByImageExtension() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imageExtension', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy>
+      sortByImageExtensionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imageExtension', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy>
       sortByIsDownloaded() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isDownloaded', Sort.asc);
@@ -4794,6 +5042,19 @@ extension MushafMetadataQuerySortBy
       sortByNameEnglishDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'nameEnglish', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy> sortByPageCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pageCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy>
+      sortByPageCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pageCount', Sort.desc);
     });
   }
 
@@ -4866,6 +5127,20 @@ extension MushafMetadataQuerySortThenBy
   }
 
   QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy>
+      thenByImageExtension() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imageExtension', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy>
+      thenByImageExtensionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imageExtension', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy>
       thenByIsDownloaded() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isDownloaded', Sort.asc);
@@ -4920,6 +5195,19 @@ extension MushafMetadataQuerySortThenBy
     });
   }
 
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy> thenByPageCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pageCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy>
+      thenByPageCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pageCount', Sort.desc);
+    });
+  }
+
   QueryBuilder<MushafMetadata, MushafMetadata, QAfterSortBy>
       thenByTotalPages() {
     return QueryBuilder.apply(this, (query) {
@@ -4964,6 +5252,14 @@ extension MushafMetadataQueryWhereDistinct
   }
 
   QueryBuilder<MushafMetadata, MushafMetadata, QDistinct>
+      distinctByImageExtension({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'imageExtension',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QDistinct>
       distinctByIsDownloaded() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isDownloaded');
@@ -4988,6 +5284,13 @@ extension MushafMetadataQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'nameEnglish', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<MushafMetadata, MushafMetadata, QDistinct>
+      distinctByPageCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'pageCount');
     });
   }
 
@@ -5026,6 +5329,13 @@ extension MushafMetadataQueryProperty
     });
   }
 
+  QueryBuilder<MushafMetadata, String?, QQueryOperations>
+      imageExtensionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'imageExtension');
+    });
+  }
+
   QueryBuilder<MushafMetadata, bool, QQueryOperations> isDownloadedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isDownloaded');
@@ -5048,6 +5358,12 @@ extension MushafMetadataQueryProperty
       nameEnglishProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'nameEnglish');
+    });
+  }
+
+  QueryBuilder<MushafMetadata, int, QQueryOperations> pageCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'pageCount');
     });
   }
 

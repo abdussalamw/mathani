@@ -72,8 +72,13 @@ const AyahSchema = CollectionSchema(
       name: r'text',
       type: IsarType.string,
     ),
-    r'textUthmani': PropertySchema(
+    r'textClean': PropertySchema(
       id: 11,
+      name: r'textClean',
+      type: IsarType.string,
+    ),
+    r'textUthmani': PropertySchema(
+      id: 12,
       name: r'textUthmani',
       type: IsarType.string,
     )
@@ -101,6 +106,19 @@ const AyahSchema = CollectionSchema(
           caseSensitive: false,
         )
       ],
+    ),
+    r'textClean': IndexSchema(
+      id: 2633766993042039944,
+      name: r'textClean',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'textClean',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
     )
   },
   links: {},
@@ -124,6 +142,7 @@ int _ayahEstimateSize(
     }
   }
   bytesCount += 3 + object.text.length * 3;
+  bytesCount += 3 + object.textClean.length * 3;
   {
     final value = object.textUthmani;
     if (value != null) {
@@ -150,7 +169,8 @@ void _ayahSerialize(
   writer.writeLong(offsets[8], object.page);
   writer.writeLong(offsets[9], object.surahNumber);
   writer.writeString(offsets[10], object.text);
-  writer.writeString(offsets[11], object.textUthmani);
+  writer.writeString(offsets[11], object.textClean);
+  writer.writeString(offsets[12], object.textUthmani);
 }
 
 Ayah _ayahDeserialize(
@@ -171,7 +191,8 @@ Ayah _ayahDeserialize(
   object.page = reader.readLong(offsets[8]);
   object.surahNumber = reader.readLong(offsets[9]);
   object.text = reader.readString(offsets[10]);
-  object.textUthmani = reader.readStringOrNull(offsets[11]);
+  object.textClean = reader.readString(offsets[11]);
+  object.textUthmani = reader.readStringOrNull(offsets[12]);
   return object;
 }
 
@@ -205,6 +226,8 @@ P _ayahDeserializeProp<P>(
     case 10:
       return (reader.readString(offset)) as P;
     case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -489,6 +512,51 @@ extension AyahQueryWhere on QueryBuilder<Ayah, Ayah, QWhereClause> {
         upper: [surahNumber, upperAyahNumber],
         includeUpper: includeUpper,
       ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterWhereClause> textCleanEqualTo(
+      String textClean) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'textClean',
+        value: [textClean],
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterWhereClause> textCleanNotEqualTo(
+      String textClean) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'textClean',
+              lower: [],
+              upper: [textClean],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'textClean',
+              lower: [textClean],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'textClean',
+              lower: [textClean],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'textClean',
+              lower: [],
+              upper: [textClean],
+              includeUpper: false,
+            ));
+      }
     });
   }
 }
@@ -1237,6 +1305,136 @@ extension AyahQueryFilter on QueryBuilder<Ayah, Ayah, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'textClean',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'textClean',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'textClean',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'textClean',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'textClean',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'textClean',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'textClean',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'textClean',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'textClean',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textCleanIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'textClean',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Ayah, Ayah, QAfterFilterCondition> textUthmaniIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1521,6 +1719,18 @@ extension AyahQuerySortBy on QueryBuilder<Ayah, Ayah, QSortBy> {
     });
   }
 
+  QueryBuilder<Ayah, Ayah, QAfterSortBy> sortByTextClean() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'textClean', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterSortBy> sortByTextCleanDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'textClean', Sort.desc);
+    });
+  }
+
   QueryBuilder<Ayah, Ayah, QAfterSortBy> sortByTextUthmani() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'textUthmani', Sort.asc);
@@ -1679,6 +1889,18 @@ extension AyahQuerySortThenBy on QueryBuilder<Ayah, Ayah, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Ayah, Ayah, QAfterSortBy> thenByTextClean() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'textClean', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Ayah, Ayah, QAfterSortBy> thenByTextCleanDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'textClean', Sort.desc);
+    });
+  }
+
   QueryBuilder<Ayah, Ayah, QAfterSortBy> thenByTextUthmani() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'textUthmani', Sort.asc);
@@ -1761,6 +1983,13 @@ extension AyahQueryWhereDistinct on QueryBuilder<Ayah, Ayah, QDistinct> {
     });
   }
 
+  QueryBuilder<Ayah, Ayah, QDistinct> distinctByTextClean(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'textClean', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Ayah, Ayah, QDistinct> distinctByTextUthmani(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1839,6 +2068,12 @@ extension AyahQueryProperty on QueryBuilder<Ayah, Ayah, QQueryProperty> {
   QueryBuilder<Ayah, String, QQueryOperations> textProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'text');
+    });
+  }
+
+  QueryBuilder<Ayah, String, QQueryOperations> textCleanProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'textClean');
     });
   }
 

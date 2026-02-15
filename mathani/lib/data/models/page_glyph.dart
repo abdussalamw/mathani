@@ -73,13 +73,17 @@ class Glyph {
   });
   
   factory Glyph.fromJson(Map<String, dynamic> json) {
+    // Determine surah/ayah keys if multiple variants exist
+    final surahVal = json['sura'] ?? json['surah'];
+    final ayahVal = json['ayah'] ?? json['aya'];
+    
     return Glyph(
       id: json['id'] as int?,
       code: json['code'] as String? ?? '',
       type: json['type'] as int,
       order: json['order'] as int?,
-      surah: json['sura'] as int?, // Note: 'sura' not 'surah' in new JSON
-      ayah: json['ayah'] as int?,
+      surah: surahVal is int ? surahVal : int.tryParse(surahVal.toString()),
+      ayah: ayahVal is int ? ayahVal : int.tryParse(ayahVal.toString()),
       wordId: json['word_id'] as int?,
     );
   }

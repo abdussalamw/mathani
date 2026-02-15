@@ -1,142 +1,175 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
-/// ثوابت نظام التخطيط المتجاوب للمصحف
-/// يضمن عرضاً متناسقاً على جميع أحجام الشاشات
+/// ═══════════════════════════════════════════════════════════════════
+/// نظام التخطيط المحكم للمصحف - النسخة المدمجة (Compact & Safe)
+/// ═══════════════════════════════════════════════════════════════════
+/// 
+/// التعديلات بناءً على طلب المستخدم:
+/// 1. "رفع الصفحة": تقليل الهامش العلوي والشريط العلوي لأقصى حد.
+/// 2. "حماية السطر 15": زيادة الهامش السفلي لضمان عدم تغطيته.
+/// 
 class ResponsiveConstants {
-  // النسب المئوية للأشرطة (الافتراضية - للشاشات العادية)
-  static const double defaultTopBarHeightRatio = 0.075;    // 7.5%
-  static const double defaultBottomBarHeightRatio = 0.0875; // 8.75%
-  static const double defaultContentHeightRatio = 0.8375;   // 83.75%
+  // ═══════════════════════════════════════════════════════════════════
+  // الثوابت الأساسية
+  // ═══════════════════════════════════════════════════════════════════
   
-  // النسب المئوية للشاشات الصغيرة (الأولوية للمحتوى)
-  static const double smallTopBarHeightRatio = 0.05;    // 5%
-  static const double smallBottomBarHeightRatio = 0.05;  // 5%
-  static const double smallContentHeightRatio = 0.90;    // 90%
-  
-  // عدد الأسطر الثابت في كل صفحة
   static const int linesPerPage = 15;
   
-  // نسبة الارتفاع/العرض (محسوبة من جوال 400×800)
-  // عرض = 400، ارتفاع سطر = (800 × 0.8375) / 15 = 44.67
-  // النسبة = 400 / 44.67 = 8.95:1
-  static const double aspectRatio = 8.95;
+  // هامش أمان: مسافة صغيرة علوية، وزيادة السفلي لحمايته
+  static const double safetyMarginTop = 16.0;    // 16px (مسافة آمنة صغيرة)
+  static const double safetyMarginBottom = 40.0; // 40px (حماية قوية للسطر 15)
+  static const double totalSafetyMargin = safetyMarginTop + safetyMarginBottom;
   
-  // الحدود الآمنة لارتفاع السطر
-  static const double minLineHeight = 40.0;
-  static const double maxLineHeight = 60.0;
+  // ═══════════════════════════════════════════════════════════════════
+  // الحدود الدنيا والعليا (Safe Values)
+  // ═══════════════════════════════════════════════════════════════════
   
-  /// تحديد ما إذا كانت الشاشة صغيرة (تحتاج لتقليل الأشرطة)
-  static bool isSmallScreen(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final rawLineHeight = (screenHeight * defaultContentHeightRatio) / linesPerPage;
-    return rawLineHeight < minLineHeight;
+  // الشريط العلوي: 45px (مدمج جداً)
+  static const double minTopBarHeight = 45.0;
+  static const double maxTopBarHeight = 80.0;
+  
+  // الشريط السفلي: 80px -> 120px
+  static const double minBottomBarHeight = 80.0;
+  static const double maxBottomBarHeight = 120.0;
+  
+  static const double minContentHeight = 400.0;
+  
+  // ═══════════════════════════════════════════════════════════════════
+  // النسب المئوية (عودة للقيم الصغيرة للجوال)
+  // ═══════════════════════════════════════════════════════════════════
+  
+  static const double mobileTopBarRatio = 0.055;     // 5.5% (صغير)
+  static const double mobileBottomBarRatio = 0.10;   // 10%
+  
+  static const double tabletTopBarRatio = 0.07;      // 7%
+  static const double tabletBottomBarRatio = 0.10;   // 10%
+  
+  static const double desktopTopBarRatio = 0.07;     // 7%
+  static const double desktopBottomBarRatio = 0.11;  // 11%
+  
+  // ═══════════════════════════════════════════════════════════════════
+  // المنطق
+  // ═══════════════════════════════════════════════════════════════════
+  
+  static DeviceType getDeviceType(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 600) return DeviceType.mobile;
+    if (width < 900) return DeviceType.tablet;
+    return DeviceType.desktop;
   }
   
-  /// الحصول على النسبة المناسبة للشريط العلوي حسب حجم الشاشة
-  static double getTopBarHeightRatio(BuildContext context) {
-    return isSmallScreen(context) ? smallTopBarHeightRatio : defaultTopBarHeightRatio;
+  static double getTopBarRatio(BuildContext context) {
+    switch (getDeviceType(context)) {
+      case DeviceType.mobile: return mobileTopBarRatio;
+      case DeviceType.tablet: return tabletTopBarRatio;
+      case DeviceType.desktop: return desktopTopBarRatio;
+    }
   }
   
-  /// الحصول على النسبة المناسبة للشريط السفلي حسب حجم الشاشة
-  static double getBottomBarHeightRatio(BuildContext context) {
-    return isSmallScreen(context) ? smallBottomBarHeightRatio : defaultBottomBarHeightRatio;
+  static double getBottomBarRatio(BuildContext context) {
+    switch (getDeviceType(context)) {
+      case DeviceType.mobile: return mobileBottomBarRatio;
+      case DeviceType.tablet: return tabletBottomBarRatio;
+      case DeviceType.desktop: return desktopBottomBarRatio;
+    }
   }
   
-  /// الحصول على النسبة المناسبة للمحتوى حسب حجم الشاشة
-  static double getContentHeightRatio(BuildContext context) {
-    return isSmallScreen(context) ? smallContentHeightRatio : defaultContentHeightRatio;
-  }
-  
-  /// حساب ارتفاع الشريط العلوي الديناميكي
+  /// حساب ارتفاع الشريط العلوي
   static double getTopBarHeight(BuildContext context) {
-    return MediaQuery.of(context).size.height * getTopBarHeightRatio(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final padding = MediaQuery.of(context).viewPadding.top; // Stable padding
+    
+    final calculated = screenHeight * getTopBarRatio(context);
+    
+    // نضمن أن الشريط يكفي الـ Status Bar + المحتوى (45px)
+    return max(calculated, minTopBarHeight + padding).clamp(minTopBarHeight + padding, maxTopBarHeight + padding);
   }
   
-  /// حساب ارتفاع الشريط السفلي الديناميكي
+  /// حساب ارتفاع الشريط السفلي
   static double getBottomBarHeight(BuildContext context) {
-    return MediaQuery.of(context).size.height * getBottomBarHeightRatio(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final padding = MediaQuery.of(context).viewPadding.bottom; // Stable padding
+    
+    final calculated = screenHeight * getBottomBarRatio(context);
+    
+    return max(calculated, minBottomBarHeight + padding).clamp(minBottomBarHeight + padding, maxBottomBarHeight + padding);
   }
   
-  /// حساب ارتفاع منطقة المحتوى
+  // بقية الدوال كما هي
   static double getContentHeight(BuildContext context) {
-    return MediaQuery.of(context).size.height * getContentHeightRatio(context);
-  }
-  
-  /// حساب ارتفاع السطر الواحد (مع تطبيق الحدود الآمنة)
-  static double getLineHeight(BuildContext context) {
-    final contentHeight = getContentHeight(context);
-    final rawLineHeight = contentHeight / linesPerPage;
-    return rawLineHeight.clamp(minLineHeight, maxLineHeight);
-  }
-  
-  /// حساب العرض المثالي للمحتوى (بناءً على نسبة الارتفاع/العرض)
-  static double getIdealContentWidth(BuildContext context) {
-    final lineHeight = getLineHeight(context);
-    return lineHeight * aspectRatio;
-  }
-  
-  /// حساب العرض النهائي للمحتوى (محدود بعرض الشاشة)
-  static double getContentWidth(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final idealWidth = getIdealContentWidth(context);
-    return min(idealWidth, screenWidth);
-  }
-  
-  /// التحقق من صلاحية الشاشة وإرجاع معلومات التحقق
-  static ScreenValidation validateScreen(BuildContext context) {
-    final lineHeight = getLineHeight(context);
-    final contentWidth = getContentWidth(context);
-    final idealWidth = getIdealContentWidth(context);
-    final isSmall = isSmallScreen(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final topBar = getTopBarHeight(context);
+    final bottomBar = getBottomBarHeight(context);
     
-    bool isTooShort = lineHeight <= minLineHeight;
-    bool isTooTall = lineHeight >= maxLineHeight;
-    bool isAspectDistorted = contentWidth < idealWidth * 0.8;
+    final calculated = screenHeight - topBar - bottomBar - totalSafetyMargin;
+    return max(calculated, minContentHeight);
+  }
+  
+  static EdgeInsets getContentPadding(BuildContext context) {
+    final topBar = getTopBarHeight(context);
+    final bottomBar = getBottomBarHeight(context);
     
-    return ScreenValidation(
-      isValid: !isTooShort && !isAspectDistorted,
-      isTooShort: isTooShort,
-      isTooTall: isTooTall,
-      isAspectDistorted: isAspectDistorted,
-      isSmallScreen: isSmall,
-      lineHeight: lineHeight,
-      contentWidth: contentWidth,
-      idealWidth: idealWidth,
+    return EdgeInsets.only(
+      top: topBar + safetyMarginTop,
+      bottom: bottomBar + safetyMarginBottom,
+      left: 16.0,
+      right: 16.0,
+    );
+  }
+  
+  static void printLayoutReport(BuildContext context) {
+    if (!kDebugMode) return;
+    
+    final screenSize = MediaQuery.of(context).size;
+    final topBar = getTopBarHeight(context);
+    final bottomBar = getBottomBarHeight(context);
+    final content = getContentHeight(context);
+    final viewPadding = MediaQuery.of(context).viewPadding;
+    
+    debugPrint('═══════════════════════════════════════════════════');
+    debugPrint('📐 Layout (Compact): Top=${topBar.toStringAsFixed(1)}, Bottom=${bottomBar.toStringAsFixed(1)}');
+    debugPrint('   ViewPadding: T=${viewPadding.top}, B=${viewPadding.bottom}');
+    debugPrint('   Content=${content.toStringAsFixed(1)} (Margin: Top=$safetyMarginTop, Bot=$safetyMarginBottom)');
+    debugPrint('═══════════════════════════════════════════════════');
+  }
+  
+  static LayoutValidation validateLayout(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final total = getTopBarHeight(context) + getContentHeight(context) + getBottomBarHeight(context) + totalSafetyMargin;
+    return LayoutValidation(
+      isValid: total <= screenHeight + 2,
+      topBarHeight: getTopBarHeight(context),
+      bottomBarHeight: getBottomBarHeight(context),
+      contentHeight: getContentHeight(context),
+      totalHeight: total,
+      screenHeight: screenHeight,
+      deviceType: getDeviceType(context),
     );
   }
 }
 
-/// نتيجة التحقق من صلاحية الشاشة
-class ScreenValidation {
+// ... (Helper classes)
+enum DeviceType { mobile, tablet, desktop }
+class LayoutValidation {
   final bool isValid;
-  final bool isTooShort;
-  final bool isTooTall;
-  final bool isAspectDistorted;
-  final bool isSmallScreen;
-  final double lineHeight;
-  final double contentWidth;
-  final double idealWidth;
+  final double topBarHeight;
+  final double bottomBarHeight;
+  final double contentHeight;
+  final double totalHeight;
+  final double screenHeight;
+  final DeviceType deviceType;
   
-  const ScreenValidation({
+  const LayoutValidation({
     required this.isValid,
-    required this.isTooShort,
-    required this.isTooTall,
-    required this.isAspectDistorted,
-    required this.isSmallScreen,
-    required this.lineHeight,
-    required this.contentWidth,
-    required this.idealWidth,
+    required this.topBarHeight,
+    required this.bottomBarHeight,
+    required this.contentHeight,
+    required this.totalHeight,
+    required this.screenHeight,
+    required this.deviceType,
   });
   
-  /// الحصول على رسالة تحذير إذا كانت الشاشة غير مثالية
-  String? getWarningMessage() {
-    if (isTooShort) {
-      return 'الشاشة صغيرة جداً، تم تقليل حجم الأشرطة لمنع التداخل';
-    }
-    if (isAspectDistorted) {
-      return 'نسبة الشاشة غير مثالية، قد يبدو النص مسطحاً';
-    }
-    return null;
-  }
+  String? getWarningMessage() => isValid ? null : 'Layout Invalid';
 }

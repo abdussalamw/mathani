@@ -3,6 +3,8 @@ import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/data/models/ayah.dart';
 import 'package:mathani/domain/repositories/quran_repository.dart';
 import 'package:mathani/core/di/service_locator.dart';
+import 'package:fpdart/fpdart.dart'; // Added for Either
+import 'package:mathani/core/errors/failures.dart'; // Added for Failure
 
 class QuranProvider with ChangeNotifier {
   final QuranRepository _repository;
@@ -21,6 +23,50 @@ class QuranProvider with ChangeNotifier {
   Surah? get currentSurah => _currentSurah;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+
+  // Search State
+  List<Ayah> _searchResults = [];
+  List<Ayah> get searchResults => _searchResults;
+  bool _isSearching = false;
+  bool get isSearching => _isSearching;
+
+  Future<void> search(String query) async {
+    if (query.isEmpty) {
+      _searchResults = [];
+      notifyListeners();
+      return;
+    }
+
+    _isSearching = true;
+    notifyListeners();
+
+    final result = await _repository.searchAyahs(query);
+    
+    result.fold(
+      (failure) {
+        _searchResults = []; // Quietly fail or showing empty results
+      },
+      (ayahs) {
+        _searchResults = ayahs;
+      },
+    );
+
+    _isSearching = false;
+    notifyListeners();
+  }
+
+  void clearSearch() {
+    _searchResults = [];
+    notifyListeners();
+  }
+  
+  // Reading State (Synced with Mushaf View)
+  int _readingSurah = 1;
+  int _readingAyah = 1;
+  int _readingPage = 1; // Added page tracking for Tafsir sync
+  int get readingSurah => _readingSurah;
+  int get readingAyah => _readingAyah;
+  int get readingPage => _readingPage;
 
   QuranProvider({QuranRepository? repository})
       : _repository = repository ?? sl<QuranRepository>(); 
@@ -77,6 +123,7 @@ class QuranProvider with ChangeNotifier {
     
     if (_errorMessage != null) return;
     
+
     // Check Ayahs Result
     ayahsResult.fold(
       (failure) {
@@ -89,6 +136,15 @@ class QuranProvider with ChangeNotifier {
          _isLoading = false;
          notifyListeners();
       }
+    );
+  }
+
+  // helper to get single ayah text (Uthmanic)
+  Future<String?> getAyahText(int surahNumber, int ayahNumber) async {
+    final result = await _repository.getAyah(surahNumber, ayahNumber);
+    return result.fold(
+      (failure) => null,
+      (ayah) => ayah?.textUthmani ?? ayah?.text // Prefer Uthmani, fallback to simple
     );
   }
   
@@ -110,9 +166,25 @@ class QuranProvider with ChangeNotifier {
     );
   }
 
+  void updateReadingLocation(int surah, int ayah) {
+    if (_readingSurah != surah || _readingAyah != ayah) {
+      _readingSurah = surah;
+      _readingAyah = ayah;
+      notifyListeners();
+    }
+  }
+
   // تحديث للتنقل
   void setJumpToSurah(int surahNumber) {
     loadSurah(surahNumber);
+  }
+
+  // تحديث الصفحة الحالية للتفسير
+  void updateReadingPage(int page) {
+    if (_readingPage != page) {
+      _readingPage = page;
+      notifyListeners(); // This allows TafsirScreen to rebuild if needed
+    }
   }
 
   // لجلب آيات صفحة كاملة (للمصحف الرقمي)
@@ -121,6 +193,23 @@ class QuranProvider with ChangeNotifier {
     return result.fold(
       (l) {
         debugPrint('Error loading page ayahs: ${l.message}');
+        return [];
+      },
+      (r) => r
+    );
+  }
+
+  // Wrapper for Repository getAyah (needed for sync logic)
+  Future<Either<Failure, Ayah?>> getAyah(int surahNumber, int ayahNumber) async {
+    return _repository.getAyah(surahNumber, ayahNumber);
+  }
+
+  // Dynamic Ayah Range Loading
+  Future<List<Ayah>> getAyahsByRange(int startSurah, int startAyah, int endSurah, int endAyah) async {
+    final result = await _repository.getAyahsCountRange(startSurah, startAyah, endSurah, endAyah);
+    return result.fold(
+      (l) {
+        debugPrint('Error loading range ayahs: ${l.message}');
         return [];
       },
       (r) => r

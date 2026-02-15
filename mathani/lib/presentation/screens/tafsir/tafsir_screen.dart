@@ -1,243 +1,361 @@
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/quran_provider.dart';
-import 'package:mathani/presentation/providers/tafsir_provider.dart';
-import 'package:provider/provider.dart';
+import 'package:mathani/presentation/providers/surah_content_provider.dart';
+import 'package:mathani/presentation/providers/settings_provider.dart';
+import 'package:mathani/data/models/ayah.dart';
+import 'package:mathani/data/providers/mushaf_navigation_provider.dart';
+import 'package:mathani/presentation/providers/ui_provider.dart'; // Added
 
 class TafsirScreen extends StatefulWidget {
-  final int surahNumber;
-  final int ayahNumber;
-
-  const TafsirScreen({
-    Key? key,
-    this.surahNumber = 1,
-    this.ayahNumber = 1,
-  }) : super(key: key);
+  final int? initialPage;
+  
+  const TafsirScreen({Key? key, this.initialPage}) : super(key: key);
 
   @override
   State<TafsirScreen> createState() => _TafsirScreenState();
 }
 
 class _TafsirScreenState extends State<TafsirScreen> {
-  late int _currentAyahNumber;
-  late int _currentSurahNumber;
-  final String _currentTafsirSource = 'الميسر';
+  late PageController _pageController;
+  int _currentPage = 1;
 
   @override
   void initState() {
     super.initState();
-    _currentAyahNumber = widget.ayahNumber;
-    _currentSurahNumber = widget.surahNumber;
+    // Default to provider's page if not passed
+    final quran = context.read<QuranProvider>();
+    _currentPage = widget.initialPage ?? quran.readingPage;
+    if (_currentPage == 0) _currentPage = 1;
     
-    // Load data
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<QuranProvider>().loadSurah(_currentSurahNumber);
-      context.read<TafsirProvider>().fetchTafsir(_currentSurahNumber, _currentAyahNumber);
-    });
+    _pageController = PageController(initialPage: _currentPage - 1);
   }
 
-  void _onAyahChanged(int newAyah) {
-    setState(() => _currentAyahNumber = newAyah);
-    context.read<TafsirProvider>().fetchTafsir(_currentSurahNumber, _currentAyahNumber);
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(TafsirScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialPage != null && widget.initialPage != oldWidget.initialPage) {
+      final newPage = widget.initialPage!;
+      if (_currentPage != newPage) {
+        setState(() {
+          _currentPage = newPage;
+        });
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(newPage - 1);
+        }
+      }
+    }
+  }
+
+  void _onPageChanged(int index) {
+    setState(() {
+      _currentPage = index + 1;
+    });
+    context.read<QuranProvider>().updateReadingPage(_currentPage);
+  }
+
+  void _showTafsirSelectionSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Consumer<SurahContentProvider>(
+          builder: (context, provider, _) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'اختر التفسير',
+                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const SizedBox(height: 16),
+                  ...[
+                    {'slug': 'w-moyassar', 'name': 'التفسير الميسر'},
+                    {'slug': 'tafsir-katheer', 'name': 'تفسير ابن كثير'},
+                    {'slug': 'tafsir-saadi', 'name': 'تفسير السعدي'},
+                    {'slug': 'tafsir-baghawy', 'name': 'تفسير البغوي'},
+                    {'slug': 'tafsir-tabary', 'name': 'تفسير الطبري'},
+                    {'slug': 'eerab-aya', 'name': 'إعراب الآية'},
+                    {'slug': 'ayat-nozool', 'name': 'أسباب النزول'},
+                  ].map((item) => ListTile(
+                    title: Text(item['name']!, style: const TextStyle(fontFamily: 'Tajawal')),
+                    trailing: provider.selectedTafsirSlug == item['slug'] 
+                      ? const Icon(Icons.check, color: AppColors.primary) 
+                      : null,
+                    onTap: () {
+                      provider.changeTafsir(item['slug']!);
+                      Navigator.pop(context);
+                      setState(() {}); // Rebuild to refresh content
+                    },
+                  )).toList(),
+                ],
+              ),
+            );
+          }
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Listen to external page changes (e.g. from Mushaf) ONLY if not navigating internally?
+    // Actually, simple way: Just use PageView.
+    
+    return Scaffold(
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1A1410) : const Color(0xFFF8F8F8),
+      appBar: AppBar(
+        title: Consumer<SurahContentProvider>(
+          builder: (context, provider, _) {
+            // Dropdown for Tafsir Selection directly in AppBar
+            return Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.white.withValues(alpha: 0.1) 
+                    : Colors.black.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: provider.selectedTafsirSlug,
+                  icon: const Icon(Icons.arrow_drop_down, size: 20),
+                  isDense: true,
+                  alignment: Alignment.center,
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                    fontSize: 14,
+                  ),
+                  dropdownColor: Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  items: const [
+                    DropdownMenuItem(value: 'w-moyassar', child: Text('التفسير الميسر')),
+                    DropdownMenuItem(value: 'tafsir-katheer', child: Text('تفسير ابن كثير')),
+                    DropdownMenuItem(value: 'tafsir-saadi', child: Text('تفسير السعدي')),
+                    DropdownMenuItem(value: 'tafsir-baghawy', child: Text('تفسير البغوي')),
+                    DropdownMenuItem(value: 'tafsir-tabary', child: Text('تفسير الطبري')),
+                    DropdownMenuItem(value: 'eerab-aya', child: Text('إعراب الآية')),
+                    DropdownMenuItem(value: 'ayat-nozool', child: Text('أسباب النزول')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      provider.changeTafsir(val);
+                      setState(() {});
+                    }
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () {
+            // Switch back to Mushaf Tab
+            context.read<UiProvider>().setTabIndex(1);
+          },
+        ),
+        actions: [
+          // Keep existing actions if any, or remove generic menu
+        ],
+      ),
+      body: Directionality(
+        textDirection: TextDirection.rtl,
+        child: PageView.builder(
+          controller: _pageController,
+          itemCount: context.select<MushafNavigationProvider, int>((p) => p.totalPages),
+          // reverse: true, // Removed: RTL Directionality handles it naturally
+          onPageChanged: _onPageChanged,
+          itemBuilder: (context, index) {
+            final pageNum = index + 1;
+            return TafsirPageContent(pageNumber: pageNum);
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class TafsirPageContent extends StatefulWidget {
+  final int pageNumber;
+  
+  const TafsirPageContent({Key? key, required this.pageNumber}) : super(key: key);
+
+  @override
+  State<TafsirPageContent> createState() => _TafsirPageContentState();
+}
+
+class _TafsirPageContentState extends State<TafsirPageContent> {
+  List<Ayah>? _ayahs;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAyahs();
+  }
+
+  Future<void> _loadAyahs() async {
+    // Determine Ayahs for this page
+    final quran = context.read<QuranProvider>();
+    final ayahs = await quran.getAyahsForPage(widget.pageNumber);
+    if (mounted) {
+      setState(() {
+        _ayahs = ayahs;
+        _isLoading = false;
+      });
+      
+      // Optionally pre-fetch tafsir for these ayahs?
+      // provider.fetchBatch(...) - if available. 
+      // If not, individual widgets will fetch.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (_ayahs == null || _ayahs!.isEmpty) {
+      return const Center(child: Text('لا توجد آيات لهذه الصفحة'));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _ayahs!.length,
+      itemBuilder: (context, index) {
+        final ayah = _ayahs![index];
+        return TafsirAyahItem(ayah: ayah);
+      },
+    );
+  }
+}
+
+class TafsirAyahItem extends StatefulWidget {
+  final Ayah ayah;
+  
+  const TafsirAyahItem({Key? key, required this.ayah}) : super(key: key);
+
+  @override
+  State<TafsirAyahItem> createState() => _TafsirAyahItemState();
+}
+
+class _TafsirAyahItemState extends State<TafsirAyahItem> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch content
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+       final provider = context.read<SurahContentProvider>();
+       if (provider.selectedTafsirSlug.isEmpty) {
+         provider.setTafsirSlug('w-moyassar');
+       }
+       // We need a specific fetch for this item, NOT affecting the global 'current' one?
+       // SurahContentProvider currently stores 'currentAyaContent'. 
+       // If we use it for a LIST, it will overwrite each other!
+       // Use a FutureBuilder with DIRECT API SERVICE call or method in provider that returns Future.
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+     // User Request: Make font 300% smaller. 
+     // Default was 20. 300% smaller -> 1/3 -> ~7? Too small. 
+     // User probably means "Literally very small". Let's try 12 or 10.
+     // Standard body is 14-16. 
+     // Let's use 12 for now.
+     
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Container(
-      color: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
-      child: Column(
-        children: [
-          // Content Area
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                   // Ayah Box
-                   Container(
-                     width: double.infinity,
-                     padding: const EdgeInsets.all(24),
-                     decoration: BoxDecoration(
-                       color: isDark ? const Color(0xFF2C2416) : Colors.white,
-                       borderRadius: BorderRadius.circular(20),
-                       boxShadow: [
-                         BoxShadow(
-                           color: AppColors.golden.withValues(alpha: 0.1),
-                           blurRadius: 10,
-                           offset: const Offset(0, 4),
-                         ),
-                       ],
-                       border: Border.all(
-                         color: AppColors.golden.withValues(alpha: 0.3),
-                         width: 1,
-                       ),
-                     ),
-                     child: Column(
-                       children: [
-                         Text(
-                           'سورة $_currentSurahNumber - آية $_currentAyahNumber',
-                           style: const TextStyle(
-                             fontFamily: 'Tajawal',
-                             fontSize: 14,
-                             color: AppColors.golden,
-                             fontWeight: FontWeight.bold,
-                           ),
-                         ),
-                         const SizedBox(height: 16),
-                         Consumer<QuranProvider>(
-                           builder: (context, quran, _) {
-                             String txt = '...';
-                             if (quran.isLoading) {
-                               txt = 'جاري التحميل...';
-                             } else if (quran.currentAyahs.isNotEmpty) {
-                               try {
-                                 final ayah = quran.currentAyahs.firstWhere(
-                                   (a) => a.ayahNumber == _currentAyahNumber);
-                                 txt = ayah.text;
-                               } catch (_) {
-                                 txt = quran.currentAyahs.first.text;
-                               }
-                             }
-                             
-                             return Text(
-                               txt,
-                               textAlign: TextAlign.center,
-                               textDirection: TextDirection.rtl,
-                               style: TextStyle(
-                                 fontFamily: 'Amiri',
-                                 fontSize: 26,
-                                 height: 1.8,
-                                 color: isDark ? Colors.white : Colors.black87,
-                                 fontWeight: FontWeight.bold,
-                               ),
-                             );
-                           },
-                         ),
-                       ],
-                     ),
-                   ),
-                   
-                   const SizedBox(height: 24),
-                   
-                   // Tafsir Source Indicator
-                   Container(
-                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                     decoration: BoxDecoration(
-                       color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1),
-                       borderRadius: BorderRadius.circular(30),
-                     ),
-                     child: Text(
-                       'التفسير: $_currentTafsirSource',
-                       style: TextStyle(
-                         fontFamily: 'Tajawal',
-                         fontSize: 12,
-                         color: Colors.grey[600],
-                       ),
-                     ),
-                   ),
-                   
-                   const SizedBox(height: 24),
-                   
-                    // Tafsir Text
-                    Consumer<TafsirProvider>(
-                      builder: (context, tafsir, _) {
-                        if (tafsir.isLoading) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 40),
-                              child: CircularProgressIndicator(color: AppColors.golden),
-                            ),
-                          );
-                        }
-                        
-                        if (tafsir.errorMessage != null) {
-                          return Center(
-                            child: Text(
-                              tafsir.errorMessage!,
-                              style: const TextStyle(fontFamily: 'Tajawal', color: Colors.red),
-                            ),
-                          );
-                        }
+    final quran = context.read<QuranProvider>();
+    final surahName = quran.surahs
+      .firstWhere((s) => s.number == widget.ayah.surahNumber, orElse: () => quran.surahs.first) 
+      .nameArabic;
 
-                        return Text(
-                          tafsir.tafsirContent,
-                          textAlign: TextAlign.justify,
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                            fontFamily: 'Amiri',
-                            fontSize: 20,
-                            height: 1.6,
-                            color: isDark ? Colors.grey[300] : const Color(0xFF4A4A4A),
-                          ),
-                        );
-                      },
-                    ),
-                 ],
-               ),
-             ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2C2416) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+         boxShadow: [
+           BoxShadow(
+             color: Colors.black.withValues(alpha: 0.05),
+             blurRadius: 4,
+             offset: const Offset(0, 2),
            ),
-           
-           // Bottom Controls
-           Container(
-             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-             decoration: BoxDecoration(
-               color: isDark ? const Color(0xFF231E18) : Colors.white,
-               boxShadow: [
-                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-               ],
-             ),
-             child: Row(
-               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-               children: [
-                 // Previous Ayah
-                 ElevatedButton(
-                   onPressed: _currentAyahNumber < 286 // Simple cap for demo, better check surah total
-                     ? () => _onAyahChanged(_currentAyahNumber + 1)
-                     : null,
-                   style: ElevatedButton.styleFrom(
-                     backgroundColor: AppColors.primary,
-                     shape: const CircleBorder(),
-                     padding: const EdgeInsets.all(12),
-                   ),
-                   child: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.white),
-                 ),
-                 
-                  // Tafsir Selection Button
-                  OutlinedButton.icon(
-                     onPressed: () {
-                       // Show Bottom Sheet to select Tafsir
-                     },
-                     icon: const Icon(Icons.menu_book),
-                     label: const Text('تغيير التفسير'),
-                     style: OutlinedButton.styleFrom(
-                       foregroundColor: AppColors.golden,
-                       side: const BorderSide(color: AppColors.golden),
-                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+         ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Ayah Header REMOVED as per request
+          
+          // Ayah Text
+          Text(
+            widget.ayah.text,
+            textAlign: TextAlign.center,
+             textDirection: TextDirection.rtl,
+            style: const TextStyle(
+              fontFamily: 'UthmanicHafs_V22', // Updated to use the new font here too!
+              fontSize: 22,
+              height: 1.6,
+              fontWeight: FontWeight.normal,
+              color: AppColors.golden, // GOLD per request
+            ),
+          ),
+          const Divider(thickness: 0.5, height: 24),
+          
+          // Tafsir Content (Fetch locally via Provider helper or Service)
+          Consumer<SurahContentProvider>(
+            builder: (context, provider, _) {
+               return FutureBuilder(
+                 future: provider.fetchTafsirForAyah(widget.ayah.surahNumber, widget.ayah.ayahNumber),
+                 builder: (context, snapshot) {
+                   if (snapshot.connectionState == ConnectionState.waiting) {
+                     return const Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)));
+                   }
+                   if (snapshot.hasError) {
+                     return const Text('خطأ في تحميل التفسير', style: TextStyle(fontSize: 10, color: Colors.red));
+                   }
+                   
+                   final content = snapshot.data as String?;
+                   if (content == null) return const SizedBox();
+
+                   return Text(
+                     content,
+                     textAlign: TextAlign.justify,
+                     textDirection: TextDirection.rtl,
+                     style: TextStyle(
+                       fontFamily: 'Amiri', // Or Tajawal?
+                       fontSize: 16, // Adjusted for readability
+                       color: isDark ? Colors.white70 : Colors.black, // BLACK per request (adjusted for dark mode)
+                       height: 1.6,
                      ),
-                  ),
-                  
-                  // Next Ayah
-                  ElevatedButton(
-                   onPressed: _currentAyahNumber > 1
-                     ? () => _onAyahChanged(_currentAyahNumber - 1)
-                     : null,
-                   style: ElevatedButton.styleFrom(
-                     backgroundColor: AppColors.primary,
-                     shape: const CircleBorder(),
-                     padding: const EdgeInsets.all(12),
-                   ),
-                   child: const Icon(Icons.arrow_forward_ios, size: 20, color: Colors.white),
-                 ),
-               ],
-             ),
-           ),
+                   );
+                 },
+               );
+            },
+          ),
         ],
       ),
     );

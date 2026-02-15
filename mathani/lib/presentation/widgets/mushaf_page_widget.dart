@@ -11,6 +11,8 @@ import '../../data/services/qcf4_font_downloader.dart';
 import '../../presentation/providers/quran_provider.dart';
 import '../../presentation/providers/settings_provider.dart';
 import '../../presentation/providers/bookmark_provider.dart';
+import '../../presentation/providers/ui_provider.dart';
+import '../../data/providers/mushaf_navigation_provider.dart';
 import '../../core/constants/responsive_constants.dart';
 import 'package:provider/provider.dart';
 
@@ -20,6 +22,7 @@ class MushafPageWidget extends StatefulWidget {
   final int? selectedSurah;
   final int? selectedAyah;
   final Function(int surah, int ayah)? onAyahSelected;
+  final Function(int surah, int ayah)? onAyahLongPress; // Added
   final bool showInfo;
   final bool isDigital;
   
@@ -29,6 +32,7 @@ class MushafPageWidget extends StatefulWidget {
     this.selectedSurah,
     this.selectedAyah,
     this.onAyahSelected,
+    this.onAyahLongPress, // Added
     this.showInfo = true,
     this.isDigital = false,
   }) : super(key: key);
@@ -46,6 +50,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   void initState() {
     super.initState();
     _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ResponsiveConstants.printLayoutReport(context);
+    });
   }
 
   @override
@@ -123,28 +130,24 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final settings = context.watch<SettingsProvider>();
+    final isDark = settings.isDarkMode;
     
     // حساب الأبعاد الديناميكية باستخدام ResponsiveConstants
     final topBarHeight = ResponsiveConstants.getTopBarHeight(context);
     final bottomBarHeight = ResponsiveConstants.getBottomBarHeight(context);
-    final contentWidth = ResponsiveConstants.getContentWidth(context);
-    
     // التحقق من صلاحية الشاشة (للتطوير فقط)
-    final validation = ResponsiveConstants.validateScreen(context);
+    final validation = ResponsiveConstants.validateLayout(context);
     if (!validation.isValid && validation.getWarningMessage() != null) {
       debugPrint('⚠️ Screen Warning: ${validation.getWarningMessage()}');
-      debugPrint('   Line Height: ${validation.lineHeight.toStringAsFixed(1)}px');
-      debugPrint('   Content Width: ${validation.contentWidth.toStringAsFixed(1)}px');
-      debugPrint('   Ideal Width: ${validation.idealWidth.toStringAsFixed(1)}px');
+      debugPrint('   Content Height: ${validation.contentHeight.toStringAsFixed(1)}px');
+      debugPrint('   Total Height: ${validation.totalHeight.toStringAsFixed(1)}px');
     }
     
     return Container(
       decoration: BoxDecoration(
-        color: isDark 
-            ? const Color(0xFF2C2416) 
-            : const Color(0xFFFFFBF0),
-        image: isDark ? null : const DecorationImage(
+        color: settings.backgroundColor,
+        image: (isDark || settings.backgroundColorMode == 'white') ? null : const DecorationImage(
           image: AssetImage('assets/images/mushaf_texture.png'),
           fit: BoxFit.cover,
           opacity: 0.15, // Very subtle
@@ -166,74 +169,80 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: [
-                    // --- 1. Right Side: Juz Name ---
+                    // --- 1. Right Side: Juz Name (Clickable) ---
                     Expanded(
                       child: Align(
                         alignment: Alignment.centerRight,
-                        child: Consumer<QuranProvider>(
-                          builder: (context, quran, child) {
-                             int? juzNumber;
-                             if (_digitalAyahs != null && _digitalAyahs!.isNotEmpty) {
-                                 juzNumber = _digitalAyahs!.first.juz; 
-                             }
-                             if (juzNumber == null) {
-                                juzNumber = ((widget.page.page - 2) / 20).floor() + 1;
-                                if (juzNumber < 1) juzNumber = 1;
-                                if (juzNumber > 30) juzNumber = 30;
-                             }
+                        child: Consumer<MushafNavigationProvider>(
+                          builder: (context, navProvider, child) {
+                            final pageInfo = navProvider.getPageInfo(widget.page.page);
+                            final juzNumber = pageInfo?.juz ?? 1;
 
-                             // QCF4_BSML Juz Range: 0xF1D8 (Juz 1) -> 0xF1F5 (Juz 30)
-                             final int juzCodePoint = 0xF1D8 + (juzNumber - 1);
-                             final String juzGlyph = String.fromCharCode(juzCodePoint);
-                                  
-                             return Text(
-                                juzGlyph,
-                                style: const TextStyle(
-                                  fontFamily: 'QCF4_BSML', 
-                                  fontSize: 18, 
-                                  color: AppColors.primary,
-                                  height: 1.0, 
+                            // QCF4_BSML Juz Range: 0xF1D8 (Juz 1) -> 0xF1F5 (Juz 30)
+                            final int juzCodePoint = 0xF1D8 + (juzNumber - 1);
+                            final String juzGlyph = String.fromCharCode(juzCodePoint);
+                                 
+                            return InkWell(
+                              onTap: () {
+                                // Navigate to Juz index (tab 1 in IndexScreen)
+                                final uiProvider = Provider.of<UiProvider>(context, listen: false);
+                                uiProvider.setTabIndex(0, indexScreenTab: 1); // Go to IndexScreen, Juz tab
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Text(
+                                  juzGlyph,
+                                  style: const TextStyle(
+                                    fontFamily: 'QCF4_BSML', 
+                                    fontSize: 20, 
+                                    color: AppColors.primary,
+                                    height: 1.0, 
+                                  ),
                                 ),
-                              );
+                              ),
+                            );
                           },
                         ),
                       ),
                     ),
 
-                    // --- 2. Center: Surah Name ---
-                    Consumer<QuranProvider>(
-                      builder: (context, quran, child) {
-                        int? surahNumber;
-                        if (_digitalAyahs != null && _digitalAyahs!.isNotEmpty) {
-                           surahNumber = _digitalAyahs!.first.surahNumber;
-                        } else {
-                          for (var line in widget.page.lines) {
-                            for (var glyph in line.glyphs) {
-                              if (glyph.surah != null) {
-                                surahNumber = glyph.surah;
-                                break;
-                              }
-                            }
-                            if (surahNumber != null) break;
-                          }
-                        }
+                    // --- 2. Center: Surah Name (Clickable) ---
+                    Expanded(
+                      child: Center(
+                        child: Consumer<MushafNavigationProvider>(
+                          builder: (context, navProvider, child) {
+                            final pageInfo = navProvider.getPageInfo(widget.page.page);
+                            final surahs = pageInfo?.surahs ?? [];
+                            final surahNumber = surahs.isNotEmpty ? surahs.first : null;
 
-                        if (surahNumber != null) {
-                           final int surahCodePoint = 0xF100 + (surahNumber - 1);
-                           final String surahGlyph = String.fromCharCode(surahCodePoint);
-                           
-                           return Text(
-                              surahGlyph,
-                              style: const TextStyle(
-                                fontFamily: 'QCF4_BSML', 
-                                fontSize: 12, 
-                                color: AppColors.primary,
-                                height: 1.0, 
-                              ),
-                            );
-                        }
-                        return const SizedBox.shrink(); 
-                      },
+                            if (surahNumber != null) {
+                              final int surahCodePoint = 0xF100 + (surahNumber - 1);
+                              final String surahGlyph = String.fromCharCode(surahCodePoint);
+                              
+                              return InkWell(
+                                onTap: () {
+                                  // Navigate to Surah index (tab 0 in IndexScreen)
+                                  final uiProvider = Provider.of<UiProvider>(context, listen: false);
+                                  uiProvider.setTabIndex(0); // Go to IndexScreen (Surah tab is default)
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Text(
+                                    surahGlyph,
+                                    style: const TextStyle(
+                                      fontFamily: 'QCF4_BSML', 
+                                      fontSize: 11, 
+                                      color: AppColors.primary,
+                                      height: 1.0, 
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink(); 
+                          },
+                        ),
+                      ),
                     ),
 
                     // --- 3. Left Side: Icons + Page Number ---
@@ -243,7 +252,6 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                             // Theme Toggle
                              Consumer<SettingsProvider>(
                                builder: (context, settings, child) {
                                  return InkWell(
@@ -251,8 +259,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                                    child: Padding(
                                      padding: const EdgeInsets.symmetric(horizontal: 4), 
                                      child: Icon(
-                                       settings.isDarkMode ? Icons.wb_sunny_outlined : Icons.nightlight_round,
-                                       size: 16,
+                                       settings.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                                       size: 22,
                                        color: AppColors.primary,
                                      ),
                                    ),
@@ -311,22 +319,24 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                              
                              const SizedBox(width: 8),
 
-                             // Page Number
-                             Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  _convertToArabicNumbers(widget.page.page),
-                                  style: const TextStyle(
-                                    fontFamily: 'Tajawal', 
-                                    fontSize: 14, 
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
+                             // Page Number (Clickable, no background)
+                             InkWell(
+                               onTap: () {
+                                 // Show page jump dialog
+                                 _showPageJumpDialog(context);
+                               },
+                               child: Padding(
+                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                 child: Text(
+                                   _convertToArabicNumbers(widget.page.page),
+                                   style: const TextStyle(
+                                     fontFamily: 'Tajawal', 
+                                     fontSize: 14, 
+                                     fontWeight: FontWeight.bold,
+                                     color: AppColors.primary,
+                                   ),
+                                 ),
+                               ),
                              ),
                           ],
                         ),
@@ -343,7 +353,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           Expanded(
             child: Center( // توسيط المحتوى أفقياً
               child: SizedBox(
-                width: contentWidth, // عرض ديناميكي بناءً على نسبة الارتفاع/العرض
+                width: ResponsiveConstants.getContentHeight(context) * 0.8, // عرض ديناميكي بناءً على نسبة الارتفاع/العرض
                 child: widget.isDigital && _isLoadingDigital
                     ? const Center(child: CircularProgressIndicator()) 
                     : (!_isFontLoaded 
@@ -351,83 +361,25 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                         : LayoutBuilder(
                             builder: (context, constraints) {
                             // Digital Mode: Full Screen Flex Layout
-                            if (widget.isDigital) {
-                              return Container(
-                                width: double.infinity,
-                                height: double.infinity,
-                                // Fixed margins to avoid jump when bars toggle
-                                // Top: 60 (Safe Area + Status Bar)
-                                // Bottom: 140 (Navigation Bar Clearance)
-                                padding: const EdgeInsets.only(top: 60, bottom: 140, left: 24, right: 24), 
-                                child: Column(
-                                  // Center content vertically if lines are few (e.g. Page 1 & 2)
-                                  // Distribute evenly (spaceBetween) if it's a full page (15 lines).
-                                  mainAxisAlignment: widget.page.lines.length < 13 
-                                      ? MainAxisAlignment.center 
-                                      : MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: widget.page.lines.map((line) {
-                                    return Container(
-                                      // Add minimal vertical padding for pages with few lines to separate them
-                                      padding: widget.page.lines.length < 13 
-                                          ? const EdgeInsets.symmetric(vertical: 8.0) 
-                                          : EdgeInsets.zero,
-                                      child: PageLineWidget(
-                                        line: line,
-                                        pageNumber: widget.page.page,
-                                        isParentFontLoaded: _isFontLoaded,
-                                        selectedSurah: widget.selectedSurah,
-                                        selectedAyah: widget.selectedAyah,
-                                        onAyahSelected: widget.onAyahSelected,
-                                        isDigital: widget.isDigital,
-                                        digitalWords: _lineWordsMap[line.line],
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              );
-                            }
-                            // QCF Mode: Force Expand Horizontally
-                            // We use a FittedBox on the COLUMN itself with fitWidth.
-                            // This takes the 'ideal' layout (width 1000) and STRETCHES it to touch the screen edges.
+                            // ✅ الحل الصحيح
+                            // getTopBarHeight يحتوي بالفعل على viewPadding.top (status bar)
+                            // لذلك نستخدم فقط safetyMarginTop كمسافة إضافية صغيرة
+                            final topPadding = ResponsiveConstants.safetyMarginTop;
+                            final bottomPadding = ResponsiveConstants.getBottomBarHeight(context) 
+                                                + ResponsiveConstants.safetyMarginBottom;
+
                             return Container(
                               width: double.infinity,
                               height: double.infinity,
-                              // Fixed margins to avoid jump when bars toggle
-                              // Top: 60, Bottom: 180 (Increased to lift last line clear of bottom bar)
-                              padding: const EdgeInsets.only(top: 60, bottom: 180, left: 16, right: 16),
-                              child: FittedBox(
-                                fit: BoxFit.fitWidth, 
-                                child: SizedBox(
-                                  // Reverted reference width from 1200 back to 1000 (v1.14 state)
-                                  width: 1000,
-                                  height: 1800, 
-                                  child: Column(
-                                    // Reverted logic to only center short pages < 13 lines (removed page <= 2 specific check)
-                                    mainAxisAlignment: widget.page.lines.length < 13 
-                                        ? MainAxisAlignment.center 
-                                        : MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: widget.page.lines.map((line) {
-                                      return Container(
-                                        padding: widget.page.lines.length < 13 
-                                            ? const EdgeInsets.symmetric(vertical: 12.0) 
-                                            : EdgeInsets.zero,
-                                        child: PageLineWidget(
-                                          line: line,
-                                          pageNumber: widget.page.page,
-                                          isParentFontLoaded: _isFontLoaded,
-                                          selectedSurah: widget.selectedSurah,
-                                          selectedAyah: widget.selectedAyah,
-                                          onAyahSelected: widget.onAyahSelected,
-                                          isDigital: widget.isDigital,
-                                          digitalWords: widget.isDigital ? _lineWordsMap[line.line] : null,
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
+                              padding: EdgeInsets.only(
+                                 top: topPadding, 
+                                 bottom: bottomPadding, 
+                                 left: 16, 
+                                 right: 16
                               ),
+                              child: ResponsiveConstants.getDeviceType(context) == DeviceType.mobile
+                                  ? _buildMobileLayout()
+                                  : _buildTabletLayout(),
                             );
                           },
                         )),
@@ -439,12 +391,98 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     );
   }
   
+  /// تخطيط الجوال: توسع كامل بين الشريطين
+  Widget _buildMobileLayout() {
+    return Column(
+      mainAxisAlignment: widget.page.lines.length < 13 
+          ? MainAxisAlignment.center 
+          : MainAxisAlignment.spaceEvenly,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: widget.page.lines.map((line) {
+        return Expanded(
+          child: Center(
+            child: PageLineWidget(
+              line: line,
+              pageNumber: widget.page.page,
+              isParentFontLoaded: _isFontLoaded,
+              selectedSurah: widget.selectedSurah,
+              selectedAyah: widget.selectedAyah,
+              onAyahSelected: widget.onAyahSelected,
+              onAyahLongPress: widget.onAyahLongPress,
+              isDigital: widget.isDigital,
+              digitalWords: widget.isDigital ? _lineWordsMap[line.line] : null,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+  
+  /// تخطيط التابلت: الحفاظ على نسبة العرض/الارتفاع
+  Widget _buildTabletLayout() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final availableHeight = constraints.maxHeight;
+        
+        const quranAspectRatio = 1000 / 1800;
+        
+        double contentWidth = availableWidth;
+        double contentHeight = contentWidth / quranAspectRatio;
+        
+        if (contentHeight > availableHeight) {
+          contentHeight = availableHeight;
+          contentWidth = contentHeight * quranAspectRatio;
+        }
+        
+        return Center(
+          child: SizedBox(
+            width: contentWidth,
+            height: contentHeight,
+            child: FittedBox(
+              fit: BoxFit.contain,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: 1000,
+                height: 1800,
+                child: Column(
+                  mainAxisAlignment: widget.page.lines.length < 13 
+                      ? MainAxisAlignment.center 
+                      : MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: widget.page.lines.map((line) {
+                    return Container(
+                      padding: widget.page.lines.length < 13 
+                          ? const EdgeInsets.symmetric(vertical: 12.0) 
+                          : EdgeInsets.zero,
+                      child: PageLineWidget(
+                        line: line,
+                        pageNumber: widget.page.page,
+                        isParentFontLoaded: _isFontLoaded,
+                        selectedSurah: widget.selectedSurah,
+                        selectedAyah: widget.selectedAyah,
+                        onAyahSelected: widget.onAyahSelected,
+                        onAyahLongPress: widget.onAyahLongPress,
+                        isDigital: widget.isDigital,
+                        digitalWords: widget.isDigital ? _lineWordsMap[line.line] : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+  
   Widget _buildSurahHeader(int surahNum, bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 16),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: AppColors.golden.withOpacity(0.1),
+        color: AppColors.golden.withValues(alpha: 0.1),
         border: Border.all(color: AppColors.golden),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -475,6 +513,56 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
         ),
         textAlign: TextAlign.center,
       ),
+    );
+  }
+
+  void _showPageJumpDialog(BuildContext context) {
+    final navProvider = Provider.of<MushafNavigationProvider>(context, listen: false);
+    final maxPages = navProvider.totalPages;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        int? selectedPage;
+        return AlertDialog(
+          title: const Text(
+            'الانتقال إلى صفحة',
+            style: TextStyle(fontFamily: 'Tajawal'),
+          ),
+          content: TextField(
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'رقم الصفحة (1-$maxPages)',
+            ),
+            onChanged: (value) {
+              selectedPage = int.tryParse(value);
+            },
+            onSubmitted: (value) {
+              selectedPage = int.tryParse(value);
+              if (selectedPage != null && navProvider.isValidPage(selectedPage!)) {
+                Navigator.pop(context);
+                Provider.of<UiProvider>(context, listen: false).jumpToPage(selectedPage!);
+              }
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
+            ),
+            TextButton(
+              onPressed: () {
+                if (selectedPage != null && navProvider.isValidPage(selectedPage!)) {
+                  Navigator.pop(context);
+                  Provider.of<UiProvider>(context, listen: false).jumpToPage(selectedPage!);
+                }
+              },
+              child: const Text('انتقال', style: TextStyle(fontFamily: 'Tajawal')),
+            ),
+          ],
+        );
+      },
     );
   }
 

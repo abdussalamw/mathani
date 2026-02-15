@@ -1,7 +1,7 @@
 name: mathani
 description: تطبيق قراءة وتدبر القرآن الكريم - مثاني
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -19,7 +19,7 @@ dependencies:
   
   # الشبكة (أساسي)
   dio: ^5.3.0
-  http: ^1.1.0
+  http: ^1.6.0
   
   # إدارة الحالة (أساسي)
   provider: ^6.0.5
@@ -44,8 +44,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  integration_test:
-    sdk: flutter
+  # integration_test:
+  #   sdk: flutter
   build_runner: ^2.4.6
   isar_generator: ^3.1.0
   flutter_lints: ^2.0.0
@@ -68,6 +68,8 @@ flutter:
     - assets/data/quran_metadata.json
     - assets/data/quran_madani.json
     - assets/data/quran_advanced.json
+    - assets/data/shamerly_quran_complete.json
+    - assets/data/reciters.json
     - assets/images/
 
   fonts:
@@ -87,5 +89,9 @@ flutter:
     - family: KFGQPC_HAFS
       fonts:
         - asset: assets/fonts/KFGQPC_HAFS.ttf
+
+    - family: UthmanicHafs
+      fonts:
+        - asset: assets/fonts/UthmanicHafs_V22.ttf
 
 

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/presentation/providers/bookmark_provider.dart';
 import 'package:mathani/presentation/providers/ui_provider.dart';
+import 'package:mathani/data/providers/mushaf_navigation_provider.dart';
 import 'package:mathani/presentation/providers/quran_provider.dart';
+import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:intl/intl.dart';
 
@@ -23,6 +25,13 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     super.dispose();
   }
 
+  /// الحصول على رمز اسم السورة من خط QCF4_BSML
+  String _getSurahGlyph(int surahNumber) {
+    if (surahNumber < 1 || surahNumber > 114) return '';
+    final codePoint = 0xF100 + (surahNumber - 1);
+    return String.fromCharCode(codePoint);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -31,6 +40,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
       color: isDark ? AppColors.darkBackground : const Color(0xFFF8F8F8),
       child: Column(
         children: [
+          // مسافة علوية لتجنب تداخل العنوان
+          const SizedBox(height: 60),
+          
           // Search Bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -70,16 +82,21 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
           
           // Bookmarks List
           Expanded(
-            child: Consumer<BookmarkProvider>(
-              builder: (context, bookmarkProvider, child) {
+            child: Consumer2<BookmarkProvider, QuranProvider>(
+              builder: (context, bookmarkProvider, quranProvider, child) {
                 final allBookmarks = bookmarkProvider.bookmarks;
                 
                 // Filter bookmarks based on search query
                 final bookmarks = _searchQuery.isEmpty
                     ? allBookmarks
                     : allBookmarks.where((bookmark) {
+                        final surah = quranProvider.surahs.firstWhere(
+                          (s) => s.number == bookmark.surahNumber,
+                          orElse: () => quranProvider.surahs.first,
+                        );
                         return bookmark.surahNumber.toString().contains(_searchQuery) ||
-                               bookmark.ayahNumber.toString().contains(_searchQuery);
+                               bookmark.ayahNumber.toString().contains(_searchQuery) ||
+                               surah.nameArabic.contains(_searchQuery);
                       }).toList();
 
           if (bookmarks.isEmpty) {
@@ -123,6 +140,14 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
               final bookmark = bookmarks[index];
               final dateString = DateFormat('yyyy/MM/dd - hh:mm a').format(bookmark.createdAt);
               
+              // الحصول على معلومات السورة
+              final surah = quranProvider.surahs.firstWhere(
+                (s) => s.number == bookmark.surahNumber,
+                orElse: () => quranProvider.surahs.isNotEmpty 
+                    ? quranProvider.surahs.first 
+                    : Surah()..number = bookmark.surahNumber,
+              );
+              
               return Dismissible(
                 key: Key('bookmark_${bookmark.id}'),
                 direction: DismissDirection.endToStart,
@@ -144,7 +169,8 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                 child: InkWell(
                 onTap: () {
                   final uiProvider = Provider.of<UiProvider>(context, listen: false);
-                  uiProvider.jumpToSurah(bookmark.surahNumber);
+                  final navProvider = Provider.of<MushafNavigationProvider>(context, listen: false);
+                  uiProvider.jumpToSurah(bookmark.surahNumber, navProvider);
                   
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -154,54 +180,101 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                   );
                 },
                   child: Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF2C2416) : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
                     child: Row(
                       children: [
+                        // أيقونة العلامة
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: AppColors.golden.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.bookmark_rounded, color: AppColors.golden),
+                          child: const Icon(Icons.bookmark_rounded, color: AppColors.golden, size: 18),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 12),
+                        
+                        // اسم السورة على اليمين
                         Expanded(
+                          flex: 2,
+                          child: Text(
+                            _getSurahGlyph(bookmark.surahNumber),
+                            style: const TextStyle(
+                              fontFamily: 'QCF4_BSML',
+                              fontSize: 16, // 50% أصغر من 20
+                              color: AppColors.primary,
+                              height: 1.2,
+                            ),
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 12),
+                        
+                        // التفاصيل على اليسار
+                        Expanded(
+                          flex: 3,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
+                              // رقم الآية
                               Text(
-                                'سورة ${bookmark.surahNumber} - آية ${bookmark.ayahNumber}',
+                                'آية ${bookmark.ayahNumber}',
                                 style: const TextStyle(
                                   fontFamily: 'Tajawal',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                dateString,
-                                style: TextStyle(
-                                  fontFamily: 'Tajawal',
-                                  fontSize: 12,
-                                  color: Colors.grey[500],
+                              const SizedBox(height: 2),
+                              // الجزء والصفحة
+                              if (surah.juzStart != null || surah.page != null)
+                                Row(
+                                  children: [
+                                    if (surah.juzStart != null) ...[
+                                      Text(
+                                        'ج${surah.juzStart}',
+                                        style: TextStyle(
+                                          fontFamily: 'Tajawal',
+                                          fontSize: 11,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                    if (surah.juzStart != null && surah.page != null)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                                        child: Text('•', style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+                                      ),
+                                    if (surah.page != null) ...[
+                                      Text(
+                                        'ص${surah.page}',
+                                        style: TextStyle(
+                                          fontFamily: 'Tajawal',
+                                          fontSize: 11,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                              ),
                             ],
                           ),
                         ),
-                        const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+                        
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
                       ],
                     ),
                   ),

@@ -64,6 +64,8 @@ class MushafMetadata {
   String? nameEnglish;
   String? type; 
   String? baseUrl; 
+  String? imageExtension;
+  int pageCount = 604;
   
   bool isDownloaded = false; 
   String? localPath; 

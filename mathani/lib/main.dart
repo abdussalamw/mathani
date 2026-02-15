@@ -15,8 +15,10 @@ import 'core/theme/app_theme.dart';
 import 'presentation/providers/settings_provider.dart';
 import 'presentation/providers/quran_provider.dart';
 import 'presentation/providers/mushaf_metadata_provider.dart';
+import 'data/providers/mushaf_navigation_provider.dart';
 import 'presentation/providers/audio_provider.dart'; // Add import
 import 'package:mathani/presentation/providers/bookmark_provider.dart';
+import 'presentation/providers/surah_content_provider.dart';
 import 'presentation/providers/ui_provider.dart';
 import 'presentation/providers/tafsir_provider.dart';
 import 'presentation/screens/splash/splash_screen.dart';
@@ -24,6 +26,8 @@ import 'presentation/screens/home/main_shell_screen.dart';
 import 'presentation/screens/mushaf/mushaf_screen.dart';
 import 'presentation/screens/test/font_test_screen.dart';
 import 'presentation/screens/startup/initial_download_screen.dart';
+
+
 
 
 void main() async {
@@ -144,8 +148,16 @@ class MathaniApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => QuranProvider()),
         ChangeNotifierProvider(create: (_) => MushafMetadataProvider()),
+        ChangeNotifierProxyProvider<MushafMetadataProvider, MushafNavigationProvider>(
+          create: (_) => MushafNavigationProvider(),
+          update: (_, metadata, navigation) {
+            navigation!.updateMushaf(metadata.currentMushafId);
+            return navigation;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => AudioProvider()),
         ChangeNotifierProvider(create: (_) => BookmarkProvider()),
+        ChangeNotifierProvider(create: (_) => SurahContentProvider()), // Added
         ChangeNotifierProvider(create: (_) => UiProvider()),
         ChangeNotifierProvider(create: (_) => TafsirProvider()),
       ],

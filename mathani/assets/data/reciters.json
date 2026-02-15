@@ -1,0 +1,128 @@
+[
+  {
+    "id": "Alafasy_128kbps",
+    "name": "مشاري راشد العفاسي",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Husary_128kbps",
+    "name": "محمود خليل الحصري",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Husary_Muallim_128kbps",
+    "name": "محمود خليل الحصري (المعلم)",
+    "style": "Muallim",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Minshawy_Murattal_128kbps",
+    "name": "محمد صديق المنشاوي",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Minshawi_Mujawwad_192kbps",
+    "name": "محمد صديق المنشاوي (مجود)",
+    "style": "Mujawwad",
+    "bitrate": "192kbps"
+  },
+  {
+    "id": "Abdul_Basit_Murattal_192kbps",
+    "name": "عبد الباسط عبد الصمد",
+    "style": "Murattal",
+    "bitrate": "192kbps"
+  },
+  {
+    "id": "Abdul_Basit_Mujawwad_128kbps",
+    "name": "عبد الباسط عبد الصمد (مجود)",
+    "style": "Mujawwad",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Abdurrahmaan_As-Sudais_192kbps",
+    "name": "عبد الرحمن السديس",
+    "style": "Murattal",
+    "bitrate": "192kbps"
+  },
+  {
+    "id": "Saood_ash-Shuraym_128kbps",
+    "name": "سعود الشريم",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "MaherAlMuaiqly128kbps",
+    "name": "ماهر المعيقلي",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Hudhaify_128kbps",
+    "name": "علي الحذيفي",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Ahmed_ibn_Ali_al-Ajamy_128kbps_3",
+    "name": "أحمد العجمي",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Nasser_Alqatami_128kbps",
+    "name": "ناصر القطامي",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Yasser_Ad-Dussary_128kbps",
+    "name": "ياسر الدوسري",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Mohammad_al_Tablaway_128kbps",
+    "name": "محمد الطبلاوي",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Abu_Bakr_Ash-Shaatree_128kbps",
+    "name": "أبو بكر الشاطري",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Ghamadi_40kbps",
+    "name": "سعد الغامدي",
+    "style": "Murattal",
+    "bitrate": "40kbps"
+  },
+  {
+    "id": "Hani_Rifai_192kbps",
+    "name": "هاني الرفاعي",
+    "style": "Murattal",
+    "bitrate": "192kbps"
+  },
+  {
+    "id": "Abdullah_Basfar_192kbps",
+    "name": "عبد الله بصفر",
+    "style": "Murattal",
+    "bitrate": "192kbps"
+  },
+  {
+    "id": "Muhammad_Ayyoub_128kbps",
+    "name": "محمد أيوب",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  },
+  {
+    "id": "Muhammad_Jibreel_128kbps",
+    "name": "محمد جبريل",
+    "style": "Murattal",
+    "bitrate": "128kbps"
+  }
+]

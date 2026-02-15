@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/data/models/juz_data.dart';
 import 'package:mathani/presentation/providers/ui_provider.dart';
+import 'package:mathani/data/providers/mushaf_navigation_provider.dart';
 
 /// تبويب الأجزاء مع كعكة دائرية للأحزاب
 class JuzTabView extends StatefulWidget {
@@ -23,7 +24,7 @@ class _JuzTabViewState extends State<JuzTabView> {
     super.dispose();
   }
 
-  List<JuzData> _getFilteredJuz() {
+  List<JuzData> _getFilteredJuz(List<JuzData> juzList) {
     if (_searchQuery.isEmpty) {
       return juzList;
     }
@@ -38,77 +39,91 @@ class _JuzTabViewState extends State<JuzTabView> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final filteredJuz = _getFilteredJuz();
 
-    return Column(
-      children: [
-        // Search Bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: TextField(
-            controller: _searchController,
-            onChanged: (value) => setState(() => _searchQuery = value),
-            style: const TextStyle(fontFamily: 'Tajawal'),
-            decoration: InputDecoration(
-              hintText: 'ابحث برقم الجزء...',
-              hintStyle: TextStyle(
-                fontFamily: 'Tajawal',
-                color: Colors.grey[500],
-                fontSize: 14,
-              ),
-              prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        setState(() {
-                          _searchQuery = '';
-                          _searchController.clear();
-                        });
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: isDark ? const Color(0xFF2C2416) : Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          ),
-        ),
+    return Consumer<MushafNavigationProvider>(
+      builder: (context, navProvider, child) {
+        // تحويل JuzInfo إلى JuzData
+        final juzList = navProvider.juzList.map((juzInfo) => JuzData(
+          number: juzInfo.number,
+          pageNumber: juzInfo.startPage,
+          surahName: juzInfo.surahName,
+          surahNumber: juzInfo.startSurah,
+          ayahNumber: juzInfo.startAyah,
+        )).toList();
 
-        // Juz List
-        Expanded(
-          child: filteredJuz.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'لا توجد نتائج للبحث',
-                        style: TextStyle(
-                          fontFamily: 'Tajawal',
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
+        final filteredJuz = _getFilteredJuz(juzList);
+
+        return Column(
+          children: [
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                style: const TextStyle(fontFamily: 'Tajawal'),
+                decoration: InputDecoration(
+                  hintText: 'ابحث برقم الجزء...',
+                  hintStyle: TextStyle(
+                    fontFamily: 'Tajawal',
+                    color: Colors.grey[500],
+                    fontSize: 14,
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 100),
-                  itemCount: filteredJuz.length,
-                  itemBuilder: (context, index) {
-                    final juz = filteredJuz[index];
-                    return _buildJuzTile(context, juz, isDark);
-                  },
+                  prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _searchQuery = '';
+                              _searchController.clear();
+                            });
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF2C2416) : Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
-        ),
-      ],
+              ),
+            ),
+
+            // Juz List
+            Expanded(
+              child: filteredJuz.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            'لا توجد نتائج للبحث',
+                            style: TextStyle(
+                              fontFamily: 'Tajawal',
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 100),
+                      itemCount: filteredJuz.length,
+                      itemBuilder: (context, index) {
+                        final juz = filteredJuz[index];
+                        return _buildJuzTile(context, juz, isDark);
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 

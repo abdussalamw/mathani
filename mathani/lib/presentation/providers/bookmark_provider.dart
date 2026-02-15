@@ -48,4 +48,29 @@ class BookmarkProvider extends ChangeNotifier {
   bool isBookmarked(int surah, int ayah) {
     return _bookmarks.any((b) => b.surahNumber == surah && b.ayahNumber == ayah);
   }
+
+  // --- Page Bookmark Logic (Surah = 0, Ayah = PageNumber) ---
+  
+  Future<void> addPageBookmark(int pageNumber) async {
+    // Check if already exists to avoid duplicates
+    if (isPageBookmarked(pageNumber)) return;
+    
+    await addBookmark(0, pageNumber, note: 'Page $pageNumber');
+  }
+
+  Future<void> removePageBookmark(int pageNumber) async {
+    await removeBookmark(0, pageNumber);
+  }
+
+  bool isPageBookmarked(int pageNumber) {
+    return _bookmarks.any((b) => b.surahNumber == 0 && b.ayahNumber == pageNumber);
+  }
+  
+  void togglePageBookmark(int pageNumber) {
+    if (isPageBookmarked(pageNumber)) {
+      removePageBookmark(pageNumber);
+    } else {
+      addPageBookmark(pageNumber);
+    }
+  }
 }

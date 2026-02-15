@@ -1,4 +1,5 @@
 import 'package:isar/isar.dart';
+import 'package:mathani/core/utils/text_utils.dart';
 
 part 'ayah.g.dart';
 
@@ -11,6 +12,9 @@ class Ayah {
   
   int ayahNumber = 1;
   
+  @Index() // Allow searching
+  String textClean = '';      // النص بدون تشكيل للبحث
+
   // النص القرآني
   String text = '';           // النص البسيط
   String? textUthmani;        // الرسم العثماني (إن وُجد)
@@ -31,10 +35,12 @@ class Ayah {
   
   // From JSON
   factory Ayah.fromJson(Map<String, dynamic> json, int surahNum) {
+    final rawText = json['text']?.toString() ?? '';
     return Ayah()
       ..surahNumber = surahNum
       ..ayahNumber = int.tryParse(json['numberInSurah']?.toString() ?? json['verseNumber']?.toString() ?? '1') ?? 1
-      ..text = json['text']?.toString() ?? ''
+      ..text = rawText
+      ..textClean = TextUtils.normalizeQuranText(rawText)
       ..juz = int.tryParse(json['juz']?.toString() ?? '1') ?? 1
       ..page = int.tryParse(json['page']?.toString() ?? '1') ?? 1
       ..hizbQuarter = int.tryParse(json['hizbQuarter']?.toString() ?? '0')

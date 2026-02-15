@@ -27,10 +27,24 @@ class AudioService {
     return '$_appDocPath/audio/$reciterId/$s/$ayah.mp3';
   }
 
-  /// Check if an Ayah file exists locally
+  /// Check if an Ayah file exists locally and is valid (size > 0)
   Future<bool> isAyahDownloaded(String reciterId, int surah, int ayah) async {
     final path = await getAyahPath(reciterId, surah, ayah);
-    return File(path).exists();
+    final file = File(path);
+    if (!await file.exists()) return false;
+    
+    // Integrity check: corrupt or empty file
+    if (await file.length() < 1000) { // Less than 1KB is definitely suspicious for audio
+       try {
+         await file.delete();
+         debugPrint('Deleted corrupt/empty audio file: $path');
+       } catch (e) {
+         debugPrint('Failed to delete corrupt file: $e');
+       }
+       return false;
+    }
+    
+    return true;
   }
 
   /// Generate the remote URL for an Ayah

@@ -3,6 +3,8 @@ import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/screens/surah_list/surah_list_screen.dart';
 import 'package:mathani/presentation/screens/bookmarks/bookmarks_screen.dart';
 import 'package:mathani/presentation/screens/index/widgets/juz_tab_view.dart';
+import 'package:mathani/presentation/providers/ui_provider.dart';
+import 'package:provider/provider.dart';
 
 /// الشاشة الرئيسية للفهرس مع 3 تبويبات
 class IndexScreen extends StatefulWidget {
@@ -14,11 +16,31 @@ class IndexScreen extends StatefulWidget {
 
 class _IndexScreenState extends State<IndexScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _lastTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    final uiProvider = context.read<UiProvider>();
+    _lastTabIndex = uiProvider.indexScreenTabIndex.clamp(0, 2);
+    _tabController = TabController(
+      length: 3, 
+      vsync: this,
+      initialIndex: _lastTabIndex,
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final uiProvider = context.watch<UiProvider>();
+    final newTabIndex = uiProvider.indexScreenTabIndex.clamp(0, 2);
+    
+    // Update tab if it changed
+    if (newTabIndex != _lastTabIndex && _tabController.index != newTabIndex) {
+      _lastTabIndex = newTabIndex;
+      _tabController.animateTo(newTabIndex);
+    }
   }
 
   @override

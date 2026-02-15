@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:mathani/data/models/page_glyph.dart';
 import 'package:mathani/data/services/glyph_data_loader.dart';
 import 'package:mathani/presentation/widgets/mushaf_page_widget.dart';
+import 'package:mathani/presentation/widgets/mushaf_image_widget.dart';
 import 'package:mathani/core/constants/app_colors.dart';
+import 'package:mathani/presentation/widgets/dialogs/ayah_content_sheet.dart'; // Added
 import 'package:mathani/presentation/screens/tafsir/tafsir_screen.dart';
 import 'package:mathani/presentation/providers/audio_provider.dart';
 import 'package:mathani/presentation/providers/bookmark_provider.dart';
 import 'package:mathani/presentation/providers/ui_provider.dart';
 import 'package:provider/provider.dart';
 import '../../providers/mushaf_metadata_provider.dart';
+import '../../../data/providers/mushaf_navigation_provider.dart';
 import '../../providers/quran_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../widgets/audio_minibar.dart'; // Added
 import '../surah_list/surah_list_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -40,9 +44,52 @@ class _MushafScreenState extends State<MushafScreen> {
     super.initState();
     _currentPage = widget.initialPage;
     _pageController = PageController(initialPage: widget.initialPage - 1);
+    
+    // Sync initial page with UI Provider for Tafsir
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _syncPageWithProvider(_currentPage);
+      }
+    });
+
     _loadPages();
     // Keep screen on while reading
     WakelockPlus.enable();
+    
+    // Listen to Audio Provider for Auto-Scroll
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AudioProvider>().addListener(_onAudioStateChange);
+    });
+  }
+  
+  void _onAudioStateChange() {
+    if (!mounted) return;
+    
+    final audio = context.read<AudioProvider>();
+    if (audio.isPlaying && audio.currentSurah != null && audio.currentAyah != null) {
+       final navProvider = context.read<MushafNavigationProvider>();
+       final page = navProvider.getPageForAyah(audio.currentSurah!, audio.currentAyah!);
+       
+       if (page != null && page != _currentPage) {
+         // Auto Turn Page
+         final targetIndex = page - 1;
+         if (_pageController.hasClients) {
+            _pageController.animateToPage(
+              targetIndex, 
+              duration: const Duration(milliseconds: 500), 
+              curve: Curves.easeInOut
+            );
+         }
+       }
+       
+       // Update visual highlight state
+       if (_selectedSurah != audio.currentSurah || _selectedAyah != audio.currentAyah) {
+         setState(() {
+           _selectedSurah = audio.currentSurah;
+           _selectedAyah = audio.currentAyah;
+         });
+       }
+    }
   }
   
   Future<void> _loadPages() async {
@@ -52,7 +99,35 @@ class _MushafScreenState extends State<MushafScreen> {
     });
     
     try {
-      final pages = await _loader.loadAllPages();
+      // Get current mushaf metadata
+      final mushafProvider = context.read<MushafMetadataProvider>();
+      final currentType = mushafProvider.currentMushafType;
+      final currentId = mushafProvider.currentMushafId;
+      
+      // Get page count from metadata
+      final navProvider = Provider.of<MushafNavigationProvider>(context, listen: false);
+      int pageCount = navProvider.totalPages;
+      try {
+        final mushaf = mushafProvider.availableMushafs.firstWhere((m) => m.identifier == currentId);
+        pageCount = mushaf.pageCount;
+      } catch (_) {}
+      
+      List<PageGlyph> pages;
+      
+      if (currentType == 'image') {
+        // For image-based mushafs (like Shamarly), create dummy pages with just page numbers
+        pages = List.generate(
+          pageCount,
+          (index) => PageGlyph(
+            page: index + 1,
+            lines: [], // No glyph data needed for images
+          ),
+        );
+      } else {
+        // For digital mushafs (like Madani), load actual glyph data
+        pages = await _loader.loadAllPages();
+      }
+      
       if (mounted) {
         setState(() {
           _pages = pages;
@@ -74,39 +149,48 @@ class _MushafScreenState extends State<MushafScreen> {
       context: context,
       builder: (context) {
         int? selectedPage;
+        final navProvider = Provider.of<MushafNavigationProvider>(context, listen: false);
         return AlertDialog(
-          title: const Text(
-            'الانتقال إلى صفحة',
-            style: TextStyle(fontFamily: 'Tajawal'),
-          ),
-          content: TextField(
-            keyboardType: TextInputType.number,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'رقم الصفحة (1-604)',
-            ),
-            onChanged: (value) {
-              selectedPage = int.tryParse(value);
-            },
-            onSubmitted: (value) {
-              if (selectedPage != null && 
-                  selectedPage! >= 1 && 
-                  selectedPage! <= (_pages?.length ?? 604)) {
-                Navigator.pop(context);
-                _pageController.jumpToPage(selectedPage! - 1);
-              }
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
-            ),
+                    title: const Text(
+                      'الانتقال إلى صفحة',
+                      style: TextStyle(fontFamily: 'Tajawal'),
+                    ),
+                    content: TextField(
+                      keyboardType: TextInputType.number,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'رقم الصفحة (1-${navProvider.totalPages})',
+                      ),
+                      onChanged: (value) {
+                        selectedPage = int.tryParse(value);
+                      },
+                      onSubmitted: (value) {
+                        // Get dynamic max pages
+                         final maxPages = navProvider.totalPages;
+        
+                        selectedPage = int.tryParse(value);
+                        if (selectedPage != null && 
+                            selectedPage! >= 1 && 
+                            selectedPage! <= maxPages) {
+                          Navigator.pop(context);
+                          _pageController.jumpToPage(selectedPage! - 1);
+                        }
+                      },
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
+                      ),
             ElevatedButton(
               onPressed: () {
+               // Get dynamic max pages
+               final navProvider = Provider.of<MushafNavigationProvider>(context, listen: false);
+               final maxPages = navProvider.totalPages;
+
                 if (selectedPage != null && 
                     selectedPage! >= 1 && 
-                    selectedPage! <= (_pages?.length ?? 604)) {
+                    selectedPage! <= maxPages) {
                   Navigator.pop(context);
                   _pageController.animateToPage(
                     selectedPage! - 1,
@@ -134,182 +218,56 @@ class _MushafScreenState extends State<MushafScreen> {
 
   void _updateSystemUI() {
     final uiProvider = context.read<UiProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
+    final isDark = settingsProvider.isDarkMode;
+    
     if (uiProvider.isImmersiveMode) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      // Set status bar icon brightness based on theme
+      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      ));
     }
   }
 
-  void _onAyahSelected(int surah, int ayah) {
-    setState(() {
-      _selectedSurah = surah;
-      _selectedAyah = ayah;
-    });
+  void _onAyahInteraction(int surah, int ayah) {
+     setState(() {
+       _selectedSurah = surah;
+       _selectedAyah = ayah;
+     });
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _buildAyahOptionsMenu(surah, ayah),
-    ).whenComplete(() {
-      setState(() {
-        _selectedSurah = null;
-        _selectedAyah = null;
-      });
-    });
+     showModalBottomSheet(
+       context: context,
+       isScrollControlled: true, // Allow full height for the sheet
+       backgroundColor: Colors.transparent,
+       builder: (context) => AyahContentSheet(
+         surahNumber: surah,
+         ayaNumber: ayah,
+         wordCount: 100, // Safe default
+       ),
+     ).whenComplete(() {
+       if (mounted) {
+         setState(() {
+           _selectedSurah = null;
+           _selectedAyah = null;
+         });
+       }
+     });
   }
 
-  Widget _buildAyahOptionsMenu(int surah, int ayah) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = isDark ? const Color(0xFF2C2416) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black87;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'سورة $surah - آية $ayah', // TODO: Use proper Surah names logic later
-            style: TextStyle(
-              fontFamily: 'Tajawal',
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildOptionButton(
-                icon: Icons.play_arrow_rounded,
-                label: 'استماع',
-                color: AppColors.primary,
-                onTap: () {
-                  Navigator.pop(context);
-                  final shouldCache = context.read<SettingsProvider>().downloadWhilePlaying;
-                  
-                  // Get total ayahs for auto-advance
-                  int? totalAyahs;
-                  try {
-                    final quran = context.read<QuranProvider>();
-                    if (quran.surahs.isNotEmpty) {
-                      final surahObj = quran.surahs.firstWhere((s) => s.number == _selectedSurah);
-                      totalAyahs = surahObj.numberOfAyahs;
-                    }
-                  } catch (_) {}
-
-                  context.read<AudioProvider>().playAyah(
-                    _selectedSurah!, 
-                    _selectedAyah!, 
-                    shouldCache: shouldCache,
-                    totalAyahsInSurah: totalAyahs
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                     const SnackBar(
-                       content: Text(
-                         'جاري تشغيل التلاوة...',
-                         style: TextStyle(fontFamily: 'Tajawal'),
-                       ),
-                       duration: Duration(seconds: 2),
-                     ),
-                  );
-                },
-              ),
-              _buildOptionButton(
-                icon: Icons.menu_book_rounded,
-                label: 'تفسير',
-                color: AppColors.golden,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TafsirScreen(
-                        surahNumber: _selectedSurah!,
-                        ayahNumber: _selectedAyah!,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              Consumer<BookmarkProvider>(
-                builder: (context, bookmarkProvider, child) {
-                  final isBookmarked = bookmarkProvider.isBookmarked(_selectedSurah!, _selectedAyah!);
-                  return _buildOptionButton(
-                    icon: isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                    label: isBookmarked ? 'محفوظ' : 'علامة',
-                    color: Colors.blue,
-                    onTap: () {
-                      Navigator.pop(context);
-                      if (isBookmarked) {
-                        bookmarkProvider.removeBookmark(_selectedSurah!, _selectedAyah!);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                           const SnackBar(content: Text('تم إزالة العلامة', style: TextStyle(fontFamily: 'Tajawal'))),
-                        );
-                      } else {
-                        bookmarkProvider.addBookmark(_selectedSurah!, _selectedAyah!);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                           const SnackBar(content: Text('تم الحفظ في العلامات', style: TextStyle(fontFamily: 'Tajawal'))),
-                        );
-                      }
-                    },
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOptionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 80,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   void dispose() {
+    // Remove listener safely
+    try {
+      context.read<AudioProvider>().removeListener(_onAudioStateChange);
+    } catch (_) {}
+    
     _pageController.dispose();
-    // Allow screen to turn off when leaving Mushaf
     WakelockPlus.disable();
     super.dispose();
   }
@@ -322,9 +280,16 @@ class _MushafScreenState extends State<MushafScreen> {
     final uiProvider = Provider.of<UiProvider>(context);
     if (uiProvider.pageToJump != null) {
       final page = uiProvider.pageToJump!;
+      
+      // Clamp page to current mushaf limits
+       final navProvider = Provider.of<MushafNavigationProvider>(context, listen: false);
+       final maxPages = navProvider.totalPages;
+       
+       final targetPage = page > maxPages ? maxPages : page;
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_pageController.hasClients) {
-          _pageController.jumpToPage(page - 1);
+          _pageController.jumpToPage(targetPage - 1);
           uiProvider.consumeJump();
         }
       });
@@ -431,26 +396,41 @@ class _MushafScreenState extends State<MushafScreen> {
       );
     }
     
+    // Calculate total pages for PageView
+    int totalPages = 604;
+    try {
+      final provider = context.read<MushafMetadataProvider>();
+      final currentId = provider.currentMushafId;
+      final mushaf = provider.availableMushafs.firstWhere((m) => m.identifier == currentId);
+      totalPages = mushaf.pageCount;
+    } catch (_) {
+      totalPages = _pages?.length ?? 604;
+    }
+
     return Container(
       color: isDark ? const Color(0xFF1A1410) : const Color(0xFFFFFDF5),
-      child: Column(
+      child: Stack(
+        children: [
+          Column(
           children: [
             Expanded(
               child: GestureDetector(
-                 onTap: () {
-                   // This wrapper catching is old, sub-gestures handle it now
-                 },
+                onTap: () {
+                  // This wrapper catching is old, sub-gestures handle it now
+                },
                 child: Directionality(
                   textDirection: TextDirection.rtl,
                   child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: _pages?.length ?? 0,
+                     controller: _pageController,
+                    itemCount: totalPages,
                     reverse: false, // In RTL, standard order means reverse: false (Page 1 on right)
                     onPageChanged: (index) {
                       setState(() {
                         _currentPage = index + 1;
                       });
+                      _syncPageWithProvider(index + 1);
                     },
+
                     itemBuilder: (context, index) {
                       return GestureDetector(
                         behavior: HitTestBehavior.translucent, 
@@ -461,12 +441,31 @@ class _MushafScreenState extends State<MushafScreen> {
                         },
                         child: Consumer<MushafMetadataProvider>(
                           builder: (context, mushafProvider, child) {
-                            final isDigital = mushafProvider.currentMushafType == 'digital';
+                            final currentType = mushafProvider.currentMushafType;
+                            final isDigital = currentType == 'digital';
+                            
+                            if (currentType == 'image') {
+                               final currentId = mushafProvider.currentMushafId;
+                               // Find metadata safely
+                               final mushaf = mushafProvider.availableMushafs.firstWhere(
+                                 (m) => m.identifier == currentId,
+                                 orElse: () => mushafProvider.availableMushafs.first
+                               );
+                               
+                               return MushafImageWidget(
+                                 pageNumber: _pages![index].page,
+                                 mushafId: currentId,
+                                 baseUrl: mushaf.baseUrl ?? '',
+                                 imageExtension: mushaf.imageExtension ?? 'jpg',
+                               );
+                            }
+
                             return MushafPageWidget(
                               page: _pages![index],
                               selectedSurah: _selectedSurah,
                               selectedAyah: _selectedAyah,
-                              onAyahSelected: _onAyahSelected,
+                              onAyahSelected: _onAyahInteraction,
+                              onAyahLongPress: _onAyahInteraction,
                               showInfo: true, // Always show top bar (Sticky)
                               isDigital: isDigital,
                             );
@@ -480,6 +479,56 @@ class _MushafScreenState extends State<MushafScreen> {
             ),
           ],
         ),
+        
+        // Audio Mini Bar
+        const Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: AudioMinibar(),
+        ),
+      ],
+      ),
     );
+  }
+  
+  void _syncPageWithProvider(int pageNum) {
+    // Sync Logic: Ensure Tafsir gets the correct "Madani" Page Number
+    final navProvider = context.read<MushafNavigationProvider>();
+    final pageInfo = navProvider.getPageInfo(pageNum);
+    final mushafId = context.read<MushafMetadataProvider>().currentMushafId;
+    
+    if (mushafId == 'shamarly_15lines' && pageInfo != null) {
+       // Async translation for Shamarly
+       final quranRepo = context.read<QuranProvider>();
+       quranRepo.getAyah(pageInfo.startSurah, pageInfo.startAyah).then((either) {
+          either.fold(
+            (failure) => null, // Ignore failures
+            (ayah) {
+              if (ayah != null && mounted) {
+                // Update UI with the STANDARD Madani page
+                context.read<UiProvider>().setCurrentMushafPage(ayah.page);
+                
+                // Also update reading location for history
+                context.read<QuranProvider>().updateReadingLocation(ayah.surahNumber, ayah.ayahNumber);
+              }
+            }
+          );
+       });
+    } else {
+       // Standard/Madani: 1-to-1 mapping
+       context.read<UiProvider>().setCurrentMushafPage(pageNum);
+       
+       // Update Reading Location Logic for Madani (Dynamic & Fast)
+       if (pageInfo != null && pageInfo.startSurah > 0) {
+          final surah = pageInfo.startSurah;
+          final ayah = pageInfo.startAyah > 0 ? pageInfo.startAyah : 1;
+          
+          context.read<QuranProvider>().updateReadingLocation(surah, ayah);
+          
+          // Audio Context Awareness: Update audio context without playing
+          context.read<AudioProvider>().setContext(surah, ayah);
+       }
+    }
   }
 }

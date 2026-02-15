@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
+import 'package:mathani/core/utils/text_utils.dart';
 import 'package:mathani/data/models/surah.dart';
+import 'package:mathani/data/models/ayah.dart'; // Added
 import 'package:mathani/presentation/providers/quran_provider.dart';
 import 'package:mathani/presentation/providers/ui_provider.dart';
+import 'package:mathani/data/providers/mushaf_navigation_provider.dart';
 import 'package:mathani/presentation/screens/mushaf/mushaf_screen.dart';
 
 class SurahListScreen extends StatefulWidget {
@@ -33,6 +37,18 @@ class _SurahListScreenState extends State<SurahListScreen> {
 
 
 
+  // Debouncer
+  Timer? _debounce;
+
+  void _onSearchChanged(String query) {
+    setState(() => _searchQuery = query);
+    
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+       context.read<QuranProvider>().search(query);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -46,10 +62,10 @@ class _SurahListScreenState extends State<SurahListScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: TextField(
               controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
+              onChanged: _onSearchChanged,
               style: const TextStyle(fontFamily: 'Tajawal'),
               decoration: InputDecoration(
-                hintText: 'ابحث باسم السورة أو رقمها...',
+                hintText: 'ابحث باسم السورة أو بآية...',
                 hintStyle: TextStyle(
                   fontFamily: 'Tajawal',
                   color: Colors.grey[500],
@@ -60,10 +76,11 @@ class _SurahListScreenState extends State<SurahListScreen> {
                   ? IconButton(
                       icon: const Icon(Icons.clear),
                       onPressed: () {
-                        setState(() {
-                          _searchQuery = '';
-                          _searchController.clear();
-                        });
+                         setState(() {
+                           _searchQuery = '';
+                           _searchController.clear();
+                         });
+                         context.read<QuranProvider>().clearSearch();
                       },
                     )
                   : null,
@@ -78,73 +95,70 @@ class _SurahListScreenState extends State<SurahListScreen> {
             ),
           ),
           
-          // Surah List
+          // Results
           Expanded(
             child: Consumer<QuranProvider>(
               builder: (context, provider, child) {
-                if (provider.isLoading) {
+                if (provider.isLoading && provider.surahs.isEmpty) {
                   return const Center(child: CircularProgressIndicator(color: AppColors.primary));
                 }
 
-                if (provider.errorMessage != null) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.amber),
-                        const SizedBox(height: 16),
-                        Text(
-                          provider.errorMessage!,
-                          style: const TextStyle(fontFamily: 'Tajawal'),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: () => provider.loadSurahs(),
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('إعادة المحاولة'),
-                        ),
-                      ],
-                    ),
-                  );
+                if (provider.errorMessage != null && provider.surahs.isEmpty) {
+                   return Center(child: Text(provider.errorMessage!));
                 }
-
-                if (provider.surahs.isEmpty) {
-                  return const Center(child: Text('لا توجد بيانات', style: TextStyle(fontFamily: 'Tajawal')));
-                }
-
+                
                 final filteredSurahs = _getFilteredSurahs(provider.surahs);
+                final ayahResults = provider.searchResults;
+                
+                // If searching show loading for search only if strict needs? 
+                // Actually provider.isSearching is available but maybe we don't want to block UI.
 
-                if (filteredSurahs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'لا توجد نتائج للبحث',
-                          style: TextStyle(
-                            fontFamily: 'Tajawal',
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                if (filteredSurahs.isEmpty && ayahResults.isEmpty && _searchQuery.isNotEmpty) {
+                   if (provider.isSearching) {
+                      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+                   }
+                   return Center(child: Text('لا توجد نتائج', style: TextStyle(fontFamily: 'Tajawal', color: isDark ? Colors.grey : Colors.grey[600])));
                 }
 
                 return Directionality(
                   textDirection: TextDirection.rtl,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.only(bottom: 100), // Increased padding for BottomBar
-                    itemCount: filteredSurahs.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final surah = filteredSurahs[index];
-                      return _buildSurahTile(context, surah, isDark);
-                    },
+                  child: CustomScrollView(
+                    slivers: [
+                       if (filteredSurahs.isNotEmpty) ...[
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Text('السور', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            ),
+                          ),
+                          SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => _buildSurahTile(context, filteredSurahs[index], isDark),
+                              childCount: filteredSurahs.length,
+                            ),
+                          ),
+                       ],
+                       
+                       if (provider.isSearching)
+                          const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))),
+
+                       if (!provider.isSearching && ayahResults.isNotEmpty) ...[
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Text('الآيات', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            ),
+                          ),
+                          SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => _buildAyahTile(context, ayahResults[index], isDark, provider.surahs),
+                              childCount: ayahResults.length,
+                            ),
+                          ),
+                       ],
+                       
+                       const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+                    ],
                   ),
                 );
               },
@@ -155,6 +169,81 @@ class _SurahListScreenState extends State<SurahListScreen> {
     );
   }
 
+  Widget _buildAyahTile(BuildContext context, Ayah ayah, bool isDark, List<Surah> surahs) {
+     final surah = surahs.firstWhere((s) => s.number == ayah.surahNumber, orElse: () => Surah()..number = 0..nameArabic = '?'..nameEnglish = '?'..numberOfAyahs = 0..revelationType = 'Meccan');
+     
+     return InkWell(
+        onTap: () {
+           final page = ayah.page; 
+           if (page > 0) {
+              context.read<UiProvider>().jumpToPage(page);
+           }
+        },
+        child: Container(
+           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+           padding: const EdgeInsets.all(16),
+           decoration: BoxDecoration(
+             color: isDark ? const Color(0xFF2C2416) : Colors.white,
+             borderRadius: BorderRadius.circular(12),
+             boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                )
+             ],
+             border: Border.all(color: isDark ? Colors.brown.withOpacity(0.3) : Colors.brown.withOpacity(0.1)),
+           ),
+           child: Column(
+             crossAxisAlignment: CrossAxisAlignment.stretch,
+             children: [
+               Row(
+                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                 children: [
+                   Container(
+                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                     decoration: BoxDecoration(
+                       color: AppColors.primary.withOpacity(0.1),
+                       borderRadius: BorderRadius.circular(20),
+                     ),
+                     child: Text(
+                       '${surah.nameArabic} : ${ayah.ayahNumber}', 
+                       style: const TextStyle(
+                         fontFamily: 'Tajawal', 
+                         fontWeight: FontWeight.bold,
+                         fontSize: 12, 
+                         color: AppColors.primary
+                       ),
+                     ),
+                   ),
+                   Text(
+                     'صفحة ${ayah.page}', 
+                     style: TextStyle(
+                       fontFamily: 'Tajawal', 
+                       fontSize: 12, 
+                       color: isDark ? Colors.grey[400] : Colors.grey[600]
+                     )
+                   ),
+                 ],
+               ),
+               const SizedBox(height: 12),
+               Text(ayah.text, 
+                 style: TextStyle(
+                   fontFamily: 'UthmanicHafs', 
+                   fontSize: 20, // Larger font for Quran
+                   height: 1.6,
+                   color: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF212121),
+                 ),
+                 maxLines: 3,
+                 overflow: TextOverflow.ellipsis,
+                 textAlign: TextAlign.justify,
+               ),
+             ],
+           ),
+        ),
+     );
+  }
+
   Widget _buildSurahTile(BuildContext context, Surah surah, bool isDark) {
     // رقم السورة → Unicode للخط QCF4_BSML
     final int surahCodePoint = 0xF100 + (surah.number - 1);
@@ -162,7 +251,8 @@ class _SurahListScreenState extends State<SurahListScreen> {
     
     return InkWell(
       onTap: () {
-        context.read<UiProvider>().jumpToSurah(surah.number);
+        final navProvider = context.read<MushafNavigationProvider>();
+        context.read<UiProvider>().jumpToSurah(surah.number, navProvider);
       },
       child: Container(
         height: 60, // تصغير من 80px
@@ -231,23 +321,13 @@ class _SurahListScreenState extends State<SurahListScreen> {
       ),
     );
   }
-  String _normalizeArabic(String text) {
-    return text
-        .replaceAll('أ', 'ا')
-        .replaceAll('إ', 'ا')
-        .replaceAll('آ', 'ا')
-        .replaceAll('ى', 'ي')
-        .replaceAll('ة', 'ه')
-        .replaceAll(RegExp(r'[\u064B-\u065F]'), ''); // Remove Tashkeel
-  }
-
   List<Surah> _getFilteredSurahs(List<Surah> surahs) {
     if (_searchQuery.isEmpty) return surahs;
     
-    final normalizedQuery = _normalizeArabic(_searchQuery);
+    final normalizedQuery = TextUtils.normalizeQuranText(_searchQuery);
     
     return surahs.where((surah) {
-      final normalizedName = _normalizeArabic(surah.nameArabic);
+      final normalizedName = TextUtils.normalizeQuranText(surah.nameArabic);
       return normalizedName.contains(normalizedQuery) ||
              surah.nameEnglish.toLowerCase().contains(_searchQuery.toLowerCase()) ||
              surah.number.toString() == _searchQuery;

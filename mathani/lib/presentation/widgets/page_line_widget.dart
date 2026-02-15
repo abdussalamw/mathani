@@ -8,6 +8,7 @@ class PageLineWidget extends StatelessWidget {
   final int pageNumber;
   final bool isParentFontLoaded;
   final Function(int surah, int ayah)? onAyahSelected;
+  final Function(int surah, int ayah)? onAyahLongPress; // Added
   final int? selectedSurah;
   final int? selectedAyah;
   
@@ -20,6 +21,7 @@ class PageLineWidget extends StatelessWidget {
     required this.pageNumber,
     required this.isParentFontLoaded,
     this.onAyahSelected,
+    this.onAyahLongPress, // Added
     this.selectedSurah,
     this.selectedAyah,
     this.isDigital = false,
@@ -48,8 +50,15 @@ class PageLineWidget extends StatelessWidget {
                  // Determine Text Content
                  String text = '';
                  // Font Style Defaults
-                 String fontFamily = 'Amiri'; // Standard Digital Font
-                 double fontSize = 22; 
+                 String fontFamily = 'UthmanicHafs'; // خط عثماني حفص V22
+                 
+                 // استخدام حجم خط متجاوب لتقليل الحاجة لتصغير السطر (FittedBox)
+                 // مما يحافظ على سماكة خط موحدة بين الأسطر
+                 double screenWidth = MediaQuery.of(context).size.width;
+                 double fontSize = screenWidth * 0.045; // 4.5% من عرض الشاشة
+                 if (fontSize > 24) fontSize = 24; // حد أقصى
+                 if (fontSize < 16) fontSize = 16; // حد أدنى
+                 
                  Color? color;
                  
                  if (glyph.isWord) {
@@ -63,9 +72,9 @@ class PageLineWidget extends StatelessWidget {
                    if (text.isEmpty) return const SizedBox();
                    
                  } else if (glyph.isAyahEnd) {
-                   text = '\uFD3E${glyph.ayah?.toString() ?? ''}\uFD3F'; // Or similar bracket
-                   fontFamily = 'Amiri';
-                   color = AppColors.golden;
+                   text = '\uFD3F${glyph.ayah?.toString() ?? ''}\uFD3E'; // عكس الأقواس للعرض الصحيح
+                   fontFamily = 'UthmanicHafs';
+                   color = AppColors.primary; // أحمر نسكافيه
                  } else if (glyph.isBasmala || glyph.isSurahName) {
                    // For now, simple text, or mapped specific text if passed
                    if (glyph.isBasmala) {
@@ -99,13 +108,14 @@ class PageLineWidget extends StatelessWidget {
                     ),
                  );
                  
-                 // Intearaction
-                 if (glyph.surah != null && glyph.ayah != null) {
-                    return GestureDetector(
-                      onTap: () => onAyahSelected?.call(glyph.surah!, glyph.ayah!),
-                      child: child,
-                    );
-                 }
+                  // Intearaction
+                  if (glyph.surah != null && glyph.ayah != null) {
+                     return GestureDetector(
+                       onTap: () => onAyahSelected?.call(glyph.surah!, glyph.ayah!),
+                       onLongPress: () => onAyahLongPress?.call(glyph.surah!, glyph.ayah!), // Added
+                       child: child,
+                     );
+                  }
                  return child;
               }).toList(),
             ),
@@ -130,6 +140,14 @@ class PageLineWidget extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: line.glyphs.map((glyph) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
+            
+            // تخطي علامات التوقف والسجدة (مدمجة في الخط بالفعل)
+            // Type 3 = Pause marks (علامات الوقف)
+            // Type 4 = Sajdah marks (علامات السجدة)
+            if (glyph.isPause || glyph.isSajdah) {
+              return const SizedBox.shrink(); // لا نعرضها منفصلة
+            }
+            
             // استخدام الأكواد الأصلية من البيانات
             String code = glyph.code;
             
@@ -151,13 +169,13 @@ class PageLineWidget extends StatelessWidget {
               return Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('\uFAD5', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 65.0, color: basmalaColor)), // بسم
+                  Text('\uFAD5', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // بسم
                   const SizedBox(width: 4),
-                  Text('\uFAD6', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 65.0, color: basmalaColor)), // الله
+                  Text('\uFAD6', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // الله
                   const SizedBox(width: 4),
-                  Text('\uFAD7', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 65.0, color: basmalaColor)), // الرحمن
+                  Text('\uFAD7', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // الرحمن
                   const SizedBox(width: 4),
-                  Text('\uFAD8', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 65.0, color: basmalaColor)), // الرحيم
+                  Text('\uFAD8', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // الرحيم
                 ],
               );
             }
@@ -196,6 +214,7 @@ class PageLineWidget extends StatelessWidget {
             if ((glyph.isWord || glyph.isAyahEnd) && glyph.surah != null && glyph.ayah != null) {
               return GestureDetector(
                 onTap: () => onAyahSelected?.call(glyph.surah!, glyph.ayah!),
+                onLongPress: () => onAyahLongPress?.call(glyph.surah!, glyph.ayah!), // Added
                 behavior: HitTestBehavior.translucent,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 1.0),
@@ -234,7 +253,7 @@ class PageLineWidget extends StatelessWidget {
   
    double _getGlyphSize(Glyph glyph) {
      if (glyph.isBasmala || glyph.isSurahName) {
-       return 65.0; // Increased significantly
+       return 56.0; // Standardized to match text
      } else if (glyph.isAyahEnd) {
        return 50.0; // Increased
      } else if (glyph.isSajdah) {

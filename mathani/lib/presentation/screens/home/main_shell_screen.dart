@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Added for SystemNavigator
 
 import '../../../core/constants/app_colors.dart';
 
@@ -7,10 +8,9 @@ import '../index/index_screen.dart';
 import '../settings/settings_screen.dart';
 import '../mushaf/mushaf_screen.dart';
 import '../tafsir/tafsir_screen.dart'; 
-import '../audio_player/audio_player_screen.dart'; 
-import '../bookmarks/bookmarks_screen.dart'; 
 import '../../providers/ui_provider.dart';
 import '../../widgets/audio_minibar.dart';
+import '../../widgets/audio_player_sheet.dart';
 import 'package:provider/provider.dart';
 
 class MainShellScreen extends StatefulWidget {
@@ -21,17 +21,48 @@ class MainShellScreen extends StatefulWidget {
 }
 
 class _MainShellScreenState extends State<MainShellScreen> {
-  // bool _isPlayingAudio = false; // We can remove this if handled by providers
+  DateTime? _lastPressedAt; // Added for double-back exit logic
   
   @override
   Widget build(BuildContext context) {
     return Consumer<UiProvider>(
       builder: (context, uiProvider, child) {
-        return Scaffold(
-          extendBody: true, // Allow body to extend behind BottomNavigationBar
-          extendBodyBehindAppBar: true, // Allow body to extend behind AppBar
-          appBar: (uiProvider.isImmersiveMode || uiProvider.currentTabIndex == 2) 
-            ? null 
+        return PopScope(
+          canPop: false,
+          onPopInvoked: (didPop) async {
+            if (didPop) return;
+
+            // 1. If not on Home (Index=0), go to Home
+            if (uiProvider.currentTabIndex != 0) {
+              uiProvider.setTabIndex(0);
+              return;
+            }
+
+            // 2. If on Home, check Double Tap to Exit
+            final now = DateTime.now();
+            final maxDuration = const Duration(seconds: 2);
+            final isWarning = _lastPressedAt == null || 
+                              now.difference(_lastPressedAt!) > maxDuration;
+
+            if (isWarning) {
+              _lastPressedAt = now;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('اضغط مرة أخرى للخروج', style: TextStyle(fontFamily: 'Tajawal')),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+
+            // 3. Exit App
+            await SystemNavigator.pop();
+          },
+          child: Scaffold(
+            extendBody: true, // Allow body to extend behind BottomNavigationBar
+            extendBodyBehindAppBar: true, // Allow body to extend behind AppBar
+            appBar: (uiProvider.isImmersiveMode || uiProvider.currentTabIndex == 1) 
+              ? null 
             : AppBar(
                 title: Text(
                   _getScreenTitle(uiProvider),
@@ -43,13 +74,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
               ),
           body: IndexedStack(
             index: _getCurrentScreenIndex(uiProvider),
-            children: const [
-              IndexScreen(),           // 0: الفهرس
-              BookmarksScreen(),       // 1: العلامات
-              MushafScreen(),          // 2: المصحف (Starts at Page 1)
-              AudioPlayerScreen(),     // 3: الاستماع
-              TafsirScreen(),          // 4: التفسير
-              SettingsScreen(),        // 5: الإعدادات
+            children: [
+              const IndexScreen(),           // 0: الفهرس
+              const MushafScreen(),          // 1: المصحف
+              TafsirScreen(initialPage: uiProvider.currentMushafPage), // 2: التفسير
+              const SettingsScreen(),        // 3: الإعدادات
             ],
           ),
           bottomNavigationBar: AnimatedSlide(
@@ -60,10 +89,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    AudioMinibar(),
+                    if (uiProvider.showAudioMinibar) const AudioMinibar(),
                     _buildBottomBar(uiProvider),
                   ],
                 ),
+          ),
           ),
         );
       },
@@ -71,25 +101,24 @@ class _MainShellScreenState extends State<MainShellScreen> {
   }
 
   int _getCurrentScreenIndex(UiProvider uiProvider) {
+    // uiProvider uses: 0=Index, 1=Mushaf, 2=Audio, 3=Settings
+    // IndexedStack has: 0=Index, 1=Mushaf, 2=Audio, 3=Tafsir, 4=Settings
     final index = uiProvider.currentTabIndex;
     final showingTafsir = uiProvider.showingTafsir;
     
     switch (index) {
       case 0: return 0; // Index
-      case 1: return 1; // Bookmarks
-      case 2: return showingTafsir ? 4 : 2; // Mushaf or Tafsir
-      case 3: return 3; // Audio
-      case 4: return 5; // Settings
-      default: return 2;
+      case 1: return showingTafsir ? 2 : 1; // Mushaf or Tafsir
+      case 3: return 3; // Settings
+      default: return 1;
     }
   }
 
   String _getScreenTitle(UiProvider uiProvider) {
     switch (uiProvider.currentTabIndex) {
       case 0: return 'فهرس السور';
-      case 1: return 'العلامات المرجعية';
-      case 3: return 'الاستماع والتلاوة';
-      case 4: return 'إعدادات التطبيق';
+      case 1: return 'المصحف الشريف';
+      case 3: return 'إعدادات التطبيق';
       default: return 'مثاني';
     }
   }
@@ -116,7 +145,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              // 1. الفهرس (البحث)
+              // 1. الفهرس
               _buildNavItem(
                 icon: Icons.search,
                 label: 'الفهرس',
@@ -128,31 +157,42 @@ class _MainShellScreenState extends State<MainShellScreen> {
               _buildNavItem(
                 icon: Icons.bookmark_outline_rounded,
                 label: 'العلامات',
-                isSelected: currentIndex == 1,
-                onTap: () => uiProvider.setTabIndex(1),
+                isSelected: false,
+                onTap: () {
+                  uiProvider.setTabIndex(0, indexScreenTab: 2);
+                },
               ),
               
-              // 3. تلاوة/تفسير (الوسط - الرئيسية)
+              // 3. المصحف/تفسير (الوسط - الرئيسية)
               _buildMainButton(
-                icon: showingTafsir ? Icons.menu_book : Icons.auto_stories,
-                label: showingTafsir ? 'المصحف' : 'تفسير',
-                onTap: () => uiProvider.toggleTafsir(),
+                icon: (currentIndex == 1 && !showingTafsir) ? Icons.auto_stories : Icons.menu_book,
+                label: (currentIndex == 1 && !showingTafsir) ? 'تفسير' : 'المصحف',
+                onTap: () {
+                  if (currentIndex == 1 && !showingTafsir) {
+                    uiProvider.toggleTafsir();
+                  } else {
+                    uiProvider.setTabIndex(1);
+                    if (showingTafsir) {
+                      uiProvider.toggleTafsir();
+                    }
+                  }
+                },
               ),
 
-              // 4. استماع
+              // 4. استماع (Toggle Minibar)
               _buildNavItem(
-                icon: Icons.headphones_outlined,
+                icon: Icons.play_arrow_rounded,
                 label: 'استماع',
-                isSelected: currentIndex == 3,
-                onTap: () => uiProvider.setTabIndex(3),
+                isSelected: uiProvider.showAudioMinibar,
+                onTap: () => uiProvider.toggleAudioMinibar(),
               ),
               
               // 5. الإعدادات
               _buildNavItem(
                 icon: Icons.settings_outlined,
-                label: 'الإعدادات',
-                isSelected: currentIndex == 4,
-                onTap: () => uiProvider.setTabIndex(4),
+                label: 'إعدادات',
+                isSelected: currentIndex == 3,
+                onTap: () => uiProvider.setTabIndex(3),
               ),
             ],
           ),

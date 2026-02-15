@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,9 +7,10 @@ class SettingsProvider with ChangeNotifier {
   double _fontSize = 24.0;
   String _fontFamily = 'Amiri';
   String _defaultReciter = 'Minshawi_Murattal_128kbps';
-  String _defaultTafsir = 'muyassar';
+  String _defaultTafsir = 'w-moyassar';
   bool _downloadWhilePlaying = true;
-  
+  String _backgroundColorMode = 'white'; // white, cream, old
+
   // Getters
   bool get isDarkMode => _isDarkMode;
   double get fontSize => _fontSize;
@@ -16,7 +18,20 @@ class SettingsProvider with ChangeNotifier {
   String get defaultReciter => _defaultReciter;
   String get defaultTafsir => _defaultTafsir;
   bool get downloadWhilePlaying => _downloadWhilePlaying;
-  
+  String get backgroundColorMode => _backgroundColorMode;
+
+  Color get backgroundColor {
+    if (_isDarkMode) return const Color(0xFF1A1A1A);
+    switch (_backgroundColorMode) {
+      case 'cream': return const Color(0xFFFFFBF0); // Values confirmed by user
+      case 'old': return const Color(0xFFF3E5AB);
+      case 'white': 
+      default: return Colors.white;
+    }
+  }
+
+  // --- Actions ---
+
   SettingsProvider() {
     _loadSettings();
   }
@@ -25,19 +40,33 @@ class SettingsProvider with ChangeNotifier {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     _isDarkMode = prefs.getBool('isDarkMode') ?? false;
+    _backgroundColorMode = prefs.getString('backgroundColorMode') ?? 'white';
     _fontSize = prefs.getDouble('fontSize') ?? 24.0;
     _fontFamily = prefs.getString('fontFamily') ?? 'Amiri';
     _defaultReciter = prefs.getString('defaultReciter') ?? 'Minshawi_Murattal_128kbps';
-    _defaultTafsir = prefs.getString('defaultTafsir') ?? 'muyassar';
+    _defaultTafsir = prefs.getString('defaultTafsir') ?? 'w-moyassar';
     _downloadWhilePlaying = prefs.getBool('downloadWhilePlaying') ?? true;
     notifyListeners();
   }
   
-  // تبديل الوضع الليلي
-  Future<void> toggleDarkMode() async {
-    _isDarkMode = !_isDarkMode;
+  // تبديل الوضع الليلي (Explicit Set)
+  Future<void> setDarkMode(bool value) async {
+    _isDarkMode = value;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkMode', _isDarkMode);
+    await prefs.setBool('isDarkMode', value);
+    notifyListeners();
+  }
+
+  // Toggle (Legacy support)
+  Future<void> toggleDarkMode() async {
+    await setDarkMode(!_isDarkMode);
+  }
+
+  // Set Background Mode
+  Future<void> setBackgroundColorMode(String mode) async {
+    _backgroundColorMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('backgroundColorMode', mode);
     notifyListeners();
   }
   

@@ -79,7 +79,16 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
               final isDownloadingThis = provider.isDownloading && provider.currentDownloadingId == mushaf.identifier;
               // تحقق خاص لـ qcf2 - إذا لم يكن محملاً يحتاج تحميل
               final isQcf2 = mushaf.identifier == 'qcf2_v4_woff2';
-              final needsDownload = !mushaf.isDownloaded && (mushaf.baseUrl != null || isQcf2);
+              final isImage = (mushaf.type ?? '') == 'image';
+              
+              // If it's Shamarly (ZIP based), we want to encourage download but also allow usage (on-demand fallback?)
+              // For now, if URL is zip, we require download or at least show the button
+              final isZip = mushaf.baseUrl?.endsWith('.zip') ?? false;
+              
+              // Needs download if:
+              // 1. Not isDownloaded AND (isZip OR isQcf2)
+              // 2. Note: We relaxed isImage check before, now we tighten it for ZIPs
+              final needsDownload = !mushaf.isDownloaded && (isZip || isQcf2);
               
               return Container(
                 decoration: BoxDecoration(
@@ -126,7 +135,7 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                         child: Text(
                           (mushaf.type ?? '').contains('font') 
                               ? (mushaf.identifier != null && mushaf.identifier!.contains('qcf') ? 'خطوط الرسم العثماني (QCF2) الماركة' : 'نسخة رقمية خفيفة وسريعة')
-                              : 'نسخة الصور (مصحف المدينة)',
+                              : 'نسخة الصور (تحتاج إنترنت للتحميل)',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -171,11 +180,9 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: () {
-                                // Download logic removed for strict clean architecture
-                                // Use embedded assets only
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('التحميل عبر الإنترنت غير متوفر في هذه النسخة')),
-                                );
+                                if (mushaf.identifier != null) {
+                                  provider.downloadMushaf(mushaf.identifier!);
+                                }
                               },
                             )
                           else if (!needsDownload)

@@ -105,4 +105,23 @@ class QuranLocalDataSource {
     // Usually they are in order.
     return pageAyahs;
   }
+
+  /// جلب جميع الآيات (للبحث والتهيئة)
+  Future<List<Ayah>> loadAllAyahs() async {
+    final data = await _loadData();
+    final List<Ayah> allAyahs = [];
+    
+    for (var surahItem in data) {
+      if (surahItem is! Map<String, dynamic>) continue;
+      final surahId = surahItem['id'] as int;
+
+      if (surahItem['verses'] is List) {
+        final verses = surahItem['verses'] as List;
+        for (var verse in verses) {
+             allAyahs.add(Ayah.fromJson(verse, surahId)); // Uses the updated fromJson with normalization
+        }
+      }
+    }
+    return allAyahs;
+  }
 }
