@@ -18,6 +18,43 @@ class MushafMetadataProvider extends ChangeNotifier {
   
   // القائمة الثابتة كـ Fallback في حال فشل الداتابيز
   final List<db_models.MushafMetadata> _fallbackMushafs = [
+    // 1. Madani New Script (Default & Vector/Font)
+    db_models.MushafMetadata()
+      ..id = db_models.fastHash('qcf2_v4_woff2')
+      ..identifier = 'qcf2_v4_woff2'
+      ..nameArabic = 'مصحف المدينة - الرسم الجديد'
+      ..nameEnglish = 'Madani Mushaf - New Script'
+      ..type = 'font_v2'
+      ..baseUrl = null  // Bundled assets
+      ..localPath = 'assets/fonts/qcf2'
+      ..isDownloaded = true,
+
+    // 2. Madani Old Script (Fonts - QPC V1)
+    db_models.MushafMetadata()
+      ..id = db_models.fastHash('madani_old_v1')
+      ..identifier = 'madani_old_v1'
+      ..nameArabic = 'مصحف المدينة ـ الرسم القديم'
+      ..nameEnglish = 'Madani Mushaf - Old Script'
+      ..type = 'page_font' // New type for QPC V1
+      ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/qpc_v1_by_page.tar.bz2'
+      ..localPath = 'mushafs/madani_old_v1' // Extracted path
+      ..pageCount = 604
+      ..isDownloaded = false,
+
+    // 3. Madani Matching Shamarly (Images)
+    db_models.MushafMetadata()
+      ..id = db_models.fastHash('shamarly_15lines')
+      ..identifier = 'shamarly_15lines'
+      // Updated Name as requested - Hidden "Images" label
+      ..nameArabic = 'مصحف المدينة موافق للشمرلي'
+      ..nameEnglish = 'Madani Matching Shamarly'
+      ..type = 'image'
+      ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_images_shamrly.zip' 
+      ..imageExtension = 'png'
+      ..pageCount = 521
+      ..isDownloaded = false,
+
+    // 3. Digital (Hidden/Fallback)
     db_models.MushafMetadata()
       ..id = db_models.fastHash('madani_font_v1')
       ..identifier = 'madani_font_v1'
@@ -25,38 +62,6 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..nameEnglish = 'Digital Mushaf (System Text)'
       ..type = 'digital'
       ..isDownloaded = true, 
-      
-    db_models.MushafMetadata()
-      ..id = db_models.fastHash('qcf2_v4_woff2')
-      ..identifier = 'qcf2_v4_woff2'
-      ..nameArabic = 'مصحف المدينة - الرسم الجديد'
-      ..nameEnglish = 'Madani Mushaf - New Script'
-      ..type = 'font_v2'
-      ..baseUrl = null  // الخطوط مضمنة في assets
-      ..localPath = 'assets/fonts/qcf2'  // مسار الخطوط المحلية
-      ..isDownloaded = true,  // الخطوط مضمنة مسبقاً
-
-    db_models.MushafMetadata()
-      ..id = db_models.fastHash('madani_images_15lines')
-      ..identifier = 'madani_images_15lines'
-      ..nameArabic = 'مصحف المدينة (صور)'
-      ..nameEnglish = 'Madani (Images)'
-      ..type = 'image'
-      ..baseUrl = 'https://android.quran.com/data/width_1024/page'
-      ..isDownloaded = false,
-
-    db_models.MushafMetadata()
-      ..id = db_models.fastHash('shamarly_15lines')
-      ..identifier = 'shamarly_15lines'
-      ..nameArabic = 'مصحف الشمرلي (صور)'
-      ..nameEnglish = 'Shamarly Mushaf (Images)'
-      ..type = 'image'
-      // رابط مؤقت لصور الشمرلي - سيتم استبداله برابط المستخدم لاحقاً
-      // رابط ملف ZIP للصور
-      ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_images_shamrly.zip' 
-      ..imageExtension = 'png'
-      ..pageCount = 521
-      ..isDownloaded = false,
   ];
 
   List<db_models.MushafMetadata> _availableMushafs = [];
@@ -66,7 +71,7 @@ class MushafMetadataProvider extends ChangeNotifier {
       : _fallbackMushafs.where((m) => m.type != 'digital').toList();
 
   String? _currentMushafId;
-  // Default to 'qcf2_v4_woff2' (Madani New Script) instead of digital
+  // Default to 'qcf2_v4_woff2' (Madani New Script)
   String get currentMushafId => _currentMushafId ?? 'qcf2_v4_woff2';
   
   String get currentMushafType {
@@ -163,7 +168,14 @@ class MushafMetadataProvider extends ChangeNotifier {
       final result = await _settingsRepository.getSettings();
       result.fold(
         (failure) => _currentMushafId = 'qcf2_v4_woff2',
-        (settings) => _currentMushafId = settings.selectedMushafId,
+        (settings) {
+           _currentMushafId = settings.selectedMushafId ?? 'qcf2_v4_woff2';
+           // FORCE MIGRATION: If old digital or system font is selected, switch to qcf2
+           if (_currentMushafId == 'madani_font_v1' || _currentMushafId == 'digital') {
+             _currentMushafId = 'qcf2_v4_woff2';
+             _saveSettings(); // Persist the fix
+           }
+        }, 
       );
     } catch (e) {
       debugPrint('MushafProvider Error: $e');
@@ -265,6 +277,21 @@ class MushafMetadataProvider extends ChangeNotifier {
       _currentDownloadingId = null;
       _downloadProgress = 0.0;
       notifyListeners();
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    if (_currentMushafId == null) return;
+    try {
+      final result = await _settingsRepository.getSettings();
+      final currentSettings = result.fold(
+        (l) => UserSettings.defaults(), 
+        (r) => r
+      );
+      final newSettings = currentSettings.copyWith(selectedMushafId: _currentMushafId);
+      await _settingsRepository.saveSettings(newSettings);
+    } catch (e) {
+      debugPrint('Error saving settings: $e');
     }
   }
 

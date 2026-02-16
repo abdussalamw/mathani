@@ -16,6 +16,8 @@ dependencies:
   isar: ^3.1.0
   isar_flutter_libs: ^3.1.0
   path_provider: ^2.1.0
+  sqflite: ^2.3.0 # Added for QPC V1 Layout
+  path: ^1.9.0
   
   # الشبكة (أساسي)
   dio: ^5.3.0
@@ -39,7 +41,9 @@ dependencies:
   shared_preferences: ^2.5.4
   just_audio: ^0.10.5
   wakelock_plus: ^1.1.0
-  package_info_plus: ^8.0.0 # Force older version compatible with Kotlin 1.9
+  package_info_plus: ^8.0.0 
+  share_plus: ^10.1.0 
+  screenshot: ^3.0.0 
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +74,9 @@ flutter:
     - assets/data/quran_advanced.json
     - assets/data/shamerly_quran_complete.json
     - assets/data/reciters.json
+    - assets/data/qpc_v1_glyphs.json # Added for QPC V1
+    - assets/data/qpc_v1_layout.db   # Added for QPC V1 Layout DB
+    - assets/images/
     - assets/images/
 
   fonts:

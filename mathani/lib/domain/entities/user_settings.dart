@@ -20,7 +20,7 @@ class UserSettings extends Equatable {
     return const UserSettings(
       isDarkMode: false,
       fontSize: 28.0,
-      selectedMushafId: 'madani_font_v1',
+      selectedMushafId: 'qcf2_v4_woff2', // Updated to Madani New Script
       defaultReciterId: 'minshawi_murattal',
       defaultTafsirId: 'muyassar',
     );

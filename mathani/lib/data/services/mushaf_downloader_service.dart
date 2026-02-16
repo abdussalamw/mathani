@@ -52,9 +52,10 @@ class MushafDownloaderService {
       }
       
       // Run extraction in isolate to avoid UI freeze
-      await compute(_extractZip, {
+      await compute(_extractArchive, {
         'bytes': allBytes, 
-        'path': destinationPath
+        'path': destinationPath,
+        'url': url,
       });
       
       onProgress(1.0);
@@ -65,18 +66,27 @@ class MushafDownloaderService {
     }
   }
 
-  static Future<void> _extractZip(Map<String, dynamic> args) async {
+  static Future<void> _extractArchive(Map<String, dynamic> args) async {
     final bytes = args['bytes'] as List<int>;
     final targetPath = args['path'] as String;
+    final url = args['url'] as String;
     
-    final archive = ZipDecoder().decodeBytes(bytes);
+    Archive archive;
+    
+    if (url.endsWith('.tar.bz2')) {
+       final decompressed = BZip2Decoder().decodeBytes(bytes);
+       archive = TarDecoder().decodeBytes(decompressed);
+    } else {
+       // Default to ZIP
+       archive = ZipDecoder().decodeBytes(bytes);
+    }
     
     for (final file in archive) {
       final filename = file.name;
       if (file.isFile) {
         final data = file.content as List<int>;
         
-        // Handle potential nested folders in ZIP: flatten or preserve?
+        // Handle potential nested folders in ZIP/Tar: flatten or preserve?
         // For Mushaf images, we usually want them in the root of targetPath 
         // to match ImagePageLoader expectations (001.webp).
         // Check if filename has digits

@@ -3,10 +3,15 @@ import 'package:provider/provider.dart';
 import '../../providers/surah_content_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/bookmark_provider.dart'; 
-import '../../providers/quran_provider.dart'; // Added
-import '../../providers/audio_provider.dart'; // Added for audio playback
+import '../../providers/quran_provider.dart'; 
+import '../../providers/audio_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/surah_app/word_content.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:screenshot/screenshot.dart';
+import 'dart:typed_data';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class AyahContentSheet extends StatefulWidget {
   final int surahNumber;
@@ -26,6 +31,7 @@ class AyahContentSheet extends StatefulWidget {
 
 class _AyahContentSheetState extends State<AyahContentSheet> {
   String? _ayahText; // Store fetched ayah text
+  final ScreenshotController _screenshotController = ScreenshotController();
 
   @override
   void initState() {
@@ -126,13 +132,50 @@ class _AyahContentSheetState extends State<AyahContentSheet> {
                 // Left Side: Icons (Share, Audio, Bookmark)
                 Row(
                   children: [
-                    // Share
+                    // Share Text
+                      IconButton(
+                        onPressed: () async {
+                          if (_ayahText == null) {
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري تحميل النص...')));
+                             return;
+                          }
+                          
+                          final tafsir = context.read<SurahContentProvider>().currentAyaContent?.content ?? '';
+                          // Use a cleaner format
+                          final shareText = '$_ayahText\n\n[سورة ${widget.surahNumber}، آية ${widget.ayaNumber}]\n\n$tafsir\n\nتطبيق مثاني';
+                          
+                          try {
+                             await Share.share(shareText);
+                          } catch (e) {
+                             debugPrint('Share Error: $e');
+                          }
+                        },
+                        icon: const Icon(Icons.share_rounded, color: AppColors.primary),
+                        tooltip: 'مشاركة نصية',
+                      ),
+                    
+                    // Share as Image
                     IconButton(
-                      onPressed: () {
-                         // TODO: Implement Share Logic (Text + Tafsir)
+                      onPressed: () async {
+                        try {
+                          final image = await _screenshotController.capture();
+                          if (image != null) {
+                            final directory = await getTemporaryDirectory();
+                            final imagePath = await File('${directory.path}/ayah_${widget.surahNumber}_${widget.ayaNumber}.png').create();
+                            await imagePath.writeAsBytes(image);
+                            
+                            await Share.shareXFiles([XFile(imagePath.path)], text: 'آية من القرآن الكريم - تطبيق مثاني');
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('فشل التقاط الصورة: $e')),
+                            );
+                          }
+                        }
                       },
-                      icon: const Icon(Icons.share_rounded, color: AppColors.primary),
-                      tooltip: 'مشاركة',
+                      icon: const Icon(Icons.image_rounded, color: AppColors.primary),
+                      tooltip: 'مشاركة كصورة',
                     ),
                     
                     // Audio
@@ -167,9 +210,9 @@ class _AyahContentSheetState extends State<AyahContentSheet> {
                          return IconButton(
                            onPressed: () {
                              if (isBookmarked) {
-                               bookmarks.removeBookmark(widget.surahNumber, widget.ayaNumber);
+                                bookmarks.removeBookmark(widget.surahNumber, widget.ayaNumber);
                              } else {
-                               bookmarks.addBookmark(widget.surahNumber, widget.ayaNumber);
+                                bookmarks.addBookmark(widget.surahNumber, widget.ayaNumber);
                              }
                            },
                            icon: Icon(
@@ -193,53 +236,59 @@ class _AyahContentSheetState extends State<AyahContentSheet> {
             child: Consumer<SurahContentProvider>(
               builder: (context, provider, child) {
                 if (provider.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
+                   return const Center(child: CircularProgressIndicator());
                 }
 
                 final content = provider.currentAyaContent;
                 
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                       // Ayah Text (Uthmanic)
-                       if (_ayahText != null)
-                         Container(
-                           margin: const EdgeInsets.only(bottom: 24),
-                           padding: const EdgeInsets.all(16),
-                           decoration: BoxDecoration(
-                             color: const Color(0xFFFFFDF5), // Light cream background
-                             borderRadius: BorderRadius.circular(12),
-                             border: Border.all(color: AppColors.golden.withValues(alpha: 0.2)),
-                           ),
-                           child: Text(
-                             _ayahText!,
-                             style: const TextStyle(
-                               fontFamily: 'UthmanicHafs_V22', // The new font
-                               fontSize: 24,
-                               height: 1.6,
-                               color: Colors.black,
+                  child: Screenshot(
+                    controller: _screenshotController,
+                    child: Container( 
+                      color: Colors.white,
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                           // Ayah Text (Uthmanic)
+                           if (_ayahText != null)
+                             Container(
+                               margin: const EdgeInsets.only(bottom: 24),
+                               padding: const EdgeInsets.all(16),
+                               decoration: BoxDecoration(
+                                 color: const Color(0xFFFFFDF5),
+                                 borderRadius: BorderRadius.circular(12),
+                                 border: Border.all(color: AppColors.golden.withValues(alpha: 0.2)),
+                               ),
+                               child: Text(
+                                 _ayahText!,
+                                 style: const TextStyle(
+                                   fontFamily: 'UthmanicHafs_V22',
+                                   fontSize: 18, // Reduced from 24
+                                   height: 1.6,
+                                   color: AppColors.primary, // Changed to system red/primary
+                                 ),
+                                 textAlign: TextAlign.center,
+                                 textDirection: TextDirection.rtl,
+                               ),
                              ),
-                             textAlign: TextAlign.center,
-                             textDirection: TextDirection.rtl,
-                           ),
-                         ),
-                         
-                       content == null 
-                        ? const Center(child: Text('لا يوجد محتوى متاح', style: TextStyle(fontFamily: 'Tajawal')))
-                        : Text(
-                            content.content,
-                            style: const TextStyle(
-                              fontFamily: 'Amiri', // Traditional font for Tafsir
-                              fontSize: 18,
-                              height: 1.8,
-                              color: Colors.black87,
-                            ),
-                            textAlign: TextAlign.justify,
-                            textDirection: TextDirection.rtl,
-                          ),
-                    ],
+                             
+                           content == null 
+                            ? const Center(child: Text('لا يوجد محتوى متاح', style: TextStyle(fontFamily: 'Tajawal')))
+                            : Text(
+                                content.content,
+                                style: const TextStyle(
+                                  fontFamily: 'Amiri',
+                                  fontSize: 18,
+                                  height: 1.8,
+                                  color: Colors.black87,
+                                ),
+                                textAlign: TextAlign.justify,
+                                textDirection: TextDirection.rtl,
+                              ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               },

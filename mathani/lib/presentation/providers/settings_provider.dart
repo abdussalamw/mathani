@@ -10,6 +10,11 @@ class SettingsProvider with ChangeNotifier {
   String _defaultTafsir = 'w-moyassar';
   bool _downloadWhilePlaying = true;
   String _backgroundColorMode = 'white'; // white, cream, old
+  int _navigationMode = 0; // 0: Horizontal, 1: Vertical Paged, 2: Vertical Continuous, 3: Hybrid (Horizontal + Inner Vertical)
+  
+  // إعدادات حساسية اللمس
+  double _pageDragSensitivity = 2.0; // Lower = more sensitive
+  double _minFlingVelocity = 80.0;   // Lower = faster response
 
   // Getters
   bool get isDarkMode => _isDarkMode;
@@ -19,6 +24,17 @@ class SettingsProvider with ChangeNotifier {
   String get defaultTafsir => _defaultTafsir;
   bool get downloadWhilePlaying => _downloadWhilePlaying;
   String get backgroundColorMode => _backgroundColorMode;
+  int get navigationMode => _navigationMode;
+  
+  // Getters for navigation settings
+  double get pageDragSensitivity => _pageDragSensitivity;
+  double get minFlingVelocity => _minFlingVelocity;
+  
+  // Helper getters
+  bool get isHybridMode => _navigationMode == 3;
+  bool get isHorizontalMode => _navigationMode == 0;
+  bool get isVerticalPagedMode => _navigationMode == 1;
+  bool get isVerticalContinuousMode => _navigationMode == 2;
 
   Color get backgroundColor {
     if (_isDarkMode) return const Color(0xFF1A1A1A);
@@ -46,6 +62,9 @@ class SettingsProvider with ChangeNotifier {
     _defaultReciter = prefs.getString('defaultReciter') ?? 'Minshawi_Murattal_128kbps';
     _defaultTafsir = prefs.getString('defaultTafsir') ?? 'w-moyassar';
     _downloadWhilePlaying = prefs.getBool('downloadWhilePlaying') ?? true;
+    _navigationMode = prefs.getInt('navigationMode') ?? 0;
+    _pageDragSensitivity = prefs.getDouble('pageDragSensitivity') ?? 2.0;
+    _minFlingVelocity = prefs.getDouble('minFlingVelocity') ?? 80.0;
     notifyListeners();
   }
   
@@ -67,6 +86,27 @@ class SettingsProvider with ChangeNotifier {
     _backgroundColorMode = mode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('backgroundColorMode', mode);
+    notifyListeners();
+  }
+
+  Future<void> setNavigationMode(int mode) async {
+    _navigationMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('navigationMode', mode);
+    notifyListeners();
+  }
+  
+  Future<void> setPageDragSensitivity(double value) async {
+    _pageDragSensitivity = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('pageDragSensitivity', value);
+    notifyListeners();
+  }
+  
+  Future<void> setMinFlingVelocity(double value) async {
+    _minFlingVelocity = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('minFlingVelocity', value);
     notifyListeners();
   }
   

@@ -132,29 +132,64 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                       ),
                       subtitle: Padding(
                         padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(
-                          (mushaf.type ?? '').contains('font') 
-                              ? (mushaf.identifier != null && mushaf.identifier!.contains('qcf') ? 'خطوط الرسم العثماني (QCF2) الماركة' : 'نسخة رقمية خفيفة وسريعة')
-                              : 'نسخة الصور (تحتاج إنترنت للتحميل)',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (isDownloadingThis)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
+                        child: isDownloadingThis 
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('جاري التحميل...', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: AppColors.primary)),
+                                  Text('${(provider.downloadProgress * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              LinearProgressIndicator(
+                                value: provider.downloadProgress, 
+                                backgroundColor: AppColors.grey10, 
+                                color: AppColors.primary,
+                                minHeight: 6,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ],
+                          )
+                        : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            LinearProgressIndicator(value: provider.downloadProgress),
-                            const SizedBox(height: 8),
-                            Text('جاري التحميل ${(provider.downloadProgress * 100).toInt()}%'),
-                            const SizedBox(height: 12),
+                             Text(
+                                (mushaf.type ?? '').contains('font') 
+                                    ? (mushaf.identifier != null && mushaf.identifier!.contains('qcf') ? 'خطوط الرسم العثماني (QCF2) الماركة' : 'نسخة رقمية خفيفة وسريعة')
+                                    : 'نسخة طباعة عالية الدقة (تحتاج إنترنت للتحميل)', // Changed from "Picture version" to "High Quality Print"
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                              if (isImage) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.sd_storage_rounded, size: 14, color: Colors.orange),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      mushaf.identifier == 'shamarly_15lines' 
+                                          ? 'حجم التنزيل: 70 ميجا تقريباً' 
+                                          : (mushaf.identifier == 'madani_old_v1' 
+                                              ? 'حجم التنزيل: 130 ميجا تقريباً' 
+                                              : 'تنزيل ملفات الصور'),
+                                      style: TextStyle(
+                                        color: Colors.orange[800],
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                           ],
                         ),
                       ),
+                    ),
                     Container(
                       decoration: BoxDecoration(
                         color: AppColors.grey05,

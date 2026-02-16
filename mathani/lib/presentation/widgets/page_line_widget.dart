@@ -14,6 +14,7 @@ class PageLineWidget extends StatelessWidget {
   
   final bool isDigital;
   final List<String>? digitalWords;
+  final String? mushafId; // Added
   
   const PageLineWidget({
     Key? key,
@@ -21,11 +22,12 @@ class PageLineWidget extends StatelessWidget {
     required this.pageNumber,
     required this.isParentFontLoaded,
     this.onAyahSelected,
-    this.onAyahLongPress, // Added
+    this.onAyahLongPress,
     this.selectedSurah,
     this.selectedAyah,
     this.isDigital = false,
     this.digitalWords,
+    this.mushafId,
   }) : super(key: key);
 
   @override
@@ -242,6 +244,13 @@ class PageLineWidget extends StatelessWidget {
     }
     
     if (isParentFontLoaded) {
+      if (mushafId == 'madani_old_v1') {
+         return 'QPC_V1_${pageNumber.toString()}'; // Simply Page Number for QPC V1 (No padding usually in family name logic I used in downloader)
+         // Wait, downloader used: 'QPC_V1_$pageNumber' (int).
+         // check downloader: 'QPC_V1_$pageNumber'
+         // So 'QPC_V1_1', 'QPC_V1_604'.
+         // Padding? I used `pageNumber` directly in downloader family name.
+      }
       return 'QCF4_${pageNumber.toString().padLeft(3, '0')}';
     }
     
@@ -298,12 +307,19 @@ class PageLineWidget extends StatelessWidget {
     final wordCount = line.glyphs.where((g) => g.isWord).length;
 
     // Use MainAxisAlignment.spaceBetween for almost all lines to justify them to edges.
-    // Only use Center if the line is EXTREMELY short (e.g. end of Surah with 1-2 words).
-    // The previous threshold of 15/35 was way too high, causing all lines to center and create margins.
-    if (wordCount < 6) { 
+    // For pages 1 and 2, which have 8 lines, we might want even verse lines to be centered 
+    // to match the traditional manuscript look where lines are shorter in the middle.
+    if (pageNumber <= 2) {
+      // Typically Page 1 and 2 verses are slightly more centered or have wider margins
+      if (wordCount < 8) return MainAxisAlignment.center;
+    }
+
+    // Standard pages
+    if (wordCount < 4) { 
       return MainAxisAlignment.center;
     }
 
+    // Most lines in Mushaf are justified to edges.
     return MainAxisAlignment.spaceBetween;
   }
 }

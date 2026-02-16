@@ -98,6 +98,81 @@ class GeneralSettingsScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _buildSection(
             context,
+            title: 'التصفح',
+            children: [
+              Consumer<SettingsProvider>(
+                builder: (context, settings, _) => Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.view_carousel, color: Colors.teal),
+                      title: const Text('طريقة العرض', style: TextStyle(fontFamily: 'Tajawal')),
+                      subtitle: Text(
+                        settings.navigationMode == 0 ? 'أفقي (صفحات)' :
+                        settings.navigationMode == 1 ? 'عمودي (صفحات)' :
+                        settings.navigationMode == 2 ? 'عمودي (مستمر)' : 'هجين (أفقي + تمرير)',
+                        style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12),
+                      ),
+                      trailing: DropdownButton<int>(
+                        value: settings.navigationMode,
+                        underline: const SizedBox(),
+                        items: const [
+                          DropdownMenuItem(value: 0, child: Text('أفقي', style: TextStyle(fontFamily: 'Tajawal'))),
+                          DropdownMenuItem(value: 1, child: Text('عمودي (صفحات)', style: TextStyle(fontFamily: 'Tajawal'))),
+                          DropdownMenuItem(value: 2, child: Text('عمودي (مستمر)', style: TextStyle(fontFamily: 'Tajawal'))),
+                          DropdownMenuItem(value: 3, child: Text('هجين ✨', style: TextStyle(fontFamily: 'Tajawal'))),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) settings.setNavigationMode(val);
+                        },
+                      ),
+                    ),
+                    // نص توضيحي للوضع المختار
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+                      child: Text(
+                        settings.navigationMode == 0 
+                            ? 'سحب يمين/يسار للتنقل بين الصفحات'
+                            : settings.navigationMode == 1 
+                                ? 'سحب فوق/تحت للتنقل بين الصفحات'
+                                : settings.navigationMode == 2
+                                    ? 'نقر مزدوج لتشغيل/إيقاف التحرك التلقائي'
+                                    : 'يمين/يسار: صفحات | فوق/تحت: تمرير داخل الصفحة | ضغطتين: تمرير تلقائي',
+                        style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey),
+                      ),
+                    ),
+                    // إعدادات حساسية اللمس (للأوضاع غير المستمرة)
+                    if (settings.navigationMode != 2) ...[
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.touch_app, color: Colors.orange),
+                        title: const Text('حساسية اللمس', style: TextStyle(fontFamily: 'Tajawal')),
+                        subtitle: Text(
+                          'أقل = أسرع (${settings.pageDragSensitivity.toStringAsFixed(1)})',
+                          style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Slider(
+                          value: settings.pageDragSensitivity,
+                          min: 1.0,
+                          max: 10.0,
+                          divisions: 18,
+                          activeColor: AppColors.primary,
+                          label: settings.pageDragSensitivity.toStringAsFixed(1),
+                          onChanged: (val) => settings.setPageDragSensitivity(val),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSection(
+            context,
             title: 'عام',
             children: [
               ListTile(

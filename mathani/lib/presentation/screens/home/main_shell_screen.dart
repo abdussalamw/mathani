@@ -149,15 +149,15 @@ class _MainShellScreenState extends State<MainShellScreen> {
               _buildNavItem(
                 icon: Icons.search,
                 label: 'الفهرس',
-                isSelected: currentIndex == 0,
-                onTap: () => uiProvider.setTabIndex(0),
+                isSelected: currentIndex == 0 && uiProvider.indexScreenTabIndex != 2,
+                onTap: () => uiProvider.setTabIndex(0, indexScreenTab: 0),
               ),
 
               // 2. العلامات
               _buildNavItem(
                 icon: Icons.bookmark_outline_rounded,
                 label: 'العلامات',
-                isSelected: false,
+                isSelected: currentIndex == 0 && uiProvider.indexScreenTabIndex == 2,
                 onTap: () {
                   uiProvider.setTabIndex(0, indexScreenTab: 2);
                 },
@@ -184,7 +184,20 @@ class _MainShellScreenState extends State<MainShellScreen> {
                 icon: Icons.play_arrow_rounded,
                 label: 'استماع',
                 isSelected: uiProvider.showAudioMinibar,
-                onTap: () => uiProvider.toggleAudioMinibar(),
+                onTap: () {
+                   // Ensure bar is shown
+                   if (!uiProvider.showAudioMinibar) {
+                      uiProvider.toggleAudioMinibar();
+                   } else {
+                      // If already shown, maybe open full player?
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => const AudioPlayerSheet(),
+                      );
+                   }
+                },
               ),
               
               // 5. الإعدادات

@@ -5,7 +5,8 @@ import '../../providers/mushaf_metadata_provider.dart';
 import '../../providers/audio_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import '../../../data/models/reciter.dart'; // Added
+import '../../../data/models/reciter.dart';
+import '../../../core/database/collections.dart'; // Needed for MushafMetadata
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -90,7 +91,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Consumer<MushafMetadataProvider>(
                 builder: (context, provider, _) {
                   return Column(
-                    children: provider.availableMushafs.map((mushaf) {
+                    children: provider.availableMushafs.map<Widget>((MushafMetadata mushaf) {
                       final isSelected = provider.currentMushafId == mushaf.identifier;
                       final isDownloaded = mushaf.isDownloaded || mushaf.type == 'font_v2' || mushaf.type == 'digital';
                       

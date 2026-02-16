@@ -75,10 +75,11 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
       }
     } catch (e) {
       if (mounted) {
+        debugPrint('Initial Download Error: $e'); // Log for dev
         setState(() {
           _isDownloading = false;
           _hasError = true;
-          _statusMessage = 'حدث خطأ أثناء التحميل.\nتأكد من اتصالك بالإنترنت وحاول مرة أخرى.\n($e)';
+          _statusMessage = 'حدث خطأ أثناء التحميل.\nتأكد من اتصالك بالإنترنت وحاول مرة أخرى.';
         });
       }
     } finally {
