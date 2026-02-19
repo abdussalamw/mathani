@@ -13,8 +13,8 @@ class SettingsProvider with ChangeNotifier {
   int _navigationMode = 0; // 0: Horizontal, 1: Vertical Paged, 2: Vertical Continuous, 3: Hybrid (Horizontal + Inner Vertical)
   
   // إعدادات حساسية اللمس
-  double _pageDragSensitivity = 2.0; // Lower = more sensitive
-  double _minFlingVelocity = 80.0;   // Lower = faster response
+  double _pageDragSensitivity = 25.0; // Higher = less sensitive (was 2.0)
+  double _minFlingVelocity = 150.0;   // Higher = requires more force (was 80.0)
 
   // Getters
   bool get isDarkMode => _isDarkMode;

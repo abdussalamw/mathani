@@ -81,14 +81,10 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
               final isQcf2 = mushaf.identifier == 'qcf2_v4_woff2';
               final isImage = (mushaf.type ?? '') == 'image';
               
-              // If it's Shamarly (ZIP based), we want to encourage download but also allow usage (on-demand fallback?)
-              // For now, if URL is zip, we require download or at least show the button
-              final isZip = mushaf.baseUrl?.endsWith('.zip') ?? false;
-              
               // Needs download if:
-              // 1. Not isDownloaded AND (isZip OR isQcf2)
-              // 2. Note: We relaxed isImage check before, now we tighten it for ZIPs
-              final needsDownload = !mushaf.isDownloaded && (isZip || isQcf2);
+              // 1. Not isDownloaded AND has a remote URL (Zip, Tar, or specific QCF2 logic)
+              final hasUrl = mushaf.baseUrl != null;
+              final needsDownload = !mushaf.isDownloaded && (hasUrl || isQcf2);
               
               return Container(
                 decoration: BoxDecoration(

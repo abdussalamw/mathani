@@ -15,6 +15,7 @@ class PageLineWidget extends StatelessWidget {
   final bool isDigital;
   final List<String>? digitalWords;
   final String? mushafId; // Added
+  final bool? isCentered; // Official alignment from QUL database (null = use fallback heuristic)
   
   const PageLineWidget({
     Key? key,
@@ -28,6 +29,7 @@ class PageLineWidget extends StatelessWidget {
     this.isDigital = false,
     this.digitalWords,
     this.mushafId,
+    this.isCentered,
   }) : super(key: key);
 
   @override
@@ -143,50 +145,41 @@ class PageLineWidget extends StatelessWidget {
               children: line.glyphs.map((glyph) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
             
-            // تخطي علامات التوقف والسجدة (مدمجة في الخط بالفعل)
-            // Type 3 = Pause marks (علامات الوقف)
-            // Type 4 = Sajdah marks (علامات السجدة)
-            if (glyph.isPause || glyph.isSajdah) {
-              return const SizedBox.shrink(); // لا نعرضها منفصلة
+            if ((glyph.isPause || glyph.isSajdah) && mushafId != 'madani_old_v1') {
+              return const SizedBox.shrink();
             }
             
             // استخدام الأكواد الأصلية من البيانات
             String code = glyph.code;
             
             // البسملة (Type 8): نعرضها كـ 4 كلمات منفصلة
-            if (glyph.isBasmala) {
-               // حالة خاصة لسورة التوبة (لا بسملة فيها)
-              if (glyph.surah == 9) {
-                return const SizedBox.shrink();
-              }
-              // سورة الفاتحة (1) - غالباً لا توجد بسملة منفصلة لأنها آية 1
-              if (glyph.surah == 1) {
-                 // إذا وجدت، لا بأس بعرضها
-              }
-              
-               // بسم الله الرحمن الرحيم
-               // اللون أسود في الوضع الفاتح
-               final basmalaColor = isDark ? Colors.white : Colors.black;
-              
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('\uFAD5', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // بسم
-                  const SizedBox(width: 4),
-                  Text('\uFAD6', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // الله
-                  const SizedBox(width: 4),
-                  Text('\uFAD7', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // الرحمن
-                  const SizedBox(width: 4),
-                  Text('\uFAD8', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // الرحيم
-                ],
-              );
-            }
-            // اسم السورة (Type 6): نعرض الكود الأصلي (\uf1xx)
-            else if (glyph.isSurahName) {
-              // الكود موجود أصلاً في البيانات (\uf100 - \uf171)
-              // لا نحتاج لتوليده!
-              // سيتم عرضه باستخدام Text widget أدناه
-            }
+            // ملاحظة: في QPC V1، البسملة جزء من نص الصفحة وتأتي كـ Glyph بكود PUA
+              // Basmala (Type 8): نعرضها كـ 4 كلمات منفصلة أو باستخدام خط QCF4 مباشرة
+             if (glyph.isBasmala) {
+               // إذا كنا في V1 الآن نستخدم نفس منطق QCF4 (خط QCF4_BSML)
+               // لأننا غيرنا الكود في LayoutService ليكون 'BSML' وهو مجرد placeholder
+               // هنا سنستخدم التصيير القياسي للبسملة
+               
+                   // بسم الله الرحمن الرحيم
+                   final basmalaColor = isDark ? Colors.white : Colors.black;
+                   return Row(
+                     mainAxisAlignment: MainAxisAlignment.center,
+                     children: [
+                       Text('\uFAD5', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // بسم
+                       const SizedBox(width: 4),
+                       Text('\uFAD6', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // الله
+                       const SizedBox(width: 4),
+                       Text('\uFAD7', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // الرحمن
+                       const SizedBox(width: 4),
+                       Text('\uFAD8', style: TextStyle(fontFamily: 'QCF4_BSML', fontSize: 56.0, color: basmalaColor)), // الرحيم
+                     ],
+                   );
+             }
+             // اسم السورة (Type 6): نعرض الكود الأصلي (من QCF4)
+             else if (glyph.isSurahName) {
+               // الكود الآن يأتي من LayoutService بصيغة QCF4 Standard
+             }
+
             
             // Check selection
             final bool isSelected = selectedSurah != null && 
@@ -237,20 +230,32 @@ class PageLineWidget extends StatelessWidget {
     );
   }
 
-  /// اختيار عائلة الخط حسب نوع العنصر
   String _getFontFamily(Glyph glyph) {
+    if (mushafId == 'madani_old_v1') {
+       // Headers use QCF4_BSML (User Request)
+       if (glyph.isSurahName || glyph.isBasmala || glyph.type == 6 || glyph.type == 8) {
+         return 'QCF4_BSML';
+       }
+       
+       // Ayah End (Type 2) typically uses Page Font which contains the number glyph
+       // Fallback to Amiri only if explicitly standard '06DD'
+       if (glyph.isAyahEnd && glyph.code == '\u06DD') {
+         return 'Amiri';
+       }
+       
+       // Words and Page-specific Glyphs use the Page Font
+       if (isParentFontLoaded) {
+         return 'p$pageNumber-v1';
+       }
+       return 'Amiri';
+    }
+
+    // ... existing logic for QCF4 ...
     if (glyph.isSurahName || glyph.isBasmala) {
       return 'QCF4_BSML';
     }
     
     if (isParentFontLoaded) {
-      if (mushafId == 'madani_old_v1') {
-         return 'QPC_V1_${pageNumber.toString()}'; // Simply Page Number for QPC V1 (No padding usually in family name logic I used in downloader)
-         // Wait, downloader used: 'QPC_V1_$pageNumber' (int).
-         // check downloader: 'QPC_V1_$pageNumber'
-         // So 'QPC_V1_1', 'QPC_V1_604'.
-         // Padding? I used `pageNumber` directly in downloader family name.
-      }
       return 'QCF4_${pageNumber.toString().padLeft(3, '0')}';
     }
     
@@ -260,15 +265,50 @@ class PageLineWidget extends StatelessWidget {
     return 'QCF_P003';
   }
   
+  // ... existing methods ...
+
+  MainAxisAlignment _getLineAlignment(PageLine line) {
+    // If we have official is_centered data from QUL, use it directly
+    if (isCentered != null) {
+      return isCentered! ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween;
+    }
+
+    // === Fallback heuristic (V1 or if alignment data not available) ===
+    
+    // Pure Header lines are centered
+    if (line.glyphs.any((g) => g.isBasmala || g.isSurahName)) {
+      return MainAxisAlignment.center;
+    }
+
+    final wordCount = line.glyphs.where((g) => g.isWord).length;
+
+    if (pageNumber <= 2) {
+      if (wordCount < 8) return MainAxisAlignment.center;
+    }
+
+    // Very short lines always centered
+    if (wordCount < 4) {
+      return MainAxisAlignment.center;
+    }
+
+    return MainAxisAlignment.spaceBetween;
+  }
+  
    double _getGlyphSize(Glyph glyph) {
-     if (glyph.isBasmala || glyph.isSurahName) {
-       return 56.0; // Standardized to match text
-     } else if (glyph.isAyahEnd) {
-       return 50.0; // Increased
-     } else if (glyph.isSajdah) {
-       return 48.0; // Increased
+     if (mushafId == 'madani_old_v1') {
+        if (glyph.isSurahName || glyph.isBasmala) return 56.0;
+        if (glyph.isAyahEnd) return 54.0; // Slightly smaller than words
+        return 58.0; // Balanced size: less FittedBox compression, consistent stroke
      }
-     return 56.0; // Increased from 44.0 to 56.0 for better visibility
+     
+     if (glyph.isBasmala || glyph.isSurahName) {
+       return 56.0; 
+     } else if (glyph.isAyahEnd) {
+       return 50.0; 
+     } else if (glyph.isSajdah) {
+       return 48.0; 
+     }
+     return 56.0; 
    }
   
   Color _getGlyphColor(Glyph glyph, BuildContext context) {
@@ -297,29 +337,5 @@ class PageLineWidget extends StatelessWidget {
   return isDark ? Colors.white : Colors.black;
 }
 
-  MainAxisAlignment _getLineAlignment(PageLine line) {
-    // Special lines (Headers) are always centered
-    if (line.glyphs.any((g) => g.isBasmala || g.isSurahName)) {
-      return MainAxisAlignment.center;
-    }
 
-    // Count meaningful words
-    final wordCount = line.glyphs.where((g) => g.isWord).length;
-
-    // Use MainAxisAlignment.spaceBetween for almost all lines to justify them to edges.
-    // For pages 1 and 2, which have 8 lines, we might want even verse lines to be centered 
-    // to match the traditional manuscript look where lines are shorter in the middle.
-    if (pageNumber <= 2) {
-      // Typically Page 1 and 2 verses are slightly more centered or have wider margins
-      if (wordCount < 8) return MainAxisAlignment.center;
-    }
-
-    // Standard pages
-    if (wordCount < 4) { 
-      return MainAxisAlignment.center;
-    }
-
-    // Most lines in Mushaf are justified to edges.
-    return MainAxisAlignment.spaceBetween;
-  }
 }

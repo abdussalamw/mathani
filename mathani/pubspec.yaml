@@ -74,8 +74,10 @@ flutter:
     - assets/data/quran_advanced.json
     - assets/data/shamerly_quran_complete.json
     - assets/data/reciters.json
-    - assets/data/qpc_v1_glyphs.json # Added for QPC V1
-    - assets/data/qpc_v1_layout.db   # Added for QPC V1 Layout DB
+    - assets/data/qpc_v1_layout.json # Added for QPC V1 Layout JSON
+    - assets/data/qpc_v1_glyphs.json # CRITICAL: Added missing glyphs file
+    - assets/data/qcf4_line_alignment.json # Official QUL alignment data (is_centered)
+    - assets/data/qpc_v1_line_alignment.json # Official QUL V1 alignment data
     - assets/images/
     - assets/images/
 
@@ -100,5 +102,4 @@ flutter:
     - family: UthmanicHafs
       fonts:
         - asset: assets/fonts/UthmanicHafs_V22.ttf
-
 

@@ -16,6 +16,7 @@ import '../../providers/settings_provider.dart';
 import '../../widgets/audio_minibar.dart';
 import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:mathani/core/constants/responsive_constants.dart';
 import 'dart:async';
 
 class MushafScreen extends StatefulWidget {
@@ -30,15 +31,15 @@ class MushafScreen extends StatefulWidget {
   State<MushafScreen> createState() => _MushafScreenState();
 }
 
-/// ScrollPhysics مخصص بحساسية عالية للتنقل بين الصفحات
-class SensitivePageScrollPhysics extends ScrollPhysics {
+/// ScrollPhysics مخصص لضمان التنقل بين الصفحات بدقة (صفحة واحدة لكل تمريرة)
+class SensitivePageScrollPhysics extends PageScrollPhysics {
   final double dragThreshold;
   final double flingVelocity;
 
   const SensitivePageScrollPhysics({
     ScrollPhysics? parent,
-    this.dragThreshold = 2.0,
-    this.flingVelocity = 80.0,
+    this.dragThreshold = 25.0, // زيادة العتبة لتقليل الحساسية العالية (كانت 2.0)
+    this.flingVelocity = 150.0, // زيادة سرعة القذف المطلوبة (كانت 80.0)
   }) : super(parent: parent);
 
   @override
@@ -55,16 +56,9 @@ class SensitivePageScrollPhysics extends ScrollPhysics {
   
   @override
   double get minFlingVelocity => flingVelocity;
-  
-  @override
-  SpringDescription get spring => const SpringDescription(
-    mass: 50,
-    stiffness: 100,
-    damping: 1,
-  );
 }
 
-class _MushafScreenState extends State<MushafScreen> {
+class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMixin {
   final GlyphDataLoader _loader = GlyphDataLoader();
   List<PageGlyph>? _pages;
   bool _isLoading = true;
@@ -81,11 +75,22 @@ class _MushafScreenState extends State<MushafScreen> {
   // ScrollControllers للصفحات الفردية (للوضع Hybrid)
   final Map<int, ScrollController> _innerScrollControllers = {};
   
+  // Bi-directional Drag State (للتنقل ثنائي الأبعاد)
+  double _secondaryOffset = 0.0;
+  bool _isSecondaryDragging = false;
+  int? _secondaryTargetPage;
+  late AnimationController _secondaryAnimController;
+  
   @override
   void initState() {
     super.initState();
     _currentPage = widget.initialPage;
     _pageController = PageController(initialPage: widget.initialPage - 1);
+    
+    _secondaryAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -286,11 +291,36 @@ class _MushafScreenState extends State<MushafScreen> {
      });
   }
 
+  // شريط علوي ثابت للوضع المتحرك
+  Widget _buildFixedHeader(SettingsProvider settings) {
+    if (!settings.isVerticalContinuousMode) return const SizedBox.shrink();
+    
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        color: settings.backgroundColor.withOpacity(0.9),
+        child: MushafPageWidget(
+          page: _pages![_currentPage - 1],
+          showInfo: true,
+          mushafId: context.read<MushafMetadataProvider>().currentMushafId,
+          // نحن نحتاج فقط للشريط العلوي من هذا الـ Widget، لذا سنجعل المحتوى فارغاً أو نمرر تعليمات بذلك
+          // لكن الأبسط في الوقت الحالي هو استخراج الـ Header فقط إذا لزم الأمر مستقبلاً
+        ),
+      ),
+    );
+  }
+
   // --- نظام Auto Scroll المحسن ---
-  void _toggleAutoScroll() {
+  void _toggleAutoScroll(SettingsProvider settings) {
     if (_isAutoScrolling) {
       _stopAutoScroll();
     } else {
+      // إذا لم نكن في الوضع الرأسي المستمر، ننتقل إليه أولاً
+      if (!settings.isVerticalContinuousMode) {
+        settings.setNavigationMode(2); // 2 is Vertical Continuous
+      }
       _startAutoScroll();
     }
   }
@@ -355,6 +385,7 @@ class _MushafScreenState extends State<MushafScreen> {
       context.read<AudioProvider>().removeListener(_onAudioStateChange);
       _autoScrollTimer?.cancel();
       _pageController.dispose();
+      _secondaryAnimController.dispose();
       // Dispose all inner scroll controllers
       for (var controller in _innerScrollControllers.values) {
         controller.dispose();
@@ -363,6 +394,153 @@ class _MushafScreenState extends State<MushafScreen> {
     
     WakelockPlus.disable();
     super.dispose();
+  }
+
+  // --- منطق التنقل ثنائي الأبعاد (Bi-directional Navigation) ---
+
+  void _handleSecondaryDragUpdate(DragUpdateDetails details, SettingsProvider settings) {
+    if (_isAutoScrolling || settings.isVerticalContinuousMode || settings.isHybridMode) return;
+    
+    final isHorizontal = settings.isHorizontalMode;
+    double delta = isHorizontal ? details.delta.dy : details.delta.dx;
+    
+    // منع التأثير إذا كان السحب صغيراً جداً في البداية لتجنب الاهتزاز
+    if (!_isSecondaryDragging && delta.abs() < 1) return;
+
+    setState(() {
+      _secondaryOffset += delta;
+      _isSecondaryDragging = true;
+      
+      // تحديد الصفحة المستهدفة (دائماً صفحة واحدة فقط بعيداً عن الحالية)
+      if (_secondaryOffset < 0) {
+        _secondaryTargetPage = _currentPage + 1;
+      } else if (_secondaryOffset > 0) {
+        _secondaryTargetPage = _currentPage - 1;
+      }
+      
+      // التاكد من حدود الصفحات
+      final maxPages = _pages?.length ?? 604;
+      if (_secondaryTargetPage != null) {
+        if (_secondaryTargetPage! < 1) _secondaryTargetPage = 1;
+        if (_secondaryTargetPage! > maxPages) _secondaryTargetPage = maxPages;
+        
+        // إذا كانت الصفحة المستهدفة هي نفسها الحالية، نجعلها null
+        if (_secondaryTargetPage == _currentPage) _secondaryTargetPage = null;
+      }
+    });
+  }
+
+  void _handleSecondaryDragEnd(DragEndDetails details, SettingsProvider settings) {
+    if (!_isSecondaryDragging) return;
+    
+    final isHorizontal = settings.isHorizontalMode;
+    final screenDimension = isHorizontal 
+        ? MediaQuery.of(context).size.height 
+        : MediaQuery.of(context).size.width;
+        
+    // رفع العتبة إلى 20% لضمان أن المستخدم يريد فعلاً التقليب
+    final threshold = screenDimension * 0.20; 
+    final velocity = isHorizontal 
+        ? details.velocity.pixelsPerSecond.dy 
+        : details.velocity.pixelsPerSecond.dx;
+    
+    bool shouldFlip = _secondaryTargetPage != null && (
+      _secondaryOffset.abs() > threshold || velocity.abs() > 700
+    );
+    
+    if (shouldFlip) {
+      double target = _secondaryOffset > 0 ? screenDimension : -screenDimension;
+      _animateSecondaryTo(target).then((_) {
+        if (mounted) {
+          _pageController.jumpToPage(_secondaryTargetPage! - 1);
+          setState(() {
+            _isSecondaryDragging = false;
+            _secondaryOffset = 0;
+            _secondaryTargetPage = null;
+          });
+        }
+      });
+    } else {
+      _animateSecondaryTo(0).then((_) {
+        if (mounted) {
+          setState(() {
+            _isSecondaryDragging = false;
+            _secondaryOffset = 0;
+            _secondaryTargetPage = null;
+          });
+        }
+      });
+    }
+  }
+
+  Future<void> _animateSecondaryTo(double target) async {
+    final animation = Tween<double>(
+      begin: _secondaryOffset,
+      end: target,
+    ).animate(CurvedAnimation(
+      parent: _secondaryAnimController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    void listener() {
+      setState(() {
+        _secondaryOffset = animation.value;
+      });
+    }
+
+    animation.addListener(listener);
+    await _secondaryAnimController.forward(from: 0);
+    animation.removeListener(listener);
+  }
+
+  Widget _buildSecondaryOverlay(SettingsProvider settings, UiProvider uiProvider) {
+    if (!_isSecondaryDragging && _secondaryOffset == 0) return const SizedBox.shrink();
+    
+    final isHorizontal = settings.isHorizontalMode;
+    final size = MediaQuery.of(context).size;
+    
+    // الصفحة الحالية
+    final currentPageWidget = _buildPageItem(context, _currentPage - 1, settings, uiProvider);
+    
+    // الصفحة المستهدفة
+    Widget? targetPageWidget;
+    if (_secondaryTargetPage != null) {
+      targetPageWidget = _buildPageItem(context, _secondaryTargetPage! - 1, settings, uiProvider);
+    }
+    
+    return Stack(
+      children: [
+        // خلفية لإخفاء PageView أثناء الحركة
+        Container(color: settings.backgroundColor),
+        
+        // الصفحة المستهدفة (تأتي من الخلف أو أمام)
+        if (targetPageWidget != null)
+          Transform.translate(
+            offset: isHorizontal 
+                ? Offset(0, _secondaryOffset > 0 ? _secondaryOffset - size.height : _secondaryOffset + size.height)
+                : Offset(_secondaryOffset > 0 ? _secondaryOffset - size.width : _secondaryOffset + size.width, 0),
+            child: targetPageWidget,
+          ),
+          
+        // الصفحة الحالية مع ظل
+        Transform.translate(
+          offset: isHorizontal ? Offset(0, _secondaryOffset) : Offset(_secondaryOffset, 0),
+          child: Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                if (_secondaryOffset != 0)
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 30,
+                    spreadRadius: 2,
+                  )
+              ],
+            ),
+            child: currentPageWidget,
+          ),
+        ),
+      ],
+    );
   }
   
   @override
@@ -419,13 +597,45 @@ class _MushafScreenState extends State<MushafScreen> {
                   behavior: HitTestBehavior.translucent,
                   onTap: () {
                      if (_isAutoScrolling) {
-                       _stopAutoScroll();
+                        // ضغطة واحدة توقف أو تستأنف الحركة في الوضع المتحرك
+                        setState(() {
+                          _isAutoScrolling = !_isAutoScrolling;
+                        });
+                        if (_isAutoScrolling) _startAutoScroll(); else _autoScrollTimer?.cancel();
                      } else {
-                       Provider.of<UiProvider>(context, listen: false).toggleImmersiveMode();
+                        Provider.of<UiProvider>(context, listen: false).toggleImmersiveMode();
                      }
                   },
                   onDoubleTap: () {
-                    _toggleAutoScroll();
+                    final settings = context.read<SettingsProvider>();
+                    if (settings.isVerticalContinuousMode) {
+                      // إذا كان في الوضع المتحرك، نقوم بإيقافه والعودة للوضع الأفقي
+                      _stopAutoScroll();
+                      settings.setNavigationMode(0); // العودة للوضع الأفقي (يمين يسار)
+                    } else {
+                      // إذا لم يكن، نفعله ونبدأ الحركة
+                      _toggleAutoScroll(settings);
+                    }
+                  },
+                  onVerticalDragUpdate: (details) {
+                    if (settings.isHorizontalMode) {
+                      _handleSecondaryDragUpdate(details, settings);
+                    }
+                  },
+                  onVerticalDragEnd: (details) {
+                    if (settings.isHorizontalMode) {
+                      _handleSecondaryDragEnd(details, settings);
+                    }
+                  },
+                  onHorizontalDragUpdate: (details) {
+                    if (!settings.isHorizontalMode) {
+                      _handleSecondaryDragUpdate(details, settings);
+                    }
+                  },
+                  onHorizontalDragEnd: (details) {
+                    if (!settings.isHorizontalMode) {
+                      _handleSecondaryDragEnd(details, settings);
+                    }
                   },
                   child: Directionality(
                     textDirection: TextDirection.rtl,
@@ -485,6 +695,26 @@ class _MushafScreenState extends State<MushafScreen> {
                 ),
               ),
             ),
+          
+          // الشريط العلوي الثابت (يظهر فقط في الوضع المتحرك)
+          if (settings.isVerticalContinuousMode) 
+            Positioned(
+              top: 0, left: 0, right: 0,
+              height: ResponsiveConstants.getTopBarHeight(context),
+              child: Container(
+                color: settings.backgroundColor,
+                child: MushafPageWidget(
+                  page: _pages![_currentPage - 1],
+                  mushafId: context.read<MushafMetadataProvider>().currentMushafId,
+                  showInfo: true,
+                  hideContent: true, // إخفاء محتوى الصفحة والاكتفاء بالشريط العلوي
+                ),
+              ),
+            ),
+
+          // Secondary Drag Overlay (التنقل ثنائي الأبعاد - يعمل فقط في وضع الصفحات)
+          if (!settings.isVerticalContinuousMode)
+            _buildSecondaryOverlay(settings, uiProvider),
         ],
       ),
     );
@@ -534,8 +764,8 @@ class _MushafScreenState extends State<MushafScreen> {
         selectedAyah: _selectedAyah,
         onAyahSelected: _onAyahInteraction,
         onAyahLongPress: _onAyahInteraction,
-        showInfo: true,
-        isDigital: isDigital || currentType == 'page_font',
+        showInfo: !settings.isVerticalContinuousMode, // إخفاء الشريط الداخلي في الوضع المستمر
+        isDigital: isDigital,
       );
     }
     

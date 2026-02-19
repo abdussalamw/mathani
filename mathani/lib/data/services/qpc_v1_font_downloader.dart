@@ -43,13 +43,13 @@ class QPCV1FontDownloader {
   static Future<bool> loadPageFont(int pageNumber) async {
     // Format: qpc_page_001.ttf
     final fontName = 'qpc_page_${pageNumber.toString().padLeft(3, '0')}';
-    final fontFamily = 'QPC_V1_$pageNumber'; // Unique family name for Flutter
+    final fontFamily = 'p$pageNumber-v1'; // Standardized naming to match resources
     
     // Check if already loaded in Flutter engine
     if (_loadedFonts[fontFamily] == true) return true;
     
     try {
-      final fontData = await _downloadOrGetCachedFont(fontName);
+      final fontData = await _downloadOrGetCachedFont(fontName, pageNumber);
       final fontLoader = FontLoader(fontFamily);
       fontLoader.addFont(Future.value(ByteData.view(fontData.buffer)));
       await fontLoader.load();
@@ -63,7 +63,7 @@ class QPCV1FontDownloader {
     }
   }
 
-  static Future<Uint8List> _downloadOrGetCachedFont(String fontName) async {
+  static Future<Uint8List> _downloadOrGetCachedFont(String fontName, int pageNumber) async {
     // WEB SPECIFIC HANDLING
     if (kIsWeb) {
       final fileNameFull = '$fontName.ttf';
@@ -77,9 +77,34 @@ class QPCV1FontDownloader {
     // NATIVE HANDLING
     try {
         final dir = await getApplicationDocumentsDirectory();
-        // Updated path to match MushafMetadataProvider's download location
-        final file = File('${dir.path}/mushafs/madani_old_v1/$fontName.ttf');
-        if (await file.exists()) return await file.readAsBytes();
+        final List<String> searchDirs = [
+          '${dir.path}/mushafs/madani_old_v1',
+          '${dir.path}/madani_old_v1',
+          '${dir.path}/fonts/qpc_v1',
+        ];
+        
+        final pageNumStr = pageNumber.toString().padLeft(3, '0');
+        
+        final List<String> possibleNames = [
+          'qpc_page_$pageNumStr.ttf',
+          'qpc_page_$pageNumStr.TTF',
+          'qpc_v1_page_$pageNumStr.ttf',
+          'qpc_page_$pageNumber.ttf',
+          '$pageNumStr.ttf',
+        ];
+
+        for (final baseDir in searchDirs) {
+          for (final name in possibleNames) {
+            final file = File('$baseDir/$name');
+            if (await file.exists()) {
+               debugPrint('SUCCESS: Found QPC V1 font at ${file.path}');
+               return await file.readAsBytes();
+            }
+          }
+        }
+        
+        debugPrint('ERROR: QPC V1 font not found. Checked ${searchDirs.length} dirs for page $pageNumber');
+
     } catch (e) {
         debugPrint('Error accessing fs: $e');
     }
@@ -94,6 +119,6 @@ class QPCV1FontDownloader {
 
   /// Helper to get the FontFamily name for a page
   static String getFontFamily(int pageNumber) {
-    return 'QPC_V1_$pageNumber';
+    return 'p$pageNumber-v1';
   }
 }
