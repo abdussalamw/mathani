@@ -45,8 +45,6 @@ class AyahWidget extends StatelessWidget {
              audioProvider.playAyah(
                currentSurahNum, 
                ayah.ayahNumber,
-               shouldCache: settingsProvider.downloadWhilePlaying,
-               totalAyahsInSurah: totalAyahs
              );
           },
           child: Container(

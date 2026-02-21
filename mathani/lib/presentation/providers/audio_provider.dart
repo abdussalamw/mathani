@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import '../../core/services/audio_service.dart';
 import '../../domain/repositories/quran_repository.dart';
 import '../../data/repositories/reciter_repository.dart';
@@ -16,7 +17,8 @@ class AudioProvider extends ChangeNotifier {
   bool _isPlaying = false;
   int? _currentSurah;
   int? _currentAyah;
-  int? _currentSurahTotalAyahs;
+
+  ConcatenatingAudioSource? _playlist;
 
   List<Reciter> _reciters = [];
   Reciter? _currentReciter;
@@ -54,14 +56,14 @@ class AudioProvider extends ChangeNotifier {
   int? get endSurah => _endSurah;
   int? get endAyah => _endAyah;
   
-  // Context
+  // Context - يُحدَّث فقط إذا لم يكن هناك صوت يعمل أو متوقف مؤقتاً
   void setContext(int surah, int ayah) {
+    // ★ لا تكتب فوق سياق تشغيل نشط أو متوقف مؤقتاً (pause)
+    if (_isPlaying) return;
+    if (_player.processingState == ProcessingState.ready) return; // paused
+    
     _currentSurah = surah;
     _currentAyah = ayah;
-    _startSurah = surah;
-    _startAyah = ayah;
-    _endSurah = surah;
-    _endAyah = ayah;
   }
 
   void setShowMinibar(bool show) {
@@ -130,26 +132,42 @@ class AudioProvider extends ChangeNotifier {
   }
   
   void _initPlayer() {
-    // Listen to player state changes
     _playerStateSubscription = _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
       notifyListeners();
     });
 
-    // Listen to processing state for auto-advance to next ayah
+    // Listen to current sequence index to update UI track info
+    _currentIndexSubscription = _player.currentIndexStream.listen((index) {
+      if (index != null && _playlist != null && index < _playlist!.length) {
+         try {
+           final child = _playlist!.children[index] as UriAudioSource;
+           final tag = child.tag as MediaItem;
+           final parts = tag.id.split('_'); // Format: surah_ayah_index
+           if (parts.length >= 2) {
+             final newSurah = int.tryParse(parts[0]);
+             final newAyah = int.tryParse(parts[1]);
+             if (newSurah != null && newAyah != null && (_currentSurah != newSurah || _currentAyah != newAyah)) {
+                _currentSurah = newSurah;
+                _currentAyah = newAyah;
+                notifyListeners();
+             }
+           }
+         } catch (e) {
+           debugPrint('Error parsing current index tag: $e');
+         }
+      }
+    });
+
+    // To auto-hide when playlist completely finishes
     _processingStateSubscription = _player.processingStateStream.listen((state) {
-      if (state == ProcessingState.completed && _currentSurah != null && _currentAyah != null) {
-        // In simple mode, ProcessingState.completed means the track (or concatenated set) is DONE.
-        // If we use ConcatenatingAudioSource, this only fires AT THE VERY END.
-        // To handle REPETITION per ayah, we should probably NOT use concatenated sources for the whole surah
-        // OR we handle it when the INDEX changes.
-        
-        _playNextAyah();
+      if (state == ProcessingState.completed) {
+         _isPlaying = false;
+         _playlist = null; // ★ تنظيف الـ playlist عند الانتهاء
+         notifyListeners();
       }
     });
   }
-
-
 
   Future<void> setLoopMode(LoopMode mode) async {
     _loopMode = mode;
@@ -157,48 +175,16 @@ class AudioProvider extends ChangeNotifier {
     notifyListeners();
   }
   
-  // --- Gapless Playback Logic ---
-  
+  // --- True Gapless & Background Playback Logic ---
+
   Future<void> playAyah(int surah, int ayah) async {
-    if (_currentReciter == null) return;
-    
-    // Reset repetition states
-    _ayahRepeatCount = 0;
-    _rangeRepeatCount = 0;
-    
-    // Set boundaries to "to end of Surah" by default
-    _startSurah = surah;
-    _startAyah = ayah;
-    _endSurah = surah;
-    _endAyah = 286; 
-    
-    _isRangeMode = false; 
-    _showMinibar = true; // Show on play
-    
-    await _playSpecificAyah(surah, ayah);
-  }
-
-  Future<void> _playSpecificAyah(int surah, int ayah) async {
-    if (_currentReciter == null) return;
-    try {
-      _isLoading = true;
-      _currentSurah = surah;
-      _currentAyah = ayah;
-      notifyListeners();
-
-      final url = _audioService.getRemoteUrl(_currentReciter!.id, surah, ayah);
-      await _player.setAudioSource(AudioSource.uri(Uri.parse(url)));
-      await _player.play();
-      
-      _isPlaying = true;
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      debugPrint('❌ Play Specific Ayah Error: $e');
-      _lastError = 'خطأ في التشغيل: $e';
-      _isLoading = false;
-      notifyListeners();
-    }
+    // جلب عدد آيات السورة الفعلي بدل الرقم الثابت
+    int endAyah = 999; // سيتم تقليصه في _buildAndPlayPlaylist
+    final surahResult = await _quranRepository.getSurahByNumber(surah);
+    surahResult.fold((l) {}, (s) {
+      if (s != null) endAyah = s.numberOfAyahs;
+    });
+    await playRange(startSurah: surah, startAyah: ayah, endSurah: surah, endAyah: endAyah);
   }
 
   Future<void> playRange({
@@ -208,6 +194,7 @@ class AudioProvider extends ChangeNotifier {
     required int endAyah
   }) async {
     if (_currentReciter == null) return;
+    if (_isLoading) return; // ★ منع الضغط المزدوج
     
     _startSurah = startSurah;
     _startAyah = startAyah;
@@ -218,9 +205,92 @@ class AudioProvider extends ChangeNotifier {
     _rangeRepeatCount = 0;
     _isRangeMode = true;
     _showMinibar = true;
-    
-    await _playSpecificAyah(startSurah, startAyah);
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _buildAndPlayPlaylist(startSurah, startAyah, endSurah, endAyah);
+    } catch (e) {
+      debugPrint('PlayRange Error: $e');
+      _lastError = 'خطأ في التشغيل: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
+
+  Future<void> _buildAndPlayPlaylist(int sSurah, int sAyah, int eSurah, int eAyah) async {
+    final List<AudioSource> sources = [];
+    int trackIndex = 0;
+
+    // Outer loop for range repeats
+    for (int rangeRep = 0; rangeRep < _rangeRepeatLimit; rangeRep++) {
+      
+      int currentSurah = sSurah;
+      while (currentSurah <= eSurah) {
+        // Get Surah length
+        final surahResult = await _quranRepository.getSurahByNumber(currentSurah);
+        int maxAyahs = 0;
+        String surahName = 'سورة $currentSurah';
+        surahResult.fold((l) {}, (s) {
+           if (s != null) {
+             maxAyahs = s.numberOfAyahs;
+             surahName = s.nameArabic;
+           }
+        });
+        
+        if (maxAyahs == 0) {
+          currentSurah++;
+          continue; // ★ تخطي السورة إذا لم نجد بياناتها
+        }
+        
+        int startA = (currentSurah == sSurah) ? sAyah : 1;
+        int endA = (currentSurah == eSurah) ? eAyah.clamp(1, maxAyahs) : maxAyahs;
+
+        for (int a = startA; a <= endA; a++) {
+          
+          // Inner loop for Ayah repeats
+          for (int ayahRep = 0; ayahRep < _ayahRepeatLimit; ayahRep++) {
+             final url = _audioService.getRemoteUrl(_currentReciter!.id, currentSurah, a);
+             
+             // Background Audio Metadata
+             final tag = MediaItem(
+                id: '${currentSurah}_${a}_$trackIndex', // Unique ID
+                album: _currentReciter!.name,
+                title: 'سورة $surahName - آية $a',
+                artist: _currentReciter!.name,
+                // Add artwork if needed
+             );
+             
+             sources.add(AudioSource.uri(Uri.parse(url), tag: tag));
+             trackIndex++;
+          }
+        }
+        currentSurah++;
+      }
+    }
+
+    if (sources.isEmpty) return;
+
+    _playlist = ConcatenatingAudioSource(children: sources);
+    await _player.setAudioSource(_playlist!, initialIndex: 0, preload: false);
+    
+    _currentSurah = sSurah;
+    _currentAyah = sAyah;
+    
+    await _player.play();
+  }
+
+  Future<void> playSurah(int surahNumber) async {
+    int endAyah = 999;
+    final surahResult = await _quranRepository.getSurahByNumber(surahNumber);
+    surahResult.fold((l) {}, (s) {
+      if (s != null) endAyah = s.numberOfAyahs;
+    });
+    await playRange(startSurah: surahNumber, startAyah: 1, endSurah: surahNumber, endAyah: endAyah);
+  }
+  
+  // --- Control Methods ---
 
   void setReciter(Reciter reciter) {
     if (_currentReciter?.id == reciter.id) return;
@@ -238,9 +308,16 @@ class AudioProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> play() async {
-    if (_player.audioSource != null) {
-        await _player.play();
+  /// ★ استئناف من الإيقاف المؤقت، أو تشغيل جديد من السياق
+  Future<void> resumeOrPlay() async {
+    // الحالة 1: متوقف مؤقتاً (paused) → استأنف
+    if (_player.processingState == ProcessingState.ready && !_player.playing) {
+      await _player.play();
+      return;
+    }
+    // الحالة 2: لا يوجد مصدر صوت (بعد stop) → شغّل من السياق
+    if (_currentSurah != null && _currentAyah != null) {
+      await playAyah(_currentSurah!, _currentAyah!);
     }
   }
 
@@ -248,131 +325,35 @@ class AudioProvider extends ChangeNotifier {
     await _player.pause();
   }
 
+  /// ★ إيقاف كامل: يمسح كل شيء ويسمح بالتنقل لسورة أخرى
   Future<void> stop() async {
     await _player.stop();
     _isPlaying = false;
     _currentSurah = null;
     _currentAyah = null;
+    _playlist = null;
     _ayahRepeatCount = 0;
     _rangeRepeatCount = 0;
     notifyListeners();
   }
 
-  void stopAndHide() {
-    stop();
+  /// ★ إيقاف نهائي وإخفاء كل الواجهة
+  Future<void> stopAndHide() async {
+    await _player.stop();
+    _isPlaying = false;
+    _currentSurah = null;
+    _currentAyah = null;
+    _playlist = null;
     _showMinibar = false;
+    _ayahRepeatCount = 0;
+    _rangeRepeatCount = 0;
+    _startSurah = null;
+    _startAyah = null;
+    _endSurah = null;
+    _endAyah = null;
     notifyListeners();
   }
 
-  // State
-  ConcatenatingAudioSource? _playlist;
-  
-  // Playback Features
-  Future<void> playSurah(int surahNumber) async {
-    if (_currentReciter == null) return;
-    
-    try {
-      // 1. Get Surah Details
-      final surahResult = await _quranRepository.getSurahByNumber(surahNumber);
-      int ayahCount = 0;
-      String surahName = 'سورة $surahNumber';
-      
-      surahResult.fold(
-        (l) => debugPrint('Error: ${l.message}'),
-        (s) {
-           if (s != null) {
-             ayahCount = s.numberOfAyahs;
-             surahName = s.nameArabic;
-           }
-        }
-      );
-      
-      if (ayahCount == 0) return;
-
-      // 2. Build Playlist
-      final List<AudioSource> sources = [];
-      
-      for (int i = 1; i <= ayahCount; i++) {
-        final url = _audioService.getRemoteUrl(_currentReciter!.id, surahNumber, i);
-        sources.add(AudioSource.uri(Uri.parse(url)));
-      }
-
-      _playlist = ConcatenatingAudioSource(children: sources);
-      
-      // 3. Setup Player
-      await _player.setAudioSource(_playlist!, initialIndex: 0, preload: false);
-      
-      _currentSurah = surahNumber;
-      _currentAyah = 1;
-      _currentSurahTotalAyahs = ayahCount;
-      notifyListeners();
-      
-      await _player.play();
-      
-    } catch (e) {
-      debugPrint('Error playing surah: $e');
-    }
-  }
-
-  /// Auto-advance to next ayah with repetition logic
-  Future<void> _playNextAyah() async {
-    if (_currentSurah == null || _currentAyah == null) return;
-    
-    // 1. Ayah Repeat Logic
-    _ayahRepeatCount++;
-    if (_ayahRepeatCount < _ayahRepeatLimit) {
-      debugPrint('🔁 Repeating Ayah $_currentAyah (Count: $_ayahRepeatCount)');
-      await _playSpecificAyah(_currentSurah!, _currentAyah!);
-      return;
-    }
-    
-    // Reset ayah counter if we move forward
-    _ayahRepeatCount = 0;
-    
-    // 2. Determine Next Ayah
-    int nextSurah = _currentSurah!;
-    int nextAyah = _currentAyah! + 1;
-    
-    // 3. Range End Logic
-    bool isRangeDone = false;
-    if (_endSurah != null && _endAyah != null) {
-      if (nextSurah > _endSurah! || (nextSurah == _endSurah! && nextAyah > _endAyah!)) {
-        isRangeDone = true;
-      }
-    }
-    
-    if (isRangeDone) {
-      _rangeRepeatCount++;
-      if (_rangeRepeatCount < _rangeRepeatLimit) {
-        debugPrint('🔁 Repeating Total Range (Range Count: $_rangeRepeatCount)');
-        if (_startSurah != null && _startAyah != null) {
-          // Restart from beginning of range
-          _currentSurah = _startSurah;
-          _currentAyah = _startAyah;
-          await _playSpecificAyah(_startSurah!, _startAyah!);
-          return;
-        }
-      }
-      
-      debugPrint('✅ Range Completion Reached');
-      await stop();
-      // Optional: keep minibar if user wants, but typically stop means done.
-      // But user said "Stop completely and hide" for the button.
-      // For auto-end, let's keep it visible but stopped? 
-      // User said: "إيقاف تماما ويختفي الشريط" for the button.
-      // For auto-end, let's just stop.
-      return;
-    }
-
-    // 4. Normal Advance (Surah Transition)
-    // If we reach the end of a surah, we need to handle the next surah if not in a specific range.
-    // However, _playSpecificAyah will fail if ayah doesn't exist.
-    // For now, let's assume we play it. 
-    // We should ideally check surah limits, but playSpecificAyah will likely throw, and we catch it.
-    
-    await _playSpecificAyah(nextSurah, nextAyah);
-  }
-  
   // Override dispose to clear playlist and cancel subscriptions
   @override
   void dispose() {

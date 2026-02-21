@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/surah_app/aya_content.dart';
 import '../../data/models/surah_app/word_content.dart';
 import '../../data/services/surah_app_api_service.dart';
+import '../../data/services/local_tafsir_service.dart';
 
 class SurahContentProvider extends ChangeNotifier {
   final SurahAppApiService _apiService = SurahAppApiService();
@@ -38,11 +39,7 @@ class SurahContentProvider extends ChangeNotifier {
     try {
       // Parallel Fetch
       final results = await Future.wait([
-        _apiService.getAyaContent(
-          suraNumber: suraNumber, 
-          ayaNumber: ayaNumber, 
-          slug: _selectedTafsirSlug
-        ),
+        _fetchAyaContentLogic(suraNumber, ayaNumber, _selectedTafsirSlug),
         _apiService.getAyahWordsContent(
           suraNumber: suraNumber, 
           ayaNumber: ayaNumber, 
@@ -62,14 +59,30 @@ class SurahContentProvider extends ChangeNotifier {
     }
   }
 
+  Future<AyaContent?> _fetchAyaContentLogic(int suraNumber, int ayaNumber, String slug) async {
+     if (slug == 'w-moyassar') {
+        final localText = await LocalTafsirService.instance.getTafsir(suraNumber, ayaNumber);
+        if (localText != null && localText.trim().isNotEmpty) {
+           return AyaContent(
+             suraNumber: suraNumber,
+             suraName: '', 
+             ayaNumber: ayaNumber,
+             ayaText: '',
+             content: localText,
+           );
+        }
+     }
+     return await _apiService.getAyaContent(
+       suraNumber: suraNumber,
+       ayaNumber: ayaNumber,
+       slug: slug,
+     );
+  }
+
   Future<String?> fetchTafsirForAyah(int suraNumber, int ayaNumber) async {
     try {
       final slug = _selectedTafsirSlug.isNotEmpty ? _selectedTafsirSlug : 'w-moyassar';
-      final ayaContent = await _apiService.getAyaContent(
-        suraNumber: suraNumber,
-        ayaNumber: ayaNumber,
-        slug: slug,
-      );
+      final ayaContent = await _fetchAyaContentLogic(suraNumber, ayaNumber, slug);
       return ayaContent?.content;
     } catch (e) {
       debugPrint('Error fetching specific tafsir: $e');

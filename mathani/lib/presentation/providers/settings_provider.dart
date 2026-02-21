@@ -15,6 +15,7 @@ class SettingsProvider with ChangeNotifier {
   // إعدادات حساسية اللمس
   double _pageDragSensitivity = 25.0; // Higher = less sensitive (was 2.0)
   double _minFlingVelocity = 150.0;   // Higher = requires more force (was 80.0)
+  int _lastPage = 1;
 
   // Getters
   bool get isDarkMode => _isDarkMode;
@@ -25,6 +26,7 @@ class SettingsProvider with ChangeNotifier {
   bool get downloadWhilePlaying => _downloadWhilePlaying;
   String get backgroundColorMode => _backgroundColorMode;
   int get navigationMode => _navigationMode;
+  int get lastPage => _lastPage;
   
   // Getters for navigation settings
   double get pageDragSensitivity => _pageDragSensitivity;
@@ -49,11 +51,11 @@ class SettingsProvider with ChangeNotifier {
   // --- Actions ---
 
   SettingsProvider() {
-    _loadSettings();
+    // We now depend on explicit init() call from main.dart
   }
   
   // تحميل الإعدادات
-  Future<void> _loadSettings() async {
+  Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _isDarkMode = prefs.getBool('isDarkMode') ?? false;
     _backgroundColorMode = prefs.getString('backgroundColorMode') ?? 'white';
@@ -65,6 +67,7 @@ class SettingsProvider with ChangeNotifier {
     _navigationMode = prefs.getInt('navigationMode') ?? 0;
     _pageDragSensitivity = prefs.getDouble('pageDragSensitivity') ?? 2.0;
     _minFlingVelocity = prefs.getDouble('minFlingVelocity') ?? 80.0;
+    _lastPage = prefs.getInt('lastPage') ?? 1;
     notifyListeners();
   }
   
@@ -150,5 +153,13 @@ class SettingsProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('downloadWhilePlaying', _downloadWhilePlaying);
     notifyListeners();
+  }
+  Future<void> setLastPage(int page) async {
+    if (page == _lastPage) return;
+    _lastPage = page;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('lastPage', page);
+    // Don't notify here to avoid constant rebuilds on every flip, 
+    // or notify if you want other screens (like Index) to update.
   }
 }

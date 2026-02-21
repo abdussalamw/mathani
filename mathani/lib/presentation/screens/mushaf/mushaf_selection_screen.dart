@@ -161,18 +161,20 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                                   fontSize: 12,
                                 ),
                               ),
-                              if (isImage) ...[
+                              if (needsDownload) ...[
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    const Icon(Icons.sd_storage_rounded, size: 14, color: Colors.orange),
+                                    const Icon(Icons.download_rounded, size: 14, color: Colors.orange),
                                     const SizedBox(width: 4),
                                     Text(
                                       mushaf.identifier == 'shamarly_15lines' 
                                           ? 'حجم التنزيل: 70 ميجا تقريباً' 
                                           : (mushaf.identifier == 'madani_old_v1' 
-                                              ? 'حجم التنزيل: 130 ميجا تقريباً' 
-                                              : 'تنزيل ملفات الصور'),
+                                              ? 'حجم التنزيل: 45 ميجا تقريباً' 
+                                              : (mushaf.identifier == 'qcf2_v4_woff2'
+                                                  ? 'حجم التنزيل: 52 ميجا تقريباً'
+                                                  : 'تنزيل ملفات المصحف')),
                                       style: TextStyle(
                                         color: Colors.orange[800],
                                         fontSize: 11,

@@ -197,6 +197,7 @@ class PageLineWidget extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: _getFontFamily(glyph),
                   fontSize: _getGlyphSize(glyph),
+                  fontWeight: FontWeight.normal,
                   color: _getGlyphColor(glyph, context),
                   height: 1.0, 
                   letterSpacing: 0,
@@ -297,8 +298,8 @@ class PageLineWidget extends StatelessWidget {
    double _getGlyphSize(Glyph glyph) {
      if (mushafId == 'madani_old_v1') {
         if (glyph.isSurahName || glyph.isBasmala) return 56.0;
-        if (glyph.isAyahEnd) return 54.0; // Slightly smaller than words
-        return 58.0; // Balanced size: less FittedBox compression, consistent stroke
+        if (glyph.isAyahEnd) return 50.0;
+        return 56.0;
      }
      
      if (glyph.isBasmala || glyph.isSurahName) {

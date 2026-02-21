@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:mathani/data/models/page_glyph.dart';
 import 'package:mathani/data/services/glyph_data_loader.dart';
 import 'package:mathani/presentation/widgets/mushaf_page_widget.dart';
@@ -31,15 +31,15 @@ class MushafScreen extends StatefulWidget {
   State<MushafScreen> createState() => _MushafScreenState();
 }
 
-/// ScrollPhysics مخصص لضمان التنقل بين الصفحات بدقة (صفحة واحدة لكل تمريرة)
+/// ScrollPhysics ظ…ط®طµطµ ظ„ط¶ظ…ط§ظ† ط§ظ„طھظ†ظ‚ظ„ ط¨ظٹظ† ط§ظ„طµظپط­ط§طھ ط¨ط¯ظ‚ط© (طµظپط­ط© ظˆط§ط­ط¯ط© ظ„ظƒظ„ طھظ…ط±ظٹط±ط©)
 class SensitivePageScrollPhysics extends PageScrollPhysics {
   final double dragThreshold;
   final double flingVelocity;
 
   const SensitivePageScrollPhysics({
     ScrollPhysics? parent,
-    this.dragThreshold = 25.0, // زيادة العتبة لتقليل الحساسية العالية (كانت 2.0)
-    this.flingVelocity = 150.0, // زيادة سرعة القذف المطلوبة (كانت 80.0)
+    this.dragThreshold = 25.0, // ط²ظٹط§ط¯ط© ط§ظ„ط¹طھط¨ط© ظ„طھظ‚ظ„ظٹظ„ ط§ظ„ط­ط³ط§ط³ظٹط© ط§ظ„ط¹ط§ظ„ظٹط© (ظƒط§ظ†طھ 2.0)
+    this.flingVelocity = 150.0, // ط²ظٹط§ط¯ط© ط³ط±ط¹ط© ط§ظ„ظ‚ط°ظپ ط§ظ„ظ…ط·ظ„ظˆط¨ط© (ظƒط§ظ†طھ 80.0)
   }) : super(parent: parent);
 
   @override
@@ -65,6 +65,8 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
   String? _errorMessage;
   late PageController _pageController;
   int _currentPage = 1;
+  String? _loadedMushafId;
+
 
   // Auto Scroll State
   Timer? _autoScrollTimer;
@@ -72,10 +74,10 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
   static const double _autoScrollSpeed = 2.0;
   static const Duration _autoScrollInterval = Duration(milliseconds: 16); // ~60fps
   
-  // ScrollControllers للصفحات الفردية (للوضع Hybrid)
+  // ScrollControllers ظ„ظ„طµظپط­ط§طھ ط§ظ„ظپط±ط¯ظٹط© (ظ„ظ„ظˆط¶ط¹ Hybrid)
   final Map<int, ScrollController> _innerScrollControllers = {};
   
-  // Bi-directional Drag State (للتنقل ثنائي الأبعاد)
+  // Bi-directional Drag State (ظ„ظ„طھظ†ظ‚ظ„ ط«ظ†ط§ط¦ظٹ ط§ظ„ط£ط¨ط¹ط§ط¯)
   double _secondaryOffset = 0.0;
   bool _isSecondaryDragging = false;
   int? _secondaryTargetPage;
@@ -102,7 +104,10 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     WakelockPlus.enable();
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AudioProvider>().addListener(_onAudioStateChange);
+      if (!_audioListenerAdded) {
+        context.read<AudioProvider>().addListener(_onAudioStateChange);
+        _audioListenerAdded = true;
+      }
     });
   }
   
@@ -111,14 +116,24 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     
     final audio = context.read<AudioProvider>();
     if (audio.isPlaying && audio.currentSurah != null && audio.currentAyah != null) {
-       final navProvider = context.read<MushafNavigationProvider>();
-       final page = navProvider.getPageForAyah(audio.currentSurah!, audio.currentAyah!);
+       final mushafId = context.read<MushafMetadataProvider>().currentMushafId;
+       int? page;
+       
+       if (mushafId == 'shamarly_15lines') {
+         final navProvider = context.read<MushafNavigationProvider>();
+         page = navProvider.getPageForAyah(audio.currentSurah!, audio.currentAyah!);
+       } else {
+         // Madani uses the precise statically hardcoded 604-page mapping
+         page = MushafNavigationProvider.pageForSurahAyah(
+           audio.currentSurah!, 
+           audio.currentAyah!,
+         );
+       }
        
        if (page != null && page != _currentPage) {
-         final targetIndex = page - 1;
          if (_pageController.hasClients) {
             _pageController.animateToPage(
-              targetIndex, 
+              page - 1, 
               duration: const Duration(milliseconds: 500), 
               curve: Curves.easeInOut
             );
@@ -175,7 +190,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'فشل تحميل المصحف: $e';
+          _errorMessage = 'ظپط´ظ„ طھط­ظ…ظٹظ„ ط§ظ„ظ…طµط­ظپ: $e';
           _isLoading = false;
         });
       }
@@ -190,14 +205,14 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
         final navProvider = Provider.of<MushafNavigationProvider>(context, listen: false);
         return AlertDialog(
           title: const Text(
-            'الانتقال إلى صفحة',
+            'ط§ظ„ط§ظ†طھظ‚ط§ظ„ ط¥ظ„ظ‰ طµظپط­ط©',
             style: TextStyle(fontFamily: 'Tajawal'),
           ),
           content: TextField(
             keyboardType: TextInputType.number,
             autofocus: true,
             decoration: InputDecoration(
-              hintText: 'رقم الصفحة (1-${navProvider.totalPages})',
+              hintText: 'ط±ظ‚ظ… ط§ظ„طµظپط­ط© (1-${navProvider.totalPages})',
             ),
             onChanged: (value) {
               selectedPage = int.tryParse(value);
@@ -216,7 +231,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
+              child: const Text('ط¥ظ„ط؛ط§ط،', style: TextStyle(fontFamily: 'Tajawal')),
             ),
             ElevatedButton(
               onPressed: () {
@@ -233,7 +248,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
                   );
                 }
               },
-              child: const Text('انتقال'),
+              child: const Text('ط§ظ†طھظ‚ط§ظ„'),
             ),
           ],
         );
@@ -248,6 +263,16 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
   void didChangeDependencies() {
     super.didChangeDependencies();
     _updateSystemUI();
+    
+    // Listen to Mushaf change
+    final mushafProvider = Provider.of<MushafMetadataProvider>(context);
+    final currentId = mushafProvider.currentMushafId;
+    
+    if (_loadedMushafId != currentId) {
+       _loadedMushafId = currentId;
+       // We delayed to avoid calling setState during build if triggered by build
+       Future.microtask(() => _loadPages());
+    }
   }
 
   void _updateSystemUI() {
@@ -291,7 +316,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
      });
   }
 
-  // شريط علوي ثابت للوضع المتحرك
+  // ط´ط±ظٹط· ط¹ظ„ظˆظٹ ط«ط§ط¨طھ ظ„ظ„ظˆط¶ط¹ ط§ظ„ظ…طھط­ط±ظƒ
   Widget _buildFixedHeader(SettingsProvider settings) {
     if (!settings.isVerticalContinuousMode) return const SizedBox.shrink();
     
@@ -305,19 +330,19 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
           page: _pages![_currentPage - 1],
           showInfo: true,
           mushafId: context.read<MushafMetadataProvider>().currentMushafId,
-          // نحن نحتاج فقط للشريط العلوي من هذا الـ Widget، لذا سنجعل المحتوى فارغاً أو نمرر تعليمات بذلك
-          // لكن الأبسط في الوقت الحالي هو استخراج الـ Header فقط إذا لزم الأمر مستقبلاً
+          // ظ†ط­ظ† ظ†ط­طھط§ط¬ ظپظ‚ط· ظ„ظ„ط´ط±ظٹط· ط§ظ„ط¹ظ„ظˆظٹ ظ…ظ† ظ‡ط°ط§ ط§ظ„ظ€ WidgetطŒ ظ„ط°ط§ ط³ظ†ط¬ط¹ظ„ ط§ظ„ظ…ط­طھظˆظ‰ ظپط§ط±ط؛ط§ظ‹ ط£ظˆ ظ†ظ…ط±ط± طھط¹ظ„ظٹظ…ط§طھ ط¨ط°ظ„ظƒ
+          // ظ„ظƒظ† ط§ظ„ط£ط¨ط³ط· ظپظٹ ط§ظ„ظˆظ‚طھ ط§ظ„ط­ط§ظ„ظٹ ظ‡ظˆ ط§ط³طھط®ط±ط§ط¬ ط§ظ„ظ€ Header ظپظ‚ط· ط¥ط°ط§ ظ„ط²ظ… ط§ظ„ط£ظ…ط± ظ…ط³طھظ‚ط¨ظ„ط§ظ‹
         ),
       ),
     );
   }
 
-  // --- نظام Auto Scroll المحسن ---
+  // --- ظ†ط¸ط§ظ… Auto Scroll ط§ظ„ظ…ط­ط³ظ† ---
   void _toggleAutoScroll(SettingsProvider settings) {
     if (_isAutoScrolling) {
       _stopAutoScroll();
     } else {
-      // إذا لم نكن في الوضع الرأسي المستمر، ننتقل إليه أولاً
+      // ط¥ط°ط§ ظ„ظ… ظ†ظƒظ† ظپظٹ ط§ظ„ظˆط¶ط¹ ط§ظ„ط±ط£ط³ظٹ ط§ظ„ظ…ط³طھظ…ط±طŒ ظ†ظ†طھظ‚ظ„ ط¥ظ„ظٹظ‡ ط£ظˆظ„ط§ظ‹
       if (!settings.isVerticalContinuousMode) {
         settings.setNavigationMode(2); // 2 is Vertical Continuous
       }
@@ -341,19 +366,19 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
       final settings = context.read<SettingsProvider>();
       final currentController = _innerScrollControllers[_currentPage];
       
-      // الوضع الهجين: نتمرر داخل الصفحة أولاً
+      // ط§ظ„ظˆط¶ط¹ ط§ظ„ظ‡ط¬ظٹظ†: ظ†طھظ…ط±ط± ط¯ط§ط®ظ„ ط§ظ„طµظپط­ط© ط£ظˆظ„ط§ظ‹
       if (settings.isHybridMode && currentController != null && currentController.hasClients) {
         final maxScroll = currentController.position.maxScrollExtent;
         final currentScroll = currentController.offset;
         
         if (currentScroll < maxScroll) {
-          // نتمرر داخل الصفحة الحالية
+          // ظ†طھظ…ط±ط± ط¯ط§ط®ظ„ ط§ظ„طµظپط­ط© ط§ظ„ط­ط§ظ„ظٹط©
           currentController.jumpTo(currentScroll + _autoScrollSpeed);
           return;
         }
       }
       
-      // إذا وصلنا للنهاية أو ليس في الوضع الهجين، ننتقل للصفحة التالية
+      // ط¥ط°ط§ ظˆطµظ„ظ†ط§ ظ„ظ„ظ†ظ‡ط§ظٹط© ط£ظˆ ظ„ظٹط³ ظپظٹ ط§ظ„ظˆط¶ط¹ ط§ظ„ظ‡ط¬ظٹظ†طŒ ظ†ظ†طھظ‚ظ„ ظ„ظ„طµظپط­ط© ط§ظ„طھط§ظ„ظٹط©
       if (_pageController.hasClients) {
         final maxPage = (_pages?.length ?? 604) - 1;
         final currentPageIndex = _pageController.page?.round() ?? _currentPage - 1;
@@ -382,7 +407,11 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
   @override
   void dispose() {
     try {
-      context.read<AudioProvider>().removeListener(_onAudioStateChange);
+      if (_audioListenerAdded) {
+        context.read<AudioProvider>().removeListener(_onAudioStateChange);
+        _audioListenerAdded = false;
+      }
+      _syncDebounce?.cancel();
       _autoScrollTimer?.cancel();
       _pageController.dispose();
       _secondaryAnimController.dispose();
@@ -396,7 +425,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     super.dispose();
   }
 
-  // --- منطق التنقل ثنائي الأبعاد (Bi-directional Navigation) ---
+  // --- ظ…ظ†ط·ظ‚ ط§ظ„طھظ†ظ‚ظ„ ط«ظ†ط§ط¦ظٹ ط§ظ„ط£ط¨ط¹ط§ط¯ (Bi-directional Navigation) ---
 
   void _handleSecondaryDragUpdate(DragUpdateDetails details, SettingsProvider settings) {
     if (_isAutoScrolling || settings.isVerticalContinuousMode || settings.isHybridMode) return;
@@ -404,27 +433,27 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     final isHorizontal = settings.isHorizontalMode;
     double delta = isHorizontal ? details.delta.dy : details.delta.dx;
     
-    // منع التأثير إذا كان السحب صغيراً جداً في البداية لتجنب الاهتزاز
+    // ظ…ظ†ط¹ ط§ظ„طھط£ط«ظٹط± ط¥ط°ط§ ظƒط§ظ† ط§ظ„ط³ط­ط¨ طµط؛ظٹط±ط§ظ‹ ط¬ط¯ط§ظ‹ ظپظٹ ط§ظ„ط¨ط¯ط§ظٹط© ظ„طھط¬ظ†ط¨ ط§ظ„ط§ظ‡طھط²ط§ط²
     if (!_isSecondaryDragging && delta.abs() < 1) return;
 
     setState(() {
       _secondaryOffset += delta;
       _isSecondaryDragging = true;
       
-      // تحديد الصفحة المستهدفة (دائماً صفحة واحدة فقط بعيداً عن الحالية)
+      // طھط­ط¯ظٹط¯ ط§ظ„طµظپط­ط© ط§ظ„ظ…ط³طھظ‡ط¯ظپط© (ط¯ط§ط¦ظ…ط§ظ‹ طµظپط­ط© ظˆط§ط­ط¯ط© ظپظ‚ط· ط¨ط¹ظٹط¯ط§ظ‹ ط¹ظ† ط§ظ„ط­ط§ظ„ظٹط©)
       if (_secondaryOffset < 0) {
         _secondaryTargetPage = _currentPage + 1;
       } else if (_secondaryOffset > 0) {
         _secondaryTargetPage = _currentPage - 1;
       }
       
-      // التاكد من حدود الصفحات
+      // ط§ظ„طھط§ظƒط¯ ظ…ظ† ط­ط¯ظˆط¯ ط§ظ„طµظپط­ط§طھ
       final maxPages = _pages?.length ?? 604;
       if (_secondaryTargetPage != null) {
         if (_secondaryTargetPage! < 1) _secondaryTargetPage = 1;
         if (_secondaryTargetPage! > maxPages) _secondaryTargetPage = maxPages;
         
-        // إذا كانت الصفحة المستهدفة هي نفسها الحالية، نجعلها null
+        // ط¥ط°ط§ ظƒط§ظ†طھ ط§ظ„طµظپط­ط© ط§ظ„ظ…ط³طھظ‡ط¯ظپط© ظ‡ظٹ ظ†ظپط³ظ‡ط§ ط§ظ„ط­ط§ظ„ظٹط©طŒ ظ†ط¬ط¹ظ„ظ‡ط§ null
         if (_secondaryTargetPage == _currentPage) _secondaryTargetPage = null;
       }
     });
@@ -438,7 +467,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
         ? MediaQuery.of(context).size.height 
         : MediaQuery.of(context).size.width;
         
-    // رفع العتبة إلى 20% لضمان أن المستخدم يريد فعلاً التقليب
+    // ط±ظپط¹ ط§ظ„ط¹طھط¨ط© ط¥ظ„ظ‰ 20% ظ„ط¶ظ…ط§ظ† ط£ظ† ط§ظ„ظ…ط³طھط®ط¯ظ… ظٹط±ظٹط¯ ظپط¹ظ„ط§ظ‹ ط§ظ„طھظ‚ظ„ظٹط¨
     final threshold = screenDimension * 0.20; 
     final velocity = isHorizontal 
         ? details.velocity.pixelsPerSecond.dy 
@@ -499,10 +528,10 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     final isHorizontal = settings.isHorizontalMode;
     final size = MediaQuery.of(context).size;
     
-    // الصفحة الحالية
+    // ط§ظ„طµظپط­ط© ط§ظ„ط­ط§ظ„ظٹط©
     final currentPageWidget = _buildPageItem(context, _currentPage - 1, settings, uiProvider);
     
-    // الصفحة المستهدفة
+    // ط§ظ„طµظپط­ط© ط§ظ„ظ…ط³طھظ‡ط¯ظپط©
     Widget? targetPageWidget;
     if (_secondaryTargetPage != null) {
       targetPageWidget = _buildPageItem(context, _secondaryTargetPage! - 1, settings, uiProvider);
@@ -510,10 +539,10 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     
     return Stack(
       children: [
-        // خلفية لإخفاء PageView أثناء الحركة
+        // ط®ظ„ظپظٹط© ظ„ط¥ط®ظپط§ط، PageView ط£ط«ظ†ط§ط، ط§ظ„ط­ط±ظƒط©
         Container(color: settings.backgroundColor),
         
-        // الصفحة المستهدفة (تأتي من الخلف أو أمام)
+        // ط§ظ„طµظپط­ط© ط§ظ„ظ…ط³طھظ‡ط¯ظپط© (طھط£طھظٹ ظ…ظ† ط§ظ„ط®ظ„ظپ ط£ظˆ ط£ظ…ط§ظ…)
         if (targetPageWidget != null)
           Transform.translate(
             offset: isHorizontal 
@@ -522,7 +551,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
             child: targetPageWidget,
           ),
           
-        // الصفحة الحالية مع ظل
+        // ط§ظ„طµظپط­ط© ط§ظ„ط­ط§ظ„ظٹط© ظ…ط¹ ط¸ظ„
         Transform.translate(
           offset: isHorizontal ? Offset(0, _secondaryOffset) : Offset(_secondaryOffset, 0),
           child: Container(
@@ -563,6 +592,8 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
         }
       });
     }
+
+    final mushafMetadata = context.watch<MushafMetadataProvider>();
     
     if (_isLoading) {
       return _buildLoadingScreen(isDark);
@@ -578,9 +609,8 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     
     int totalPages = 604;
     try {
-      final provider = context.read<MushafMetadataProvider>();
-      final currentId = provider.currentMushafId;
-      final mushaf = provider.availableMushafs.firstWhere((m) => m.identifier == currentId);
+      final currentId = mushafMetadata.currentMushafId;
+      final mushaf = mushafMetadata.availableMushafs.firstWhere((m) => m.identifier == currentId);
       totalPages = mushaf.pageCount;
     } catch (_) {
       totalPages = _pages?.length ?? 604;
@@ -597,7 +627,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
                   behavior: HitTestBehavior.translucent,
                   onTap: () {
                      if (_isAutoScrolling) {
-                        // ضغطة واحدة توقف أو تستأنف الحركة في الوضع المتحرك
+                        // ط¶ط؛ط·ط© ظˆط§ط­ط¯ط© طھظˆظ‚ظپ ط£ظˆ طھط³طھط£ظ†ظپ ط§ظ„ط­ط±ظƒط© ظپظٹ ط§ظ„ظˆط¶ط¹ ط§ظ„ظ…طھط­ط±ظƒ
                         setState(() {
                           _isAutoScrolling = !_isAutoScrolling;
                         });
@@ -609,11 +639,11 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
                   onDoubleTap: () {
                     final settings = context.read<SettingsProvider>();
                     if (settings.isVerticalContinuousMode) {
-                      // إذا كان في الوضع المتحرك، نقوم بإيقافه والعودة للوضع الأفقي
+                      // ط¥ط°ط§ ظƒط§ظ† ظپظٹ ط§ظ„ظˆط¶ط¹ ط§ظ„ظ…طھط­ط±ظƒطŒ ظ†ظ‚ظˆظ… ط¨ط¥ظٹظ‚ط§ظپظ‡ ظˆط§ظ„ط¹ظˆط¯ط© ظ„ظ„ظˆط¶ط¹ ط§ظ„ط£ظپظ‚ظٹ
                       _stopAutoScroll();
-                      settings.setNavigationMode(0); // العودة للوضع الأفقي (يمين يسار)
+                      settings.setNavigationMode(0); // ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ظˆط¶ط¹ ط§ظ„ط£ظپظ‚ظٹ (ظٹظ…ظٹظ† ظٹط³ط§ط±)
                     } else {
-                      // إذا لم يكن، نفعله ونبدأ الحركة
+                      // ط¥ط°ط§ ظ„ظ… ظٹظƒظ†طŒ ظ†ظپط¹ظ„ظ‡ ظˆظ†ط¨ط¯ط£ ط§ظ„ط­ط±ظƒط©
                       _toggleAutoScroll(settings);
                     }
                   },
@@ -652,10 +682,13 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
                           itemCount: totalPages,
                           reverse: false,
                           onPageChanged: (index) {
+                            final page = index + 1;
                             setState(() {
-                              _currentPage = index + 1;
+                              _currentPage = page;
                             });
-                            _syncPageWithProvider(index + 1);
+                            _syncPageWithProvider(page);
+                            // ط­ظپط¸ ط¢ط®ط± طµظپط­ط© ظ‚ط±ط§ط،ط©
+                            context.read<SettingsProvider>().setLastPage(page);
                           },
                           itemBuilder: (context, index) {
                             return _buildPageItem(context, index, settings, uiProvider);
@@ -669,13 +702,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
             ],
           ),
           
-          // Audio Mini Bar
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: AudioMinibar(),
-          ),
+          // AudioMinibar removed â€” it's already in main_shell_screen
           
           // Auto Scroll Indicator
           if (_isAutoScrolling)
@@ -696,7 +723,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
               ),
             ),
           
-          // الشريط العلوي الثابت (يظهر فقط في الوضع المتحرك)
+          // ط§ظ„ط´ط±ظٹط· ط§ظ„ط¹ظ„ظˆظٹ ط§ظ„ط«ط§ط¨طھ (ظٹط¸ظ‡ط± ظپظ‚ط· ظپظٹ ط§ظ„ظˆط¶ط¹ ط§ظ„ظ…طھط­ط±ظƒ)
           if (settings.isVerticalContinuousMode) 
             Positioned(
               top: 0, left: 0, right: 0,
@@ -707,12 +734,12 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
                   page: _pages![_currentPage - 1],
                   mushafId: context.read<MushafMetadataProvider>().currentMushafId,
                   showInfo: true,
-                  hideContent: true, // إخفاء محتوى الصفحة والاكتفاء بالشريط العلوي
+                  hideContent: true, // ط¥ط®ظپط§ط، ظ…ط­طھظˆظ‰ ط§ظ„طµظپط­ط© ظˆط§ظ„ط§ظƒطھظپط§ط، ط¨ط§ظ„ط´ط±ظٹط· ط§ظ„ط¹ظ„ظˆظٹ
                 ),
               ),
             ),
 
-          // Secondary Drag Overlay (التنقل ثنائي الأبعاد - يعمل فقط في وضع الصفحات)
+          // Secondary Drag Overlay (ط§ظ„طھظ†ظ‚ظ„ ط«ظ†ط§ط¦ظٹ ط§ظ„ط£ط¨ط¹ط§ط¯ - ظٹط¹ظ…ظ„ ظپظ‚ط· ظپظٹ ظˆط¶ط¹ ط§ظ„طµظپط­ط§طھ)
           if (!settings.isVerticalContinuousMode)
             _buildSecondaryOverlay(settings, uiProvider),
         ],
@@ -736,7 +763,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     final currentId = context.read<MushafMetadataProvider>().currentMushafId;
     final isDigital = currentType == 'digital';
     
-    // إنشاء ScrollController للصفحة إذا لم يكن موجوداً (للوضع الهجين)
+    // ط¥ظ†ط´ط§ط، ScrollController ظ„ظ„طµظپط­ط© ط¥ط°ط§ ظ„ظ… ظٹظƒظ† ظ…ظˆط¬ظˆط¯ط§ظ‹ (ظ„ظ„ظˆط¶ط¹ ط§ظ„ظ‡ط¬ظٹظ†)
     if (settings.isHybridMode && !_innerScrollControllers.containsKey(index + 1)) {
       _innerScrollControllers[index + 1] = ScrollController();
     }
@@ -764,12 +791,12 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
         selectedAyah: _selectedAyah,
         onAyahSelected: _onAyahInteraction,
         onAyahLongPress: _onAyahInteraction,
-        showInfo: !settings.isVerticalContinuousMode, // إخفاء الشريط الداخلي في الوضع المستمر
+        showInfo: !settings.isVerticalContinuousMode, // ط¥ط®ظپط§ط، ط§ظ„ط´ط±ظٹط· ط§ظ„ط¯ط§ط®ظ„ظٹ ظپظٹ ط§ظ„ظˆط¶ط¹ ط§ظ„ظ…ط³طھظ…ط±
         isDigital: isDigital,
       );
     }
     
-    // في الوضع الهجين، نضيف SingleChildScrollView داخلي
+    // ظپظٹ ط§ظ„ظˆط¶ط¹ ط§ظ„ظ‡ط¬ظٹظ†طŒ ظ†ط¶ظٹظپ SingleChildScrollView ط¯ط§ط®ظ„ظٹ
     if (settings.isHybridMode) {
       pageContent = SingleChildScrollView(
         controller: _innerScrollControllers[index + 1],
@@ -797,7 +824,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
       backgroundColor: isDark ? const Color(0xFF1A1410) : const Color(0xFFFFFDF5),
       appBar: AppBar(
         title: const Text(
-          'المصحف الشريف',
+          'ط§ظ„ظ…طµط­ظپ ط§ظ„ط´ط±ظٹظپ',
           style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -813,7 +840,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
             ),
             SizedBox(height: 16),
             Text(
-              'جاري تحميل المصحف...',
+              'ط¬ط§ط±ظٹ طھط­ظ…ظٹظ„ ط§ظ„ظ…طµط­ظپ...',
               style: TextStyle(
                 fontFamily: 'Tajawal',
                 fontSize: 16,
@@ -830,7 +857,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
       backgroundColor: isDark ? const Color(0xFF1A1410) : const Color(0xFFFFFDF5),
       appBar: AppBar(
         title: const Text(
-          'المصحف الشريف',
+          'ط§ظ„ظ…طµط­ظپ ط§ظ„ط´ط±ظٹظپ',
           style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -858,7 +885,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
             ElevatedButton.icon(
               onPressed: _loadPages,
               icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
+              label: const Text('ط¥ط¹ط§ط¯ط© ط§ظ„ظ…ط­ط§ظˆظ„ط©'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
@@ -874,7 +901,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
       backgroundColor: isDark ? const Color(0xFF1A1410) : const Color(0xFFFFFDF5),
       appBar: AppBar(
         title: const Text(
-          'المصحف الشريف',
+          'ط§ظ„ظ…طµط­ظپ ط§ظ„ط´ط±ظٹظپ',
           style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -883,7 +910,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
       ),
       body: const Center(
         child: Text(
-          'لا توجد بيانات',
+          'ظ„ط§ طھظˆط¬ط¯ ط¨ظٹط§ظ†ط§طھ',
           style: TextStyle(
             fontFamily: 'Tajawal',
             fontSize: 18,
@@ -893,34 +920,45 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     );
   }
   
+  // Debounce timer (reserved for future use, cancelled in dispose)
+  Timer? _syncDebounce;
+  bool _audioListenerAdded = false; // guard against duplicate listeners
+
   void _syncPageWithProvider(int pageNum) {
-    final navProvider = context.read<MushafNavigationProvider>();
-    final pageInfo = navProvider.getPageInfo(pageNum);
     final mushafId = context.read<MushafMetadataProvider>().currentMushafId;
     
-    if (mushafId == 'shamarly_15lines' && pageInfo != null) {
-       final quranRepo = context.read<QuranProvider>();
-       quranRepo.getAyah(pageInfo.startSurah, pageInfo.startAyah).then((either) {
-          either.fold(
-            (failure) => null,
-            (ayah) {
-              if (ayah != null && mounted) {
-                context.read<UiProvider>().setCurrentMushafPage(ayah.page);
-                context.read<QuranProvider>().updateReadingLocation(ayah.surahNumber, ayah.ayahNumber);
-              }
-            }
-          );
-       });
-    } else {
-       context.read<UiProvider>().setCurrentMushafPage(pageNum);
-       
+    // Update current page in UiProvider immediately
+    context.read<UiProvider>().setCurrentMushafPage(pageNum);
+    
+    if (mushafId == 'shamarly_15lines') {
+       // Shamarly: uses its own JSON page data
+       final navProvider = context.read<MushafNavigationProvider>();
+       final pageInfo = navProvider.getPageInfo(pageNum);
        if (pageInfo != null && pageInfo.startSurah > 0) {
-          final surah = pageInfo.startSurah;
-          final ayah = pageInfo.startAyah > 0 ? pageInfo.startAyah : 1;
-          
-          context.read<QuranProvider>().updateReadingLocation(surah, ayah);
-          context.read<AudioProvider>().setContext(surah, ayah);
+         final surah = pageInfo.startSurah;
+         final ayah = pageInfo.startAyah > 0 ? pageInfo.startAyah : 1;
+         context.read<QuranProvider>().updateReadingLocation(surah, ayah);
+         context.read<AudioProvider>().setContext(surah, ayah);
+         
+         // Async improvement from DB (fire and forget)
+         context.read<QuranProvider>().getAyah(surah, ayah).then((either) {
+           either.fold(
+             (failure) => null,
+             (ayahObj) {
+               if (ayahObj != null && mounted) {
+                 context.read<QuranProvider>().updateReadingLocation(ayahObj.surahNumber, ayahObj.ayahNumber);
+                 context.read<AudioProvider>().setContext(ayahObj.surahNumber, ayahObj.ayahNumber);
+               }
+             }
+           );
+         });
        }
+    } else {
+       // Madani (v1/v2): use full 604-page static map — instant, no DB needed
+       final surah = MushafNavigationProvider.surahForPageFull(pageNum);
+       final ayah  = MushafNavigationProvider.ayahForPageFull(pageNum);
+       context.read<QuranProvider>().updateReadingLocation(surah, ayah);
+       context.read<AudioProvider>().setContext(surah, ayah);
     }
   }
 }

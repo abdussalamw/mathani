@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../data/services/local_tafsir_service.dart';
 
 class TafsirProvider with ChangeNotifier {
   bool _isLoading = false;
@@ -16,6 +17,18 @@ class TafsirProvider with ChangeNotifier {
   Future<void> fetchTafsir(int surah, int ayah, {int tafsirId = 16}) async {
     // Tafsir ID 16 is Tafsir Muyassar (Moyassar)
     if (_lastFetchedSurah == surah && _lastFetchedAyah == ayah) return;
+
+    // 1. Try local offline Tafsir first
+    final localTafsir = await LocalTafsirService.instance.getTafsir(surah, ayah);
+    if (localTafsir != null) {
+      _tafsirContent = localTafsir;
+      _lastFetchedSurah = surah;
+      _lastFetchedAyah = ayah;
+      _isLoading = false;
+      _errorMessage = null;
+      notifyListeners();
+      return;
+    }
 
     _isLoading = true;
     _errorMessage = null;

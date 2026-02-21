@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/services/qcf4_font_downloader.dart';
+import '../../../data/services/local_tafsir_service.dart';
+import '../../providers/mushaf_metadata_provider.dart';
+import 'package:provider/provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -47,11 +50,13 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;
     
-    // Check if fonts are available
-    final fontsReady = await QCF4FontDownloader.areAllFontsAvailable();
+    // Check if Tafseer and fonts are available based on what's needed
+    final tafsirReady = await LocalTafsirService.instance.isTafsirDownloaded();
     
     if (mounted) {
-      if (fontsReady) {
+      if (tafsirReady) {
+        // Load tafsir locally
+        LocalTafsirService.instance.loadTafsirData();
         Navigator.of(context).pushReplacementNamed('/home');
       } else {
         Navigator.of(context).pushReplacementNamed('/initial_download');

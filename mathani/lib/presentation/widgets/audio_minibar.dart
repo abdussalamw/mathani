@@ -58,29 +58,14 @@ class AudioMinibar extends StatelessWidget {
                      if (audio.isPlaying) {
                        audio.pause();
                      } else if (hasContext) {
-                       audio.play();
+                       // استئناف من حيث توقف
+                       audio.resumeOrPlay();
                      } else {
-                       // No context? Start from beginning of current page!
-                       final ui = context.read<UiProvider>();
-                       final nav = context.read<MushafNavigationProvider>();
-                       final page = ui.currentMushafPage;
-                       final info = nav.getPageInfo(page);
-                       
-                       if (info != null) {
-                         // Prefer startSurah/startAyah
-                         // Note: PageInfo usually has accurate start/end
-                         final surah = info.startSurah;
-                         final ayah = info.startAyah > 0 ? info.startAyah : 1;
-                         audio.playAyah(surah, ayah);
-                       } else {
-                         // Fallback: Open Sheet
-                         showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => const AudioPlayerSheet(),
-                        );
-                       }
+                       // ★ ابدأ من موقع القراءة الحالي (readingSurah مُحدّث دائماً)
+                       final quran = context.read<QuranProvider>();
+                       final surah = quran.readingSurah;
+                       final ayah = quran.readingAyah > 0 ? quran.readingAyah : 1;
+                       audio.playAyah(surah, ayah);
                      }
                    },
                    isPrimary: true,
@@ -96,9 +81,12 @@ class AudioMinibar extends StatelessWidget {
                     children: [
                       Consumer<QuranProvider>(
                         builder: (context, quran, _) {
-                          String surahName = _getSurahName(quran, audio.currentSurah);
+                          // ★ استخدم readingSurah كـ fallback إذا currentSurah فارغ
+                          final displaySurah = audio.currentSurah ?? quran.readingSurah;
+                          String surahName = _getSurahName(quran, displaySurah);
+                          final displayAyah = audio.currentAyah ?? quran.readingAyah;
                           return Text(
-                            hasContext ? 'سورة $surahName (${audio.currentAyah})' : 'تلاوة القرآن',
+                            'سورة $surahName ($displayAyah)',
                             style: TextStyle(
                               fontFamily: 'Tajawal',
                               fontSize: 13,
@@ -125,24 +113,32 @@ class AudioMinibar extends StatelessWidget {
                 
                 // 3. Navigation Controls
                 if (hasContext) ...[
-                  // Prev
+                  // Prev (Right arrow → plays previous Ayah)
                   _SmallButton(
-                    icon: Icons.skip_next_rounded, // Mirrored Logic: Skip Next (Points Right) = Previous Ayah
-                    onPressed: () => audio.playAyah(audio.currentSurah!, audio.currentAyah! - 1),
-                  ),
-                  // Next
-                  _SmallButton(
-                    icon: Icons.skip_previous_rounded, // Mirrored Logic: Skip Prev (Points Left) = Next Ayah
-                    onPressed: () => audio.playAyah(audio.currentSurah!, audio.currentAyah! + 1),
-                  ),
-                  // Toggle Repeat Ayah
-                  _SmallButton(
-                    icon: Icons.repeat_one_rounded,
+                    icon: Icons.skip_next_rounded, // Mirrored icon
                     onPressed: () {
-                      audio.setAyahRepeatLimit(audio.ayahRepeatLimit == 1 ? 999 : 1);
+                      if (audio.player.hasPrevious) {
+                         audio.player.seekToPrevious();
+                      } else if (audio.currentSurah != null && audio.currentAyah != null && audio.currentAyah! > 1) {
+                         // Fallback if not in playlist
+                         audio.playAyah(audio.currentSurah!, audio.currentAyah! - 1);
+                      }
                     },
-                    color: audio.ayahRepeatLimit > 1 ? AppColors.primary : Colors.grey[400],
                   ),
+                  // Next (Left arrow → plays next Ayah)
+                  _SmallButton(
+                    icon: Icons.skip_previous_rounded, // Mirrored icon
+                    onPressed: () {
+                      if (audio.player.hasNext) {
+                         audio.player.seekToNext();
+                      } else if (audio.currentSurah != null && audio.currentAyah != null) {
+                         // Fallback
+                         audio.playAyah(audio.currentSurah!, audio.currentAyah! + 1);
+                      }
+                    },
+                  ),
+                  // Toggle Repeat Ayah: 1 → 2 → 3 → ... → 10 → 1
+                  _RepeatButton(audio: audio),
                 ],
 
                 const SizedBox(width: 8),
@@ -209,6 +205,59 @@ class _SmallButton extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(6),
         child: Icon(icon, color: color ?? Colors.grey[500], size: 22),
+      ),
+    );
+  }
+}
+
+/// زر التكرار الدوري: 1 → 2 → 3 → ... → 10 → 1
+class _RepeatButton extends StatelessWidget {
+  final AudioProvider audio;
+  const _RepeatButton({required this.audio});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = audio.ayahRepeatLimit;
+    final isActive = count > 1;
+    return InkWell(
+      onTap: () {
+        // دورة: 1→2→...→10→1
+        final next = count >= 10 ? 1 : count + 1;
+        audio.setAyahRepeatLimit(next);
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              Icons.repeat_one_rounded,
+              color: isActive ? AppColors.primary : Colors.grey[400],
+              size: 22,
+            ),
+            if (isActive)
+              Positioned(
+                top: -6,
+                right: -8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${count}x',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Tajawal',
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

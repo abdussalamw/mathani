@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/audio_provider.dart';
 import 'package:mathani/presentation/providers/quran_provider.dart';
+import 'package:mathani/presentation/providers/ui_provider.dart';
+import 'package:mathani/data/providers/mushaf_navigation_provider.dart';
 
 class AudioPlayerSheet extends StatelessWidget {
   const AudioPlayerSheet({Key? key}) : super(key: key);
@@ -12,62 +14,66 @@ class AudioPlayerSheet extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final audio = context.watch<AudioProvider>();
     final quran = context.watch<QuranProvider>();
+    final screenHeight = MediaQuery.of(context).size.height;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 1. Handle
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 24),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
+    return SizedBox(
+      height: screenHeight * 0.65,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 1. Handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
 
-                // 2. Header (Surah & Reciter)
-                Text(
-                  'سورة ${_getSurahName(quran, audio.currentSurah)}',
-                  style: const TextStyle(fontFamily: 'Amiri', fontSize: 26, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                _ReciterBadge(audio: audio),
+                  // 2. Header - show active or reading Surah
+                  Builder(
+                    builder: (_) {
+                      final activeSurah = audio.currentSurah ?? quran.readingSurah;
+                      return Text(
+                        'سورة ${_getSurahName(quran, activeSurah)}',
+                        style: const TextStyle(fontFamily: 'Amiri', fontSize: 22, fontWeight: FontWeight.bold),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _ReciterBadge(audio: audio),
 
-                const SizedBox(height: 32),
+                  const SizedBox(height: 20),
 
-                // 3. Progress Bar
-                _ProgressBar(audio: audio),
+                  // 3. Main Controls (no progress bar)
+                  _MainControls(audio: audio, quran: quran),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
-                // 4. Main Controls
-                _MainControls(audio: audio),
-
-                const SizedBox(height: 40),
-
-                // 5. Advanced Repetition & Range
-                _AdvancedOptions(audio: audio, quran: quran),
-                
-                const SizedBox(height: 16),
-              ],
+                  // 4. Advanced Options
+                  _AdvancedOptions(audio: audio, quran: quran),
+                  
+                  const SizedBox(height: 8),
+                ],
+              ),
             ),
           ),
         ),
@@ -179,7 +185,8 @@ class _ProgressBar extends StatelessWidget {
 
 class _MainControls extends StatelessWidget {
   final AudioProvider audio;
-  const _MainControls({required this.audio});
+  final QuranProvider quran;
+  const _MainControls({required this.audio, required this.quran});
 
   @override
   Widget build(BuildContext context) {
@@ -188,24 +195,59 @@ class _MainControls extends StatelessWidget {
       children: [
         // Prev Ayah
         IconButton(
-          onPressed: () => audio.playAyah(audio.currentSurah!, audio.currentAyah! - 1),
+          onPressed: () {
+            if (audio.player.hasPrevious) {
+               audio.player.seekToPrevious();
+            } else if (audio.currentSurah != null && audio.currentAyah != null && audio.currentAyah! > 1) {
+               audio.playAyah(audio.currentSurah!, audio.currentAyah! - 1);
+            }
+          },
           icon: const Icon(Icons.skip_next_rounded, size: 36), // Mirrored
+        ),
+
+        // Stop (square) - إيقاف كامل
+        IconButton(
+          onPressed: () {
+            audio.stop();
+            Navigator.of(context).pop(); // أغلق الشاشة
+          },
+          icon: const Icon(Icons.stop_rounded, size: 36, color: Colors.redAccent),
+          tooltip: 'إيقاف',
         ),
 
         // Play/Pause
         GestureDetector(
-          onTap: () => audio.isPlaying ? audio.pause() : audio.play(),
+          onTap: () {
+            if (audio.isPlaying) {
+              audio.pause();
+            } else if (audio.currentSurah != null) {
+              audio.resumeOrPlay();
+            } else {
+              // ابدأ من موقع القراءة الحالي في المصحف
+              final surah = quran.readingSurah;
+              final ayah = quran.readingAyah > 0 ? quran.readingAyah : 1;
+              audio.playAyah(surah, ayah);
+            }
+          },
           child: Container(
             width: 72,
             height: 72,
             decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-            child: Icon(audio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 48),
+            child: audio.isLoading
+              ? const SizedBox(width: 32, height: 32, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+              : Icon(audio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 48),
           ),
         ),
 
         // Next Ayah
         IconButton(
-          onPressed: () => audio.playAyah(audio.currentSurah!, audio.currentAyah! + 1),
+          onPressed: () {
+             if (audio.player.hasNext) {
+               audio.player.seekToNext();
+             } else if (audio.currentSurah != null && audio.currentAyah != null) {
+               audio.playAyah(audio.currentSurah!, audio.currentAyah! + 1);
+             }
+          },
           icon: const Icon(Icons.skip_previous_rounded, size: 36), // Mirrored
         ),
       ],
@@ -231,10 +273,16 @@ class _AdvancedOptionsState extends State<_AdvancedOptions> {
   @override
   void initState() {
     super.initState();
-    startSurah = widget.audio.startSurah ?? widget.audio.currentSurah ?? 1;
-    startAyah = widget.audio.startAyah ?? widget.audio.currentAyah ?? 1;
-    endSurah = widget.audio.endSurah ?? widget.audio.currentSurah ?? 1;
-    endAyah = widget.audio.endAyah ?? (widget.audio.currentAyah != null ? widget.audio.currentAyah! + 5 : 7);
+    
+    // استخدم QuranProvider كمصدر موثوق للسورة والآية الحالية
+    final quran = context.read<QuranProvider>();
+    final defaultSurah = widget.audio.currentSurah ?? quran.readingSurah;
+    final defaultAyah = widget.audio.currentAyah ?? quran.readingAyah;
+
+    startSurah = widget.audio.startSurah ?? defaultSurah;
+    startAyah = widget.audio.startAyah ?? defaultAyah;
+    endSurah = widget.audio.endSurah ?? defaultSurah;
+    endAyah = widget.audio.endAyah ?? defaultAyah + 10;
   }
 
   @override
@@ -316,7 +364,18 @@ class _AdvancedOptionsState extends State<_AdvancedOptions> {
     );
   }
 
+  int _getAyahCountForSurah(int surahNumber) {
+    try {
+      return widget.quran.surahs.firstWhere((s) => s.number == surahNumber).numberOfAyahs;
+    } catch (_) {
+      return 286; // fallback
+    }
+  }
+
   Widget _buildRangeRow(String label, int surah, int ayah, Function(int, int) onChanged) {
+    final maxAyahs = _getAyahCountForSurah(surah);
+    final clampedAyah = ayah.clamp(1, maxAyahs);
+    
     return Row(
       children: [
         SizedBox(width: 40, child: Text(label, style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13))),
@@ -336,7 +395,7 @@ class _AdvancedOptionsState extends State<_AdvancedOptions> {
                   child: Text(s.nameArabic, style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13)),
                 )).toList(),
                 onChanged: (val) {
-                  if (val != null) onChanged(val, 1);
+                  if (val != null) onChanged(val, 1); // إعادة الآية لـ 1 عند تغيير السورة
                 },
               ),
             ),
@@ -345,7 +404,7 @@ class _AdvancedOptionsState extends State<_AdvancedOptions> {
         
         const SizedBox(width: 8),
 
-        // Ayah Selector
+        // Ayah Selector - ★ ديناميكي حسب عدد آيات السورة
         Expanded(
           flex: 1,
           child: Container(
@@ -353,9 +412,9 @@ class _AdvancedOptionsState extends State<_AdvancedOptions> {
             decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<int>(
-                value: ayah,
+                value: clampedAyah,
                 isExpanded: true,
-                items: List.generate(286, (i) => i + 1).map((i) => DropdownMenuItem(
+                items: List.generate(maxAyahs, (i) => i + 1).map((i) => DropdownMenuItem(
                   value: i,
                   child: Text('$i', style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13)),
                 )).toList(),

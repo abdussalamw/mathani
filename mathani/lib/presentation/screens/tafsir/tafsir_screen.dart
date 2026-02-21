@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
@@ -7,7 +6,8 @@ import 'package:mathani/presentation/providers/surah_content_provider.dart';
 import 'package:mathani/presentation/providers/settings_provider.dart';
 import 'package:mathani/data/models/ayah.dart';
 import 'package:mathani/data/providers/mushaf_navigation_provider.dart';
-import 'package:mathani/presentation/providers/ui_provider.dart'; // Added
+import 'package:mathani/presentation/providers/ui_provider.dart';
+import 'package:mathani/presentation/providers/mushaf_metadata_provider.dart'; // Added Import
 
 class TafsirScreen extends StatefulWidget {
   final int? initialPage;
@@ -82,7 +82,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                   ),
                   const SizedBox(height: 16),
                   ...[
-                    {'slug': 'w-moyassar', 'name': 'التفسير الميسر'},
+                    {'slug': 'w-moyassar', 'name': 'التفسير الميسر للقرآن الكريم'},
                     {'slug': 'tafsir-katheer', 'name': 'تفسير ابن كثير'},
                     {'slug': 'tafsir-saadi', 'name': 'تفسير السعدي'},
                     {'slug': 'tafsir-baghawy', 'name': 'تفسير البغوي'},
@@ -144,7 +144,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                   dropdownColor: Theme.of(context).scaffoldBackgroundColor,
                   borderRadius: BorderRadius.circular(12),
                   items: const [
-                    DropdownMenuItem(value: 'w-moyassar', child: Text('التفسير الميسر')),
+                    DropdownMenuItem(value: 'w-moyassar', child: Text('التفسير الميسر للقرآن الكريم')),
                     DropdownMenuItem(value: 'tafsir-katheer', child: Text('تفسير ابن كثير')),
                     DropdownMenuItem(value: 'tafsir-saadi', child: Text('تفسير السعدي')),
                     DropdownMenuItem(value: 'tafsir-baghawy', child: Text('تفسير البغوي')),
@@ -179,15 +179,22 @@ class _TafsirScreenState extends State<TafsirScreen> {
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
-        child: PageView.builder(
-          controller: _pageController,
-          itemCount: context.select<MushafNavigationProvider, int>((p) => p.totalPages),
-          // reverse: true, // Removed: RTL Directionality handles it naturally
-          onPageChanged: _onPageChanged,
-          itemBuilder: (context, index) {
-            final pageNum = index + 1;
-            return TafsirPageContent(pageNumber: pageNum);
-          },
+        child: Consumer<MushafMetadataProvider>(
+          builder: (context, mushafProvider, _) {
+            final mushafId = mushafProvider.currentMushafId;
+            return PageView.builder(
+              controller: _pageController,
+              itemCount: context.select<MushafNavigationProvider, int>((p) => p.totalPages),
+              onPageChanged: _onPageChanged,
+              itemBuilder: (context, index) {
+                final pageNum = index + 1;
+                return TafsirPageContent(
+                  key: ValueKey('tafsir_page_${mushafId}_$pageNum'), 
+                  pageNumber: pageNum
+                );
+              },
+            );
+          }
         ),
       ),
     );
@@ -213,19 +220,44 @@ class _TafsirPageContentState extends State<TafsirPageContent> {
     _loadAyahs();
   }
 
+  @override
+  void didUpdateWidget(TafsirPageContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.pageNumber != oldWidget.pageNumber) {
+      _loadAyahs();
+    }
+  }
+
   Future<void> _loadAyahs() async {
-    // Determine Ayahs for this page
+    setState(() => _isLoading = true);
     final quran = context.read<QuranProvider>();
-    final ayahs = await quran.getAyahsForPage(widget.pageNumber);
+    final navProvider = context.read<MushafNavigationProvider>();
+    final mushafProvider = context.read<MushafMetadataProvider>();
+    
+    final mushafId = mushafProvider.currentMushafId;
+    List<Ayah> ayahs = [];
+    
+    if (mushafId == 'shamarly_15lines') {
+      final pageInfo = navProvider.getPageInfo(widget.pageNumber);
+      if (pageInfo != null && pageInfo.startSurah > 0) {
+        // Fetch by specific range mapped from Shamarly Navigation Data
+        ayahs = await quran.getAyahsByRange(
+          pageInfo.startSurah, 
+          pageInfo.startAyah, 
+          pageInfo.endSurah, 
+          pageInfo.endAyah
+        );
+      }
+    } else {
+      // Default to Madani 604 page mapping attached to the Isar DB
+      ayahs = await quran.getAyahsForPage(widget.pageNumber);
+    }
+    
     if (mounted) {
       setState(() {
         _ayahs = ayahs;
         _isLoading = false;
       });
-      
-      // Optionally pre-fetch tafsir for these ayahs?
-      // provider.fetchBatch(...) - if available. 
-      // If not, individual widgets will fetch.
     }
   }
 

@@ -12,6 +12,7 @@ import '../../core/di/service_locator.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/entities/user_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../data/services/qcf4_font_downloader.dart';
 
 class MushafMetadataProvider extends ChangeNotifier {
   final SettingsRepository _settingsRepository = sl<SettingsRepository>();
@@ -227,7 +228,7 @@ class MushafMetadataProvider extends ChangeNotifier {
       orElse: () => _availableMushafs.first
     );
 
-    if (mushaf.baseUrl == null) return;
+    if (identifier != 'qcf2_v4_woff2' && mushaf.baseUrl == null) return;
 
     _isDownloading = true;
     _currentDownloadingId = identifier;
@@ -236,17 +237,27 @@ class MushafMetadataProvider extends ChangeNotifier {
 
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      final targetPath = '${appDir.path}/mushafs/$identifier';
+      String targetPath = '${appDir.path}/mushafs/$identifier';
       
-      // Use the new downloader service
-      await db_models.MushafDownloaderService.downloadAndExtract(
-        url: mushaf.baseUrl!,
-        destinationPath: targetPath,
-        onProgress: (progress) {
-          _downloadProgress = progress;
-          notifyListeners();
-        },
-      );
+      if (identifier == 'qcf2_v4_woff2') {
+         await QCF4FontDownloader.downloadAllFonts(
+           onProgress: (progress) {
+             _downloadProgress = progress;
+             notifyListeners();
+           },
+           onStatusChanged: (_) {}
+         );
+         targetPath = '${appDir.path}/fonts';
+      } else {
+         await db_models.MushafDownloaderService.downloadAndExtract(
+           url: mushaf.baseUrl!,
+           destinationPath: targetPath,
+           onProgress: (progress) {
+             _downloadProgress = progress;
+             notifyListeners();
+           },
+         );
+      }
 
       // Update metadata
       final isar = IsarService.instance.isar;

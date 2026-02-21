@@ -9,6 +9,7 @@ import '../settings/settings_screen.dart';
 import '../mushaf/mushaf_screen.dart';
 import '../tafsir/tafsir_screen.dart'; 
 import '../../providers/ui_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../widgets/audio_minibar.dart';
 import '../../widgets/audio_player_sheet.dart';
 import 'package:provider/provider.dart';
@@ -76,7 +77,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
             index: _getCurrentScreenIndex(uiProvider),
             children: [
               const IndexScreen(),           // 0: الفهرس
-              const MushafScreen(),          // 1: المصحف
+              MushafScreen(initialPage: context.read<SettingsProvider>().lastPage), // 1: المصحف
               TafsirScreen(initialPage: uiProvider.currentMushafPage), // 2: التفسير
               const SettingsScreen(),        // 3: الإعدادات
             ],
@@ -188,15 +189,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
                    // Ensure bar is shown
                    if (!uiProvider.showAudioMinibar) {
                       uiProvider.toggleAudioMinibar();
-                   } else {
-                      // If already shown, maybe open full player?
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => const AudioPlayerSheet(),
-                      );
                    }
+                   // Always open the full player sheet directly
+                   showModalBottomSheet(
+                     context: context,
+                     isScrollControlled: true,
+                     backgroundColor: Colors.transparent,
+                     builder: (_) => const AudioPlayerSheet(),
+                   );
                 },
               ),
               

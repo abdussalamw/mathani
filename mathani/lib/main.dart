@@ -30,8 +30,20 @@ import 'presentation/screens/startup/initial_download_screen.dart';
 
 
 
+import 'package:just_audio_background/just_audio_background.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
+      androidNotificationChannelName: 'Audio playback',
+      androidNotificationOngoing: true,
+    );
+  } catch (e) {
+    debugPrint('Failed to initialize JustAudioBackground: $e');
+  }
   
   try {
     // تهيئة قاعدة البيانات
@@ -73,23 +85,27 @@ void main() async {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
+    
+    final settingsProvider = SettingsProvider();
+    await settingsProvider.init();
+    
+    runApp(MathaniApp(settingsProvider: settingsProvider));
   } catch (e, stackTrace) {
     debugPrint('CRITICAL ERROR in main(): $e');
     debugPrint('Stack trace: $stackTrace');
     // Pass error to app
     runApp(MathaniApp(initializationError: e.toString()));
-    return;
   }
-  
-  runApp(const MathaniApp());
 }
 
 class MathaniApp extends StatelessWidget {
   final String? initializationError;
+  final SettingsProvider? settingsProvider;
 
   const MathaniApp({
     Key? key,
     this.initializationError,
+    this.settingsProvider,
   }) : super(key: key);
 
   @override
@@ -145,7 +161,7 @@ class MathaniApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider.value(value: settingsProvider ?? SettingsProvider()),
         ChangeNotifierProvider(create: (_) => QuranProvider()),
         ChangeNotifierProvider(create: (_) => MushafMetadataProvider()),
         ChangeNotifierProxyProvider<MushafMetadataProvider, MushafNavigationProvider>(

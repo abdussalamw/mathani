@@ -32,7 +32,7 @@ dependencies:
   
   # الأدوات (أساسي)
   intl: ^0.20.2
-  archive: ^3.6.1 # Essential for Mushaf Zip
+  archive: ^4.0.9 # Essential for Mushaf Zip
   
   # Architecture & Core (Added for Phase 3)
   get_it: ^7.6.0
@@ -44,6 +44,8 @@ dependencies:
   package_info_plus: ^8.0.0 
   share_plus: ^10.1.0 
   screenshot: ^3.0.0 
+  just_audio_background: ^0.0.1-beta.17
+  csv: 6.0.0
 
 dev_dependencies:
   flutter_test:

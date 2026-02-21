@@ -17,8 +17,8 @@ class ResponsiveConstants {
   
   static const int linesPerPage = 15;
   
-  // هامش أمان: مسافة صغيرة علوية، وزيادة السفلي لحمايته
-  static const double safetyMarginTop = 16.0;    // 16px (مسافة آمنة صغيرة)
+  // هامش أمان: مسافة ملغاة علوية لتلتصق الشاشة بالشريط العلوي، وزيادة السفلي لحمايته
+  static const double safetyMarginTop = 0.0;    // 0px (لرفع السطر الأول للأعلى تماماً)
   static const double safetyMarginBottom = 40.0; // 40px (حماية قوية للسطر 15)
   static const double totalSafetyMargin = safetyMarginTop + safetyMarginBottom;
   

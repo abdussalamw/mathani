@@ -36,6 +36,18 @@ class ShamarlyDataLoader {
         final surahs = List<int>.from(pageJson['suras'] as List);
         final ayahs = pageJson['ayahs'] as List<dynamic>;
         
+        // Filter out empty ornament ayahs
+        final validAyahs = ayahs.where((a) => (a['text'] as String).trim().isNotEmpty).toList();
+        
+        // Fix Fatiha chaotic numbering
+        if (surahs.contains(1)) {
+          for (var a in validAyahs) {
+            if (a['sura'] == 1 && a['ayah_index'] is int) {
+               a['ayah'] = a['ayah_index'];
+            }
+          }
+        }
+        
         // بناء surahToPage (أول ظهور للسورة)
         for (var surahNum in surahs) {
           if (!surahToPage.containsKey(surahNum)) {
@@ -44,7 +56,7 @@ class ShamarlyDataLoader {
         }
 
         // بناء ayahToPage
-        for (var ayah in ayahs) {
+        for (var ayah in validAyahs) {
           final s = ayah['sura'] as int;
           final a = ayah['ayah'] as int;
           ayahToPage['$s:$a'] = pageNum;
@@ -56,9 +68,20 @@ class ShamarlyDataLoader {
         int endSurah = 0;
         int endAyah = 0;
 
-        if (ayahs.isNotEmpty) {
-          final first = ayahs.first as Map<String, dynamic>;
-          final last = ayahs.last as Map<String, dynamic>;
+        List<dynamic> sortedAyahs = [];
+        
+        if (validAyahs.isNotEmpty) {
+          sortedAyahs = List.from(validAyahs)..sort((a, b) {
+            final sA = a['sura'] as int;
+            final sB = b['sura'] as int;
+            if (sA != sB) return sA.compareTo(sB);
+            final yA = a['ayah'] as int;
+            final yB = b['ayah'] as int;
+            return yA.compareTo(yB);
+          });
+          
+          final first = sortedAyahs.first as Map<String, dynamic>;
+          final last = sortedAyahs.last as Map<String, dynamic>;
           
           startSurah = first['sura'] as int;
           startAyah = first['ayah'] as int;
@@ -81,8 +104,8 @@ class ShamarlyDataLoader {
         
         // بناء juzData (أول صفحة في كل جزء)
         final juzNum = pageJson['juz'] as int;
-        if (!juzData.containsKey(juzNum) && ayahs.isNotEmpty) {
-          final firstAyah = ayahs[0] as Map<String, dynamic>;
+        if (!juzData.containsKey(juzNum) && sortedAyahs.isNotEmpty) {
+          final firstAyah = sortedAyahs.first as Map<String, dynamic>;
           juzData[juzNum] = JuzInfo(
             number: juzNum,
             startPage: pageNum,
