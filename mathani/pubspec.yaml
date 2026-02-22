@@ -72,7 +72,6 @@ flutter:
     - assets/fonts/tajawal/
     - assets/data/quran_glyphs.json
     - assets/data/quran_metadata.json
-    - assets/data/quran_madani.json
     - assets/data/quran_advanced.json
     - assets/data/shamerly_quran_complete.json
     - assets/data/reciters.json
