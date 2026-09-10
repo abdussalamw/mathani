@@ -7,6 +7,7 @@ import '../../providers/audio_provider.dart';
 import '../../../data/services/local_tafsir_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/database/collections.dart';
+import '../../providers/recitation_provider.dart';
 
 class DownloadCenterScreen extends StatefulWidget {
   const DownloadCenterScreen({Key? key}) : super(key: key);
@@ -56,7 +57,9 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                 _buildCategoryHeader(context, l10n.settingsTafsirs),
                 _buildTafsirList(context),
                 const SizedBox(height: 24),
-                // Add Audio if needed
+                _buildCategoryHeader(context, 'نماذج الذكاء الاصطناعي (التسميع)'),
+                _buildAiModelsList(context),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -228,6 +231,31 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
               isSelected: settings.defaultTafsir == 'muyassar',
             ),
             // Other tafsirs could be added here as "Online" cards
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAiModelsList(BuildContext context) {
+    return Consumer<RecitationProvider>(
+      builder: (context, provider, _) {
+        return Column(
+          children: [
+            _buildDownloadCard(
+              context,
+              title: 'نموذج التعرف الصوتي (Whisper)',
+              subtitle: 'لتحليل التلاوة ومطابقتها مع النص القرآني',
+              isDownloaded: provider.isAsrModelDownloaded,
+              isDownloading: provider.isAsrDownloading,
+              progress: provider.asrDownloadProgress,
+              size: '142 MB',
+              onDownload: () => provider.downloadAsrModel(),
+              onActivate: () {},
+              isSelected: provider.isAsrModelDownloaded,
+            ),
+            // ملاحظة: بطاقة "مصنف التجويد" أزيلت — لا يوجد نموذج حقيقي بعد،
+            // والنتائج السابقة كانت محاكاة زائفة (لا نعرض ميزات وهمية للمستخدم).
           ],
         );
       },

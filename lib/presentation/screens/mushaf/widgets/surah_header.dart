@@ -36,11 +36,12 @@ class SurahHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(40),
             ),
             child: Text(
-              'سورة ${surah.nameArabic}',
-              style: GoogleFonts.amiri(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
+              String.fromCharCode(0xF100 + (surah.number - 1)),
+              style: const TextStyle(
+                fontFamily: 'QCF4_BSML',
+                fontSize: 32,
                 color: AppColors.darkBrown,
+                height: 1.0,
               ),
             ),
           ),

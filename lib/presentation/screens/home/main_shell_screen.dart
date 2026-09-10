@@ -13,6 +13,8 @@ import '../../providers/ui_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../widgets/audio_minibar.dart';
 import '../../widgets/audio_player_sheet.dart';
+import '../../widgets/recitation_minibar.dart';
+import '../../widgets/recitation_expanded_panel.dart';
 import 'package:provider/provider.dart';
 
 class MainShellScreen extends StatefulWidget {
@@ -115,6 +117,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
                     child: const AudioPlayerSheet(),
                   ),
                 ),
+              
+
             ],
           ),
           bottomNavigationBar: AnimatedSlide(
@@ -125,8 +129,27 @@ class _MainShellScreenState extends State<MainShellScreen> {
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (uiProvider.showAudioMinibar) const AudioMinibar(),
-                    _buildBottomBar(uiProvider),
+                    if (uiProvider.showRecitationMinibar)
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        transitionBuilder: (child, animation) {
+                          return SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 1),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          );
+                        },
+                        child: uiProvider.showRecitationResults
+                            ? const RecitationExpandedPanel(key: ValueKey('expanded'))
+                            : const RecitationMiniBar(key: ValueKey('minibar')),
+                      )
+                    else ...[
+                      // Audio minibar (استماع)
+                      if (uiProvider.showAudioMinibar) const AudioMinibar(),
+                      _buildBottomBar(uiProvider),
+                    ],
                   ],
                 ),
           ),
@@ -186,25 +209,35 @@ class _MainShellScreenState extends State<MainShellScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              // 1. الفهرس
+              // 1. الفهرس / المكتبة
               _buildNavItem(
-                icon: Icons.grid_view_rounded, // More modern icon
-                label: AppLocalizations.of(context)!.indexTab,
-                isSelected: currentIndex == 0 && uiProvider.indexScreenTabIndex != 2,
+                icon: uiProvider.hasNpu ? Icons.collections_bookmark_rounded : Icons.grid_view_rounded,
+                label: uiProvider.hasNpu ? 'المكتبة' : AppLocalizations.of(context)!.indexTab,
+                isSelected: currentIndex == 0 && (uiProvider.hasNpu || uiProvider.indexScreenTabIndex != 2),
                 onTap: () => uiProvider.setTabIndex(0, indexScreenTab: 0),
               ),
 
-              // 2. العلامات
-              _buildNavItem(
-                icon: Icons.bookmarks_outlined,
-                label: AppLocalizations.of(context)!.bookmarksTab,
-                isSelected: currentIndex == 0 && uiProvider.indexScreenTabIndex == 2,
-                onTap: () {
-                  uiProvider.setTabIndex(0, indexScreenTab: 2);
-                },
-              ),
+              // 2. العلامات (تظهر فقط إذا لم يكن هناك NPU)
+              if (!uiProvider.hasNpu)
+                _buildNavItem(
+                  icon: Icons.bookmarks_outlined,
+                  label: AppLocalizations.of(context)!.bookmarksTab,
+                  isSelected: currentIndex == 0 && uiProvider.indexScreenTabIndex == 2,
+                  onTap: () {
+                    uiProvider.setTabIndex(0, indexScreenTab: 2);
+                  },
+                ),
               
-              // 3. المصحف (المركزية)
+              // 3. التسميع (يظهر فقط إذا كان هناك NPU)
+              if (uiProvider.hasNpu)
+                _buildNavItem(
+                  icon: uiProvider.isRecitationActive ? Icons.mic : Icons.mic_none_rounded,
+                  label: uiProvider.isRecitationActive ? 'تسجيل' : 'التسميع',
+                  isSelected: uiProvider.showRecitationMinibar,
+                  onTap: () => _handleRecitationTap(uiProvider),
+                ),
+
+              // 4. المصحف (المركزية)
               _buildMainButton(
                 icon: (currentIndex == 1 && !showingTafsir) ? Icons.menu_book : Icons.auto_stories,
                 label: (currentIndex == 1 && !showingTafsir) ? AppLocalizations.of(context)!.tafsirTab : AppLocalizations.of(context)!.mushafTab,
@@ -220,7 +253,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
                 },
               ),
 
-               // 4. استماع
+               // 5. استماع
                _buildNavItem(
                  icon: uiProvider.showFullAudioPlayer ? Icons.headphones : Icons.headphones_outlined,
                  label: AppLocalizations.of(context)!.listeningTab,
@@ -233,7 +266,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
                  },
                ),
               
-              // 5. الإعدادات
+              // 6. الإعدادات
               _buildNavItem(
                 icon: Icons.settings_outlined,
                 label: AppLocalizations.of(context)!.settingsTab,
@@ -247,6 +280,17 @@ class _MainShellScreenState extends State<MainShellScreen> {
     );
   }
 
+
+  void _handleRecitationTap(UiProvider uiProvider) {
+    if (uiProvider.showRecitationMinibar) {
+      uiProvider.hideRecitationMinibar();
+    } else {
+      uiProvider.openRecitationMinibar();
+      if (uiProvider.currentTabIndex != 1) {
+        uiProvider.setTabIndex(1);
+      }
+    }
+  }
 
   Widget _buildNavItem({
     required IconData icon,

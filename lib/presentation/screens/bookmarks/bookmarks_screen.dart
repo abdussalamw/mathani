@@ -208,12 +208,12 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                surah.nameArabic,
+                                _getSurahGlyph(surah.number),
                                 style: const TextStyle(
-                                  fontFamily: 'Tajawal',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'QCF4_BSML',
+                                  fontSize: 18,
                                   color: AppColors.slateText,
+                                  height: 1.0,
                                 ),
                               ),
                               const SizedBox(height: 2),

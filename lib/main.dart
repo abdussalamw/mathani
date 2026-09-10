@@ -21,10 +21,13 @@ import 'package:mathani/presentation/providers/bookmark_provider.dart';
 import 'presentation/providers/surah_content_provider.dart';
 import 'presentation/providers/ui_provider.dart';
 import 'presentation/providers/tafsir_provider.dart';
+import 'presentation/providers/recitation_provider.dart';
+import 'data/models/recitation_session.dart';
 import 'data/services/local_tafsir_service.dart';
 import 'presentation/screens/splash/splash_screen.dart';
 import 'presentation/screens/home/main_shell_screen.dart';
 import 'presentation/screens/mushaf/mushaf_screen.dart';
+import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import 'presentation/screens/startup/initial_download_screen.dart';
 import 'presentation/screens/settings/download_center_screen.dart';
@@ -36,6 +39,10 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ─── تهيئة Sherpa-ONNX (يجب أن تكون أول شيء) ───
+  sherpa.initBindings();
+  debugPrint('✅ sherpa_onnx bindings initialized');
   
   try {
     await JustAudioBackground.init(
@@ -178,6 +185,7 @@ class MathaniApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SurahContentProvider()), // Added
         ChangeNotifierProvider(create: (_) => UiProvider()),
         ChangeNotifierProvider(create: (_) => TafsirProvider()),
+        ChangeNotifierProvider(create: (_) => RecitationProvider()),
         ChangeNotifierProvider.value(value: LocalTafsirService.instance),
       ],
       child: Consumer<SettingsProvider>(

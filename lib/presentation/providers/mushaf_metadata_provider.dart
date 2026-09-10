@@ -55,7 +55,7 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..pageCount = 521
       ..isDownloaded = false,
 
-    // 3. Digital (Hidden/Fallback)
+    // 4. Digital (Hidden/Fallback)
     db_models.MushafMetadata()
       ..id = db_models.fastHash('madani_font_v1')
       ..identifier = 'madani_font_v1'

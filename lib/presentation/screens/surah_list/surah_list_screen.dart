@@ -387,16 +387,18 @@ class _SurahListScreenState extends State<SurahListScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Surah Name Glyph (QCF4_BSML)
                   Text(
-                    surah.nameArabic,
+                    String.fromCharCode(0xF100 + (surah.number - 1)),
                     style: const TextStyle(
-                      fontFamily: 'Tajawal', // Using Tajawal for a cleaner look in high density
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                      fontFamily: 'QCF4_BSML',
+                      fontSize: 22, // Calligraphic font needs to be larger to be readable
                       color: AppColors.slateText,
+                      height: 1.0,
                     ),
                     maxLines: 1,
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     '${surah.numberOfAyahs} آية',
                     style: const TextStyle(fontFamily: 'Tajawal', fontSize: 9, color: AppColors.mutedText),

@@ -14,8 +14,8 @@ class SettingsProvider with ChangeNotifier {
   String _locale = 'ar'; // Default Language
   
   // إعدادات حساسية اللمس
-  double _pageDragSensitivity = 25.0; // Higher = less sensitive (was 2.0)
-  double _minFlingVelocity = 150.0;   // Higher = requires more force (was 80.0)
+  double _pageDragSensitivity = 10.0; // Higher = less sensitive (was 2.0 / 25.0) — تقليب أسهل بسحبة أصغر
+  double _minFlingVelocity = 90.0;    // Higher = requires more force (was 80.0 / 150.0)
   int _lastPage = 1;
 
   // Getters
@@ -69,8 +69,8 @@ class SettingsProvider with ChangeNotifier {
     if (_defaultTafsir == 'w-moyassar') _defaultTafsir = 'muyassar';
     _downloadWhilePlaying = prefs.getBool('downloadWhilePlaying') ?? true;
     _navigationMode = prefs.getInt('navigationMode') ?? 0;
-    _pageDragSensitivity = prefs.getDouble('pageDragSensitivity') ?? 2.0;
-    _minFlingVelocity = prefs.getDouble('minFlingVelocity') ?? 80.0;
+    _pageDragSensitivity = prefs.getDouble('pageDragSensitivity') ?? 10.0;
+    _minFlingVelocity = prefs.getDouble('minFlingVelocity') ?? 90.0;
     _lastPage = prefs.getInt('lastPage') ?? 1;
     _locale = prefs.getString('languageCode') ?? 'ar';
     notifyListeners();

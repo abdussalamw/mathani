@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../data/models/page_glyph.dart';
 import '../../core/constants/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../providers/recitation_provider.dart';
+import '../../data/models/recitation_result.dart';
 
 /// Widget لعرض سطر واحد من صفحة المصحف
 class PageLineWidget extends StatelessWidget {
@@ -91,30 +94,63 @@ class PageLineWidget extends StatelessWidget {
                    return const SizedBox(); // Skip pauses/sajdahs in digital for now or handle them
                  }
 
-                 final isSelected = selectedSurah != null && 
-                                     selectedAyah != null &&
-                                     glyph.surah == selectedSurah && 
-                                     glyph.ayah == selectedAyah;
+                  final isSelected = selectedSurah != null && 
+                                      selectedAyah != null &&
+                                      glyph.surah == selectedSurah && 
+                                      glyph.ayah == selectedAyah;
 
-                 Widget child = AnimatedContainer(
-                    duration: const Duration(milliseconds: 600),
-                    decoration: isSelected ? BoxDecoration(
+                  // تلوين الكلمات لحظياً أثناء التسميع
+                  final recProvider = Provider.of<RecitationProvider>(context, listen: false);
+                  final wordKey = "${glyph.surah}_${glyph.ayah}_${glyph.wordId}";
+                  final liveVerdict = recProvider.liveWordVerdicts[wordKey];
+                  
+                  BoxDecoration decoration = const BoxDecoration();
+                  Color? customColor;
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  
+                  if (liveVerdict != null) {
+                    if (liveVerdict == WordVerdict.correct) {
+                      decoration = BoxDecoration(
+                        color: Colors.green.withOpacity(isDark ? 0.25 : 0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      );
+                      customColor = isDark ? Colors.green.shade300 : Colors.green.shade700;
+                    } else if (liveVerdict == WordVerdict.incorrect) {
+                      decoration = BoxDecoration(
+                        color: Colors.red.withOpacity(isDark ? 0.25 : 0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      );
+                      customColor = isDark ? Colors.red.shade300 : Colors.red.shade700;
+                    } else if (liveVerdict == WordVerdict.acceptable) {
+                      decoration = BoxDecoration(
+                        color: Colors.orange.withOpacity(isDark ? 0.25 : 0.15),
+                        borderRadius: BorderRadius.circular(2),
+                      );
+                      customColor = isDark ? Colors.orange.shade300 : Colors.orange.shade700;
+                    }
+                  } else if (isSelected) {
+                    decoration = BoxDecoration(
                       color: AppColors.golden.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(4),
-                    ) : const BoxDecoration(),
-                    padding: const EdgeInsets.symmetric(horizontal: 1),
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 600),
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontSize: fontSize,
-                        color: color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                      ),
-                      child: Text(
-                        text,
-                      ),
-                    ),
-                 );
+                    );
+                  }
+
+                  Widget child = AnimatedContainer(
+                     duration: const Duration(milliseconds: 600),
+                     decoration: decoration,
+                     padding: const EdgeInsets.symmetric(horizontal: 1),
+                     child: AnimatedDefaultTextStyle(
+                       duration: const Duration(milliseconds: 600),
+                       style: TextStyle(
+                         fontFamily: fontFamily,
+                         fontSize: fontSize,
+                         color: customColor ?? color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                       ),
+                       child: Text(
+                         text,
+                       ),
+                     ),
+                  );
                  
                   // Intearaction
                   if (glyph.surah != null && glyph.ayah != null) {
@@ -195,19 +231,51 @@ class PageLineWidget extends StatelessWidget {
                                    glyph.surah == selectedSurah && 
                                    glyph.ayah == selectedAyah;
             
-            Widget child = AnimatedContainer(
-              duration: const Duration(milliseconds: 600),
-              decoration: isSelected ? BoxDecoration(
+            // تلوين الكلمات لحظياً أثناء التسميع
+            final recProvider = Provider.of<RecitationProvider>(context, listen: false);
+            final wordKey = "${glyph.surah}_${glyph.ayah}_${glyph.wordId}";
+            final liveVerdict = recProvider.liveWordVerdicts[wordKey];
+            
+            BoxDecoration decoration = const BoxDecoration();
+            Color? customColor;
+            
+            if (liveVerdict != null) {
+              if (liveVerdict == WordVerdict.correct) {
+                decoration = BoxDecoration(
+                  color: Colors.green.withOpacity(isDark ? 0.25 : 0.15),
+                  borderRadius: BorderRadius.circular(2),
+                );
+                customColor = isDark ? Colors.green.shade300 : Colors.green.shade700;
+              } else if (liveVerdict == WordVerdict.incorrect) {
+                decoration = BoxDecoration(
+                  color: Colors.red.withOpacity(isDark ? 0.25 : 0.15),
+                  borderRadius: BorderRadius.circular(2),
+                );
+                customColor = isDark ? Colors.red.shade300 : Colors.red.shade700;
+              } else if (liveVerdict == WordVerdict.acceptable) {
+                decoration = BoxDecoration(
+                  color: Colors.orange.withOpacity(isDark ? 0.25 : 0.15),
+                  borderRadius: BorderRadius.circular(2),
+                );
+                customColor = isDark ? Colors.orange.shade300 : Colors.orange.shade700;
+              }
+            } else if (isSelected) {
+              decoration = BoxDecoration(
                 color: AppColors.golden.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(2),
-              ) : const BoxDecoration(),
+              );
+            }
+            
+            Widget child = AnimatedContainer(
+              duration: const Duration(milliseconds: 600),
+              decoration: decoration,
               child: AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 600),
                     style: TextStyle(
                       fontFamily: _getFontFamily(glyph),
                       fontSize: _getGlyphSize(glyph),
                       fontWeight: FontWeight.normal,
-                      color: _getGlyphColor(glyph, context),
+                      color: customColor ?? _getGlyphColor(glyph, context),
                       height: 1.0, 
                       letterSpacing: 0,
                     ),

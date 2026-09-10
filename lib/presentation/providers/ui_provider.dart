@@ -9,10 +9,16 @@ class UiProvider with ChangeNotifier {
   int _indexScreenTabIndex = 0; // 0=Surahs, 1=Juz, 2=Bookmarks
   bool _showAudioMinibar = false; 
   bool _showFullAudioPlayer = false;
+  bool _hasNpu = true;
 
   // ✅ تم إزالة surahToPage المشفر - يتم استخدام MushafNavigationProvider الآن
   
-  int _currentMushafPage = 1; // Tracks the current page in MushafScreen
+  int _currentMushafPage = 1;
+
+  // ─── حالة التسميع الذكي ───
+  bool _showRecitationMinibar = false;
+  bool _isRecitationActive = false;   // قيد التسجيل حالياً
+  bool _showRecitationResults = false; // بعد إيقاف التسجيل، النتائج التفصيلية
 
   int get currentTabIndex => _currentTabIndex;
   int? get pageToJump => _pageToJump;
@@ -22,6 +28,10 @@ class UiProvider with ChangeNotifier {
   int get currentMushafPage => _currentMushafPage;
   bool get showAudioMinibar => _showAudioMinibar;
   bool get showFullAudioPlayer => _showFullAudioPlayer;
+  bool get hasNpu => _hasNpu;
+  bool get showRecitationMinibar => _showRecitationMinibar;
+  bool get isRecitationActive => _isRecitationActive;
+  bool get showRecitationResults => _showRecitationResults;
 
   void toggleAudioMinibar() {
     _showAudioMinibar = !_showAudioMinibar;
@@ -41,6 +51,11 @@ class UiProvider with ChangeNotifier {
 
   void setShowAudioMinibar(bool show) {
     _showAudioMinibar = show;
+    notifyListeners();
+  }
+
+  void setHasNpu(bool value) {
+    _hasNpu = value;
     notifyListeners();
   }
 
@@ -98,5 +113,41 @@ class UiProvider with ChangeNotifier {
 
   void consumeJump() {
     _pageToJump = null;
+  }
+
+  // ─── دوال التسميع ───
+  void toggleRecitationMinibar() {
+    _showRecitationMinibar = !_showRecitationMinibar;
+    if (!_showRecitationMinibar) {
+      _isRecitationActive = false;
+      _showRecitationResults = false;
+    }
+    notifyListeners();
+  }
+
+  void setRecitationActive(bool active) {
+    _isRecitationActive = active;
+    notifyListeners();
+  }
+
+  void setShowRecitationResults(bool show) {
+    _showRecitationResults = show;
+    notifyListeners();
+  }
+
+  void openRecitationMinibar() {
+    if (!_showRecitationMinibar) {
+      _showRecitationMinibar = true;
+      _showAudioMinibar = false; // تعطيل AudioMinibar أثناء التسميع
+      _showFullAudioPlayer = false;
+      notifyListeners();
+    }
+  }
+
+  void hideRecitationMinibar() {
+    _showRecitationMinibar = false;
+    _isRecitationActive = false;
+    _showRecitationResults = false;
+    notifyListeners();
   }
 }

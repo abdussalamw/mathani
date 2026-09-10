@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import '../../providers/mushaf_metadata_provider.dart';
 import '../../../data/providers/mushaf_navigation_provider.dart';
 import '../../providers/quran_provider.dart';
+import '../../providers/recitation_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../widgets/audio_minibar.dart';
 import 'package:flutter/services.dart';
@@ -39,8 +40,8 @@ class SensitivePageScrollPhysics extends PageScrollPhysics {
 
   const SensitivePageScrollPhysics({
     ScrollPhysics? parent,
-    this.dragThreshold = 25.0, // ط²ظٹط§ط¯ط© ط§ظ„ط¹طھط¨ط© ظ„طھظ‚ظ„ظٹظ„ ط§ظ„ط­ط³ط§ط³ظٹط© ط§ظ„ط¹ط§ظ„ظٹط© (ظƒط§ظ†طھ 2.0)
-    this.flingVelocity = 150.0, // ط²ظٹط§ط¯ط© ط³ط±ط¹ط© ط§ظ„ظ‚ط°ظپ ط§ظ„ظ…ط·ظ„ظˆط¨ط© (ظƒط§ظ†طھ 80.0)
+    this.dragThreshold = 10.0, // عتبة سحب منخفضة — يتبع الإصبع مبكراً وتقليب أسهل بسحبة أصغر
+    this.flingVelocity = 90.0, // قذف أسهل — لمسة/سحبة خفيفة تكفي للانتقال
   }) : super(parent: parent);
 
   @override
@@ -73,9 +74,10 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
   Timer? _autoScrollTimer;
   bool _isAutoScrolling = false;
   bool _isAutoScrollPaused = false; // للإيقاف المؤقت بضغطة واحدة
-  static const double _autoScrollMaxSpeed = 0.75; // السرعة القصوى (بكسل/إطار) - مخفضة للضعف
+  static const double _autoScrollMaxSpeed = 0.22; // ~13 بكسل/ث — صفحة (~800-900px) تُنجز في ~دقيقة
   static const Duration _autoScrollInterval = Duration(milliseconds: 16); // ~60fps
-  static const Duration _autoScrollRampDuration = Duration(seconds: 3); // مدة التسارع التدريجي
+  static const Duration _autoScrollRampDuration = Duration(seconds: 5); // تسارع أطول وناعم (بدون قفزة)
+  static const double _autoScrollSlowdownStart = 0.15; // بدء التباطؤ السلس في آخر 15% من المحتوى
   DateTime? _autoScrollStartTime; // وقت بدء التمرير
   
   // ScrollControllers ظ„ظ„طµظپط­ط§طھ ط§ظ„ظپط±ط¯ظٹط© (ظ„ظ„ظˆط¶ط¹ Hybrid)
@@ -115,6 +117,10 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
       if (!_audioListenerAdded) {
         context.read<AudioProvider>().addListener(_onAudioStateChange);
         _audioListenerAdded = true;
+      }
+      if (!_recitationListenerAdded) {
+        context.read<RecitationProvider>().addListener(_onRecitationStateChange);
+        _recitationListenerAdded = true;
       }
     });
   }
@@ -156,6 +162,54 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
        }
     }
   }
+
+  void _onRecitationStateChange() {
+    if (!mounted) return;
+    
+    final recitation = context.read<RecitationProvider>();
+    final uiProvider = context.read<UiProvider>();
+    
+    if (uiProvider.isRecitationActive) {
+      if (recitation.matchedSurah != null && recitation.matchedAyah != null) {
+        final mushafId = context.read<MushafMetadataProvider>().currentMushafId;
+        int? page;
+        
+        if (mushafId == 'shamarly_15lines') {
+          final navProvider = context.read<MushafNavigationProvider>();
+          page = navProvider.getPageForAyah(recitation.matchedSurah!, recitation.matchedAyah!);
+        } else {
+          page = MushafNavigationProvider.pageForSurahAyah(
+            recitation.matchedSurah!, 
+            recitation.matchedAyah!,
+          );
+        }
+        
+        if (page != null && page != _currentPage) {
+          if (_pageController.hasClients) {
+             _pageController.animateToPage(
+               page - 1, 
+               duration: const Duration(milliseconds: 500), 
+               curve: Curves.easeInOut
+             );
+          }
+        }
+        
+        _selectedSurah = recitation.matchedSurah;
+        _selectedAyah = recitation.matchedAyah;
+      }
+      setState(() {});
+    } else {
+      if (_selectedSurah != null || _selectedAyah != null) {
+        final audio = context.read<AudioProvider>();
+        if (!audio.isPlaying) {
+          setState(() {
+            _selectedSurah = null;
+            _selectedAyah = null;
+          });
+        }
+      }
+    }
+  }
   
   void _onScroll() {
     if (!mounted || _isLoading) return;
@@ -166,10 +220,8 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
         final topOffset = _pageController.offset + ResponsiveConstants.getTopBarHeight(context);
         final topPage = (topOffset / viewportHeight).floor() + 1;
         if (topPage != _currentPage && topPage >= 1 && topPage <= (_pages?.length ?? 604)) {
-          setState(() {
-            _currentPage = topPage;
-          });
-          _syncPageWithProvider(topPage);
+          // دمج المزامنة بتردد محدود لتجنّب إعادة بناء الشاشة مع كل بكسل (سلاسة الوضع المستمر)
+          _debouncedContinuousPageSync(topPage);
         }
       }
     }
@@ -428,14 +480,25 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     _startAutoScrollTimer();
   }
 
-  /// حساب السرعة الحالية مع تسارع تدريجي (easeIn)
-  double _getCurrentAutoScrollSpeed() {
+  /// حساب السرعة الحالية: تسارع ناعم في البداية (easeInOut) وتباطؤ سلس قرب نهاية المحتوى
+  double _getCurrentAutoScrollSpeed({double? fractionRemaining}) {
     if (_autoScrollStartTime == null) return _autoScrollMaxSpeed;
     final elapsed = DateTime.now().difference(_autoScrollStartTime!);
     final progress = (elapsed.inMilliseconds / _autoScrollRampDuration.inMilliseconds).clamp(0.0, 1.0);
-    // Ease-in curve: يبدأ بطيء ثم يتسارع
-    final easedProgress = progress * progress; // quadratic easeIn
-    return _autoScrollMaxSpeed * 0.2 + (_autoScrollMaxSpeed * 0.8 * easedProgress);
+    // منحنى easeInOut: انطلاق ناعم تدريجياً بدون قفزة سرعة مفاجئة
+    final easedProgress = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - ((2 - 2 * progress) * (2 - 2 * progress) * 0.5);
+    final base = _autoScrollMaxSpeed * 0.15 + (_autoScrollMaxSpeed * 0.85 * easedProgress);
+
+    // تباطؤ سلس قرب نهاية المحتوى (smoothstep): نخفض السرعة تدريجياً إلى الصفر
+    if (fractionRemaining != null && fractionRemaining < _autoScrollSlowdownStart) {
+      final slowProgress = (fractionRemaining / _autoScrollSlowdownStart).clamp(0.0, 1.0);
+      final easedSlow = slowProgress * slowProgress * (3 - 2 * slowProgress); // smoothstep
+      return base * easedSlow;
+    }
+
+    return base;
   }
 
   void _startAutoScrollTimer() {
@@ -447,8 +510,6 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
       }
       if (_isAutoScrollPaused) return; // إيقاف مؤقت - لا تتحرك
       
-      final speed = _getCurrentAutoScrollSpeed(); // سرعة تدريجية
-      
       final settings = context.read<SettingsProvider>();
       final currentController = _innerScrollControllers[_currentPage];
       
@@ -458,6 +519,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
         final currentScroll = currentController.offset;
         
         if (currentScroll < maxScroll) {
+          final speed = _getCurrentAutoScrollSpeed();
           // تمرير بكسلي مباشر داخل الصفحة (60fps = سلس طبيعياً)
           currentController.jumpTo(
             (currentScroll + speed).clamp(0.0, maxScroll),
@@ -472,6 +534,10 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
           final maxScroll = _pageController.position.maxScrollExtent;
           final current = _pageController.offset;
           if (current < maxScroll) {
+            // تباطؤ سلس قرب نهاية المحتوى (آخر 15%) بدلاً من توقف مفاجئ
+            final remaining = (maxScroll - current).clamp(0.0, maxScroll);
+            final fraction = maxScroll > 0 ? remaining / maxScroll : 1.0;
+            final speed = _getCurrentAutoScrollSpeed(fractionRemaining: fraction);
             // jumpTo بكسل واحد لكل إطار = حركة سلسة بدون تداخل animations
             _pageController.jumpTo(
               (current + speed).clamp(0.0, maxScroll),
@@ -511,6 +577,10 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
       if (_audioListenerAdded) {
         context.read<AudioProvider>().removeListener(_onAudioStateChange);
         _audioListenerAdded = false;
+      }
+      if (_recitationListenerAdded) {
+        context.read<RecitationProvider>().removeListener(_onRecitationStateChange);
+        _recitationListenerAdded = false;
       }
       _syncDebounce?.cancel();
       _autoScrollTimer?.cancel();
@@ -587,8 +657,8 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
         ? MediaQuery.of(context).size.height 
         : MediaQuery.of(context).size.width;
         
-    // رفع العتبة إلى 20% لضمان أن المستخدم يريد فعلاً التقليب
-    final threshold = screenDimension * 0.20; 
+    // عتبة 12% + قذف أخف — تقليب أسهل بسحبة أصغر دون سحب كبير
+    final threshold = screenDimension * 0.12; 
     final velocity = isHorizontal 
         ? details.velocity.pixelsPerSecond.dy 
         : details.velocity.pixelsPerSecond.dx;
@@ -596,7 +666,7 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
     final currentOffset = _secondaryOffsetNotifier.value;
 
     bool shouldFlip = _secondaryTargetPage != null && (
-      currentOffset.abs() > threshold || velocity.abs() > 700
+      currentOffset.abs() > threshold || velocity.abs() > 550
     );
     
     if (shouldFlip) {
@@ -1105,7 +1175,29 @@ class _MushafScreenState extends State<MushafScreen> with TickerProviderStateMix
   
   // Debounce timer (reserved for future use, cancelled in dispose)
   Timer? _syncDebounce;
+  int? _pendingContinuousPage; // أحدث صفحة مستهدفة تنتظر مزامنتها في الوضع المستمر
   bool _audioListenerAdded = false; // guard against duplicate listeners
+  bool _recitationListenerAdded = false; // guard against duplicate listeners
+
+  /// مزامنة رقم الصفحة في الوضع المستمر بتردد محدود (مرة كل 66ms) لضمان سلاسة الحركة
+  /// دون إعادة بناء كاملة للشاشة مع كل بكسل تمرير.
+  void _debouncedContinuousPageSync(int page) {
+    // نحتفظ بأحدث صفحة فقط (تجاهل القيم الوسيطة أثناء التمرير السريع)
+    _pendingContinuousPage = page;
+    if (_syncDebounce != null) return; // يوجد جدول زمني قائم بالفعل
+
+    _syncDebounce = Timer(const Duration(milliseconds: 66), () {
+      _syncDebounce = null;
+      if (!mounted) return;
+      final target = _pendingContinuousPage;
+      _pendingContinuousPage = null;
+      if (target == null || target == _currentPage) return;
+      setState(() {
+        _currentPage = target;
+      });
+      _syncPageWithProvider(target);
+    });
+  }
 
   void _syncPageWithProvider(int pageNum) {
     final mushafId = context.read<MushafMetadataProvider>().currentMushafId;

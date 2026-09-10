@@ -40,14 +40,7 @@ class AudioPlayerSheet extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text('اختبار v2', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                  ), 
+                  const SizedBox(width: 40), // Placeholder to keep handle centered
                   Container(
                     width: 32,
                     height: 3,

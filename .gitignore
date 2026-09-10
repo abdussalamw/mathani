@@ -70,3 +70,22 @@ audio_cache/
 *.zip
 *.gz
 scripts/*.csv
+
+# === Local AI workspace & artifacts (kept on disk, NOT tracked) ===
+*.apk
+/model/
+/onnx_output/
+/tadabur/
+/ai_lab/
+analyze_log.txt
+_chk.ps1
+fix_tadabbur_model.py
+patch_tadabbur_v2.py
+patch_tadabbur_v3.py
+zip_patched_model.py
+_wt.txt
+_t2.txt
+_machine.txt
+_test_log.txt
+_analyze.txt
+_*.txt

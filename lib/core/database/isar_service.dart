@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/data/models/ayah.dart';
 import 'package:mathani/core/database/collections.dart';
+import 'package:mathani/data/models/recitation_session.dart';
 
 class IsarService {
   static final IsarService _instance = IsarService._internal();
@@ -44,6 +45,7 @@ class IsarService {
             ReadingProgressSchema,
             BookmarkSchema,
             TafsirSchema,
+            RecitationSessionSchema,
           ],
           directory: dir.path,
           inspector: !kReleaseMode,
@@ -74,6 +76,7 @@ class IsarService {
             ReadingProgressSchema,
             BookmarkSchema,
             TafsirSchema,
+            RecitationSessionSchema,
           ],
           directory: dir.path,
           inspector: !kReleaseMode,

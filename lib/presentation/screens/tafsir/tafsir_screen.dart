@@ -94,7 +94,11 @@ class _TafsirScreenState extends State<TafsirScreen> {
     setState(() {
       _currentPage = index + 1;
     });
-    context.read<QuranProvider>().updateReadingPage(_currentPage);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<QuranProvider>().updateReadingPage(_currentPage);
+      }
+    });
   }
 
   void _showTafsirSelectionSheet() {

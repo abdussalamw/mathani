@@ -41,22 +41,26 @@ class MushafDownloaderService {
       }
       httpClient.close();
       
-      // 3. Extract
-      // Extraction is 70% to 100% of the progress
-      onProgress(0.75);
+      // 3. Handle Archive vs Direct File
+      final isArchive = url.endsWith('.zip') || url.endsWith('.tar.bz2') || url.endsWith('.tar.gz');
       
-      if (kIsWeb) {
-        // Web extraction not fully supported for persistent storage in this context yet
-        // but we can implement logical support if needed.
-        return;
+      if (isArchive) {
+        onProgress(0.75);
+        if (!kIsWeb) {
+          await compute(_extractArchive, {
+            'bytes': allBytes, 
+            'path': destinationPath,
+            'url': url,
+          });
+        }
+      } else {
+        // Direct file download
+        onProgress(0.9);
+        final fileName = url.split('/').last;
+        final outFile = File('$destinationPath/$fileName');
+        await outFile.parent.create(recursive: true);
+        await outFile.writeAsBytes(allBytes);
       }
-      
-      // Run extraction in isolate to avoid UI freeze
-      await compute(_extractArchive, {
-        'bytes': allBytes, 
-        'path': destinationPath,
-        'url': url,
-      });
       
       onProgress(1.0);
       

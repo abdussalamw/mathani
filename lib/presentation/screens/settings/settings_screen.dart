@@ -9,6 +9,8 @@ import '../../../data/models/reciter.dart';
 import '../../../data/services/local_tafsir_service.dart';
 import '../../../core/database/collections.dart'; // Needed for MushafMetadata
 import '../../../l10n/app_localizations.dart';
+import 'recitation_diagnostic_screen.dart';
+import '../recitation/recitation_setup_view.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -49,8 +51,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           bottom: 120
         ),
         children: [
-          // 0. مركز التحميل (الجديد)
+          // 0. مركز التحميل
           _buildDownloadCenterLink(context, isDark),
+          
+          const SizedBox(height: 8),
+
+          // 0b. تشخيص نظام التسميع
+          _buildDiagnosticLink(context, isDark),
+          
+          const SizedBox(height: 8),
+
+          // 0c. إعدادات التسميع
+          _buildRecitationSettingsLink(context, isDark),
           
           const SizedBox(height: 16),
 
@@ -314,6 +326,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildDiagnosticLink(BuildContext context, bool isDark) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RecitationDiagnosticScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A1A2E) : const Color(0xFFEEF2FF),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.indigo.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.indigo.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Text('🔬', style: TextStyle(fontSize: 20)),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'تشخيص نظام التسميع',
+                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  Text(
+                    'فحص شامل: ميكروفون، نماذج، محرك ASR، التجويد',
+                    style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecitationSettingsLink(BuildContext context, bool isDark) {
+    // استيراد وفتح RecitationSetupView كصفحة
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const _RecitationSetupPage(),
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1A1A) : const Color(0xFFFFF4E5),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.brandGold.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.brandGold.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.tune_rounded, color: AppColors.brandGold, size: 20),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'إعدادات التسميع',
+                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  Text(
+                    'اختيار السورة، وضع التسميع، تحميل النماذج',
+                    style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _getTafsirName(BuildContext context, String id) {
     final localizations = AppLocalizations.of(context)!;
     switch (id) {
@@ -368,6 +475,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 // --- Compact Widgets ---
+
+/// صفحة إعدادات التسميع الكاملة (تفتح من الإعدادات)
+class _RecitationSetupPage extends StatelessWidget {
+  const _RecitationSetupPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'إعدادات التسميع',
+          style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: const RecitationSetupView(),
+    );
+  }
+}
 
 class _CompactThemeButton extends StatelessWidget {
   final String title;
