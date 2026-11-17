@@ -1,7 +1,4 @@
-import 'dart:io';
-
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,7 +7,9 @@ import 'package:mathani/main.dart';
 import 'package:mathani/presentation/providers/settings_provider.dart';
 
 void main() {
-  testWidgets('App smoke test — real entry point constructs', (WidgetTester tester) async {
+  testWidgets('App smoke test — real entry point constructs', (
+    WidgetTester tester,
+  ) async {
     TestWidgetsFlutterBinding.ensureInitialized();
 
     // تهيئة نفس التبعيات التي يهيئها main() الحقيقي

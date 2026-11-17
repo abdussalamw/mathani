@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
@@ -24,7 +24,10 @@ class RecitationHistoryView extends StatelessWidget {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded, color: AppColors.slateText),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppColors.slateText,
+                    ),
                     onPressed: () => provider.goToSetup(),
                   ),
                   const Expanded(
@@ -75,7 +78,7 @@ class RecitationHistoryView extends StatelessWidget {
           Icon(
             Icons.history_rounded,
             size: 64,
-            color: Colors.grey.withOpacity(0.4),
+            color: Colors.grey.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -115,7 +118,7 @@ class RecitationHistoryView extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E22) : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.withOpacity(0.08)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
       ),
       child: Row(
         children: [
@@ -124,7 +127,7 @@ class RecitationHistoryView extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: gradeColor.withOpacity(0.1),
+              color: gradeColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,

@@ -36,3 +36,6 @@ analyzer:
     - ai_lab/**
     - onnx_output/**
     - build/**
+    - android/**
+    - web/**
+    - windows/**

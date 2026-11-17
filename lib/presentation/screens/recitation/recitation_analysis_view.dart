@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
@@ -33,8 +33,8 @@ class RecitationAnalysisView extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.brandGold.withOpacity(0.15),
-                      AppColors.brandGold.withOpacity(0.05),
+                      AppColors.brandGold.withValues(alpha: 0.15),
+                      AppColors.brandGold.withValues(alpha: 0.05),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -89,8 +89,12 @@ class RecitationAnalysisView extends StatelessWidget {
                       builder: (_, value, __) => LinearProgressIndicator(
                         value: value,
                         minHeight: 8,
-                        backgroundColor: AppColors.brandGold.withOpacity(0.1),
-                        valueColor: const AlwaysStoppedAnimation(AppColors.brandGold),
+                        backgroundColor: AppColors.brandGold.withValues(
+                          alpha: 0.1,
+                        ),
+                        valueColor: const AlwaysStoppedAnimation(
+                          AppColors.brandGold,
+                        ),
                       ),
                     ),
                   ),
@@ -118,7 +122,9 @@ class RecitationAnalysisView extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E1E22) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.brandGold.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.brandGold.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Text(
                     provider.liveTranscript,
@@ -181,7 +187,9 @@ class RecitationAnalysisView extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDone
                 ? AppColors.success
-                : (isActive ? AppColors.brandGold : Colors.grey.withOpacity(0.2)),
+                : (isActive
+                      ? AppColors.brandGold
+                      : Colors.grey.withValues(alpha: 0.2)),
             shape: BoxShape.circle,
           ),
           child: Icon(
@@ -197,7 +205,9 @@ class RecitationAnalysisView extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'Tajawal',
               fontSize: 13,
-              fontWeight: isActive || isDone ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isActive || isDone
+                  ? FontWeight.bold
+                  : FontWeight.normal,
               color: isDone
                   ? AppColors.success
                   : (isActive ? AppColors.slateText : AppColors.mutedText),

@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class BasmalaWidget extends StatelessWidget {
-  const BasmalaWidget({Key? key}) : super(key: key);
+  const BasmalaWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -10,10 +10,7 @@ class BasmalaWidget extends StatelessWidget {
       child: Text(
         'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ',
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontFamily: 'HafsSmart',
-          fontSize: 24,
-        ),
+        style: TextStyle(fontFamily: 'HafsSmart', fontSize: 24),
       ),
     );
   }

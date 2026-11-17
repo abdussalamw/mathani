@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter/material.dart';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
@@ -91,18 +92,27 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     // تحميل النموذج جارٍ
     if (recProvider.isModelLoading) {
       return Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          12 + MediaQuery.of(context).padding.bottom,
+        ),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF151412) : Colors.white,
           border: Border(
             top: BorderSide(
-              color: isDark ? AppColors.primary.withOpacity(0.15) : Colors.grey.shade200,
+              color: isDark
+                  ? AppColors.primary.withValues(alpha: 0.15)
+                  : Colors.grey.shade200,
               width: 1.5,
             ),
           ),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.04),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 15,
               offset: const Offset(0, -4),
             ),
@@ -130,7 +140,11 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.mutedText),
+              icon: const Icon(
+                Icons.close_rounded,
+                size: 20,
+                color: AppColors.mutedText,
+              ),
               onPressed: () {
                 uiProvider.hideRecitationMinibar();
                 recProvider.reset();
@@ -146,18 +160,27 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     // جاري التحليل النهائي
     if (recProvider.state == RecitationState.analyzing) {
       return Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          12 + MediaQuery.of(context).padding.bottom,
+        ),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF151412) : Colors.white,
           border: Border(
             top: BorderSide(
-              color: isDark ? AppColors.primary.withOpacity(0.15) : Colors.grey.shade200,
+              color: isDark
+                  ? AppColors.primary.withValues(alpha: 0.15)
+                  : Colors.grey.shade200,
               width: 1.5,
             ),
           ),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.04),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 15,
               offset: const Offset(0, -4),
             ),
@@ -176,7 +199,9 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                recProvider.analysisStep.isNotEmpty ? recProvider.analysisStep : 'جاري تحليل نطق الآيات...',
+                recProvider.analysisStep.isNotEmpty
+                    ? recProvider.analysisStep
+                    : 'جاري تحليل نطق الآيات...',
                 style: const TextStyle(
                   fontFamily: 'Tajawal',
                   fontSize: 13,
@@ -190,20 +215,26 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     }
 
     // حالة الخطأ
-    if (recProvider.state == RecitationState.error || recProvider.errorMessage != null) {
+    if (recProvider.state == RecitationState.error ||
+        recProvider.errorMessage != null) {
       return Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          12 + MediaQuery.of(context).padding.bottom,
+        ),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF151412) : Colors.white,
           border: Border(
             top: BorderSide(
-              color: Colors.red.withOpacity(0.3),
+              color: Colors.red.withValues(alpha: 0.3),
               width: 1.5,
             ),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.red.withOpacity(0.05),
+              color: Colors.red.withValues(alpha: 0.05),
               blurRadius: 15,
               offset: const Offset(0, -4),
             ),
@@ -211,7 +242,11 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.red, size: 20),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.red,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -227,7 +262,11 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.mutedText),
+              icon: const Icon(
+                Icons.close_rounded,
+                size: 20,
+                color: AppColors.mutedText,
+              ),
               onPressed: () {
                 uiProvider.hideRecitationMinibar();
                 recProvider.reset();
@@ -245,18 +284,27 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
       final result = recProvider.currentResult!;
       final isExcellent = result.accuracyPercent >= 80;
       return Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          12 + MediaQuery.of(context).padding.bottom,
+        ),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF151412) : Colors.white,
           border: Border(
             top: BorderSide(
-              color: isDark ? AppColors.primary.withOpacity(0.15) : Colors.grey.shade200,
+              color: isDark
+                  ? AppColors.primary.withValues(alpha: 0.15)
+                  : Colors.grey.shade200,
               width: 1.5,
             ),
           ),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.04),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 15,
               offset: const Offset(0, -4),
             ),
@@ -268,17 +316,23 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: isExcellent ? AppColors.success.withOpacity(0.08) : Colors.orange.withOpacity(0.08),
+                color: isExcellent
+                    ? AppColors.success.withValues(alpha: 0.08)
+                    : Colors.orange.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isExcellent ? AppColors.success.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                  color: isExcellent
+                      ? AppColors.success.withValues(alpha: 0.2)
+                      : Colors.orange.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    isExcellent ? Icons.stars_rounded : Icons.info_outline_rounded,
+                    isExcellent
+                        ? Icons.stars_rounded
+                        : Icons.info_outline_rounded,
                     color: isExcellent ? AppColors.success : Colors.orange,
                     size: 16,
                   ),
@@ -312,7 +366,10 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                 uiProvider.setShowRecitationResults(true);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFFE5C16C), Color(0xFFCFB058)],
@@ -322,15 +379,15 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.3),
+                      color: AppColors.primary.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
                   ],
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
+                  children: [
                     Text(
                       'توسيع النتائج',
                       style: TextStyle(
@@ -349,7 +406,11 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
             const SizedBox(width: 12),
             // زر إغلاق الجلسة
             IconButton(
-              icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.mutedText),
+              icon: const Icon(
+                Icons.close_rounded,
+                size: 20,
+                color: AppColors.mutedText,
+              ),
               onPressed: () {
                 uiProvider.hideRecitationMinibar();
                 recProvider.reset();
@@ -366,18 +427,27 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     return GestureDetector(
       onTap: isRecording ? null : _startRecitation,
       child: Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          12 + MediaQuery.of(context).padding.bottom,
+        ),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF151412) : Colors.white,
           border: Border(
             top: BorderSide(
-              color: isDark ? AppColors.primary.withOpacity(0.15) : Colors.grey.shade200,
+              color: isDark
+                  ? AppColors.primary.withValues(alpha: 0.15)
+                  : Colors.grey.shade200,
               width: 1.5,
             ),
           ),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.04),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 15,
               offset: const Offset(0, -4),
             ),
@@ -399,7 +469,10 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                       decoration: BoxDecoration(
                         gradient: isRecording
                             ? LinearGradient(
-                                colors: [Colors.red.shade400, Colors.red.shade700],
+                                colors: [
+                                  Colors.red.shade400,
+                                  Colors.red.shade700,
+                                ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               )
@@ -412,13 +485,21 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                         boxShadow: [
                           BoxShadow(
                             color: isRecording
-                                ? Colors.red.withOpacity(0.4 * (0.5 + _pulseController.value * 0.5))
-                                : AppColors.primary.withOpacity(0.3),
+                                ? Colors.red.withValues(
+                                    alpha:
+                                        0.4 *
+                                        (0.5 + _pulseController.value * 0.5),
+                                  )
+                                : AppColors.primary.withValues(alpha: 0.3),
                             blurRadius: isRecording
                                 ? 12 + _pulseController.value * 6
                                 : 10,
-                            spreadRadius: isRecording ? _pulseController.value * 2 : 0,
-                            offset: isRecording ? Offset.zero : const Offset(0, 4),
+                            spreadRadius: isRecording
+                                ? _pulseController.value * 2
+                                : 0,
+                            offset: isRecording
+                                ? Offset.zero
+                                : const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -433,9 +514,19 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                 const SizedBox(width: 12),
                 // العدادات ببطاقات كبسولية أنيقة
                 if (isRecording) ...[
-                  _buildBadge('آيات', '${recProvider.matchedAyahsCount}', Icons.menu_book_rounded, Colors.blue),
+                  _buildBadge(
+                    'آيات',
+                    '${recProvider.matchedAyahsCount}',
+                    Icons.menu_book_rounded,
+                    Colors.blue,
+                  ),
                   const SizedBox(width: 8),
-                  _buildBadge('أخطاء', '${recProvider.mistakesCount}', Icons.error_outline_rounded, Colors.red),
+                  _buildBadge(
+                    'أخطاء',
+                    '${recProvider.mistakesCount}',
+                    Icons.error_outline_rounded,
+                    Colors.red,
+                  ),
                 ],
                 const Spacer(),
                 // وقت التسجيل والتوقيف المؤقت
@@ -454,11 +545,15 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : Colors.grey.shade100,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        recProvider.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                        recProvider.isPaused
+                            ? Icons.play_arrow_rounded
+                            : Icons.pause_rounded,
                         color: AppColors.primary,
                         size: 18,
                       ),
@@ -473,7 +568,9 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : Colors.grey.shade100,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -495,7 +592,11 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                   const SizedBox(width: 10),
                   // زر إلغاء التسجيل بالكامل
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20, color: Colors.red),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 20,
+                      color: Colors.red,
+                    ),
                     onPressed: () {
                       _stopTimers();
                       recProvider.cancelRecording();
@@ -526,7 +627,11 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.mutedText),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 20,
+                      color: AppColors.mutedText,
+                    ),
                     onPressed: () {
                       uiProvider.hideRecitationMinibar();
                       recProvider.reset();
@@ -541,20 +646,33 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
             if (isRecording && recProvider.promptWord != null) ...[
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: AppColors.brandGold.withOpacity(0.1),
+                  color: AppColors.brandGold.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.brandGold.withOpacity(0.2)),
+                  border: Border.all(
+                    color: AppColors.brandGold.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.help_outline_rounded, color: AppColors.brandGold, size: 14),
+                    const Icon(
+                      Icons.help_outline_rounded,
+                      color: AppColors.brandGold,
+                      size: 14,
+                    ),
                     const SizedBox(width: 6),
                     const Text(
                       'الكلمة التالية: ',
-                      style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: AppColors.mutedText),
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 11,
+                        color: AppColors.mutedText,
+                      ),
                     ),
                     Text(
                       recProvider.promptWord!,
@@ -578,23 +696,31 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                     child: SizedBox(
                       height: 14,
                       child: Row(
-                        children: _waveformData.map((v) => Expanded(
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 1),
-                            height: 2 + v * 10,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppColors.primary.withOpacity(0.4),
-                                  AppColors.primary,
-                                ],
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
+                        children: _waveformData
+                            .map(
+                              (v) => Expanded(
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 1,
+                                  ),
+                                  height: 2 + v * 10,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.primary.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                        AppColors.primary,
+                                      ],
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                    ),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
                               ),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        )).toList(),
+                            )
+                            .toList(),
                       ),
                     ),
                   ),
@@ -606,9 +732,14 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
               const SizedBox(height: 6),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.02) : Colors.grey.shade50,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.02)
+                      : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -635,9 +766,9 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -659,7 +790,7 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
             style: TextStyle(
               fontFamily: 'Tajawal',
               fontSize: 10,
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -668,17 +799,22 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     );
   }
 
-  Widget _buildHistoryBadge(BuildContext context, RecitationProvider recProvider) {
+  Widget _buildHistoryBadge(
+    BuildContext context,
+    RecitationProvider recProvider,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => _showPreviousRecitationsSheet(context, recProvider),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.brandGold.withOpacity(0.12) : AppColors.brandGold.withOpacity(0.08),
+          color: isDark
+              ? AppColors.brandGold.withValues(alpha: 0.12)
+              : AppColors.brandGold.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: AppColors.brandGold.withOpacity(0.3),
+            color: AppColors.brandGold.withValues(alpha: 0.3),
             width: 0.8,
           ),
         ),
@@ -706,10 +842,13 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     );
   }
 
-  void _showPreviousRecitationsSheet(BuildContext context, RecitationProvider recProvider) {
+  void _showPreviousRecitationsSheet(
+    BuildContext context,
+    RecitationProvider recProvider,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final uiProvider = context.read<UiProvider>();
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -721,13 +860,18 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, -5),
               ),
             ],
           ),
-          padding: EdgeInsets.fromLTRB(20, 16, 20, 24 + MediaQuery.of(context).padding.bottom),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            24 + MediaQuery.of(context).padding.bottom,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -776,7 +920,9 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                 itemBuilder: (context, index) {
                   final session = recProvider.sessions[index];
                   final isExcellent = session.accuracyPercent >= 80;
-                  final badgeColor = isExcellent ? AppColors.success : Colors.orange;
+                  final badgeColor = isExcellent
+                      ? AppColors.success
+                      : Colors.orange;
 
                   return InkWell(
                     onTap: () {
@@ -788,10 +934,14 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E1E22) : Colors.grey.shade50,
+                        color: isDark
+                            ? const Color(0xFF1E1E22)
+                            : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey.shade200,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.04)
+                              : Colors.grey.shade200,
                           width: 1,
                         ),
                       ),
@@ -800,7 +950,7 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: AppColors.brandGold.withOpacity(0.1),
+                              color: AppColors.brandGold.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -820,7 +970,9 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                                     fontFamily: 'Tajawal',
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : AppColors.slateText,
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppColors.slateText,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -837,11 +989,17 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                           ),
                           const SizedBox(width: 12),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
-                              color: badgeColor.withOpacity(0.08),
+                              color: badgeColor.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: badgeColor.withOpacity(0.2), width: 1),
+                              border: Border.all(
+                                color: badgeColor.withValues(alpha: 0.2),
+                                width: 1,
+                              ),
                             ),
                             child: Text(
                               '${session.accuracyPercent}%',

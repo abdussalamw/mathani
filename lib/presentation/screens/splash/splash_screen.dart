@@ -1,88 +1,89 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../data/services/qcf4_font_downloader.dart';
 import '../../../data/services/local_tafsir_service.dart';
 import '../../providers/mushaf_metadata_provider.dart';
-import '../../../l10n/app_localizations.dart';
+
 import 'package:provider/provider.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> 
+class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  
+
   @override
   void initState() {
     super.initState();
-    
+
     _controller = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
       ),
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
       ),
     );
-    
+
     _controller.forward();
-    
+
     _navigateToHome();
   }
-  
+
   void _navigateToHome() async {
     // 1. Wait for minimum splash time
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
-    
+
     final provider = context.read<MushafMetadataProvider>();
-    
+
     // 2. Wait for Provider to initialize (max 5 seconds timeout)
     int retryCount = 0;
     while (!provider.isInitialized && retryCount < 50) {
-       await Future.delayed(const Duration(milliseconds: 100));
-       retryCount++;
+      await Future.delayed(const Duration(milliseconds: 100));
+      retryCount++;
     }
 
     if (!mounted) return;
-    
+
     final currentId = provider.currentMushafId;
-    
+
     // 3. Check if Tafseer is ready
     final tafsirReady = await LocalTafsirService.instance.isTafsirDownloaded();
-    
+
     // 4. Check if selected Mushaf is ready
     bool mushafReady = false;
     if (currentId == 'qcf2_v4_woff2') {
-       mushafReady = await QCF4FontDownloader.areAllFontsAvailable();
+      mushafReady = await QCF4FontDownloader.areAllFontsAvailable();
     } else {
-       final mushafList = provider.availableMushafs;
-       if (mushafList.isNotEmpty) {
-          final mushaf = mushafList.firstWhere(
-            (m) => m.identifier == currentId, 
-            orElse: () => mushafList.first
-          );
-          mushafReady = mushaf.isDownloaded;
-       }
+      final mushafList = provider.availableMushafs;
+      if (mushafList.isNotEmpty) {
+        final mushaf = mushafList.firstWhere(
+          (m) => m.identifier == currentId,
+          orElse: () => mushafList.first,
+        );
+        mushafReady = mushaf.isDownloaded;
+      }
     }
-    
+
     if (mounted) {
       if (tafsirReady && mushafReady) {
         // Load tafsir locally (background)
@@ -93,13 +94,13 @@ class _SplashScreenState extends State<SplashScreen>
       }
     }
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,16 +134,16 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 // الآية القرآنية
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 32),
                   child: Text(
                     'اللَّهُ نَزَّلَ أَحْسَنَ الْحَدِيثِ كِتَابًا مُّتَشَابِهًا مَّثَانِيَ',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Tajawal',
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -151,9 +152,9 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 48),
-                
+
                 // مؤشر التحميل
                 const CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),

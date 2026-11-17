@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 // Export separate models
 export '../../data/models/surah.dart';
@@ -14,7 +14,7 @@ class AudioCache {
 
   @Index()
   int surahNumber = 1;
-  
+
   @Index()
   int ayahNumber = 1;
 
@@ -30,14 +30,14 @@ class UserSettings {
 
   double fontSize = 28.0;
   String fontFamily = 'Tajawal';
-  
+
   bool isDarkMode = false;
   bool autoScroll = false;
-  
+
   String defaultTafsir = 'muyassar';
   String defaultReciter = 'minshawi_murattal';
-  
-  String selectedMushafId = 'madani_font_v1'; 
+
+  String selectedMushafId = 'madani_font_v1';
 }
 
 @collection
@@ -45,10 +45,10 @@ class ReadingProgress {
   Id id = Isar.autoIncrement;
 
   DateTime date = DateTime.now();
-  
+
   int pagesRead = 0;
   int ayahsRead = 0;
-  
+
   int timeSpent = 0; // in seconds
   double completionPercentage = 0.0;
 }
@@ -58,18 +58,18 @@ class MushafMetadata {
   Id id = Isar.autoIncrement;
 
   @Index(unique: true)
-  String? identifier; 
+  String? identifier;
 
   String? nameArabic;
   String? nameEnglish;
-  String? type; 
-  String? baseUrl; 
+  String? type;
+  String? baseUrl;
   String? imageExtension;
   int pageCount = 604;
-  
-  bool isDownloaded = false; 
-  String? localPath; 
-  
+
+  bool isDownloaded = false;
+  String? localPath;
+
   int totalPages = 604;
 }
 
@@ -79,7 +79,7 @@ class Bookmark {
 
   @Index()
   int surahNumber = 1;
-  
+
   @Index()
   int ayahNumber = 1;
 
@@ -88,11 +88,7 @@ class Bookmark {
 }
 
 // Helper enum for Mushaf Types logic (not stored directly)
-enum MushafTypeEnum {
-  font,
-  image,
-  svg
-}
+enum MushafTypeEnum { font, image, svg }
 
 /// FNV-1a 32-bit hash algorithm compatible with Web (JavaScript)
 int fastHash(String string) {

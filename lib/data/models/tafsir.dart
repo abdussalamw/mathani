@@ -1,4 +1,4 @@
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 part 'tafsir.g.dart';
 
@@ -8,7 +8,7 @@ class Tafsir {
 
   @Index()
   int surahNumber = 1;
-  
+
   @Index()
   int ayahNumber = 1;
 

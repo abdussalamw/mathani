@@ -1,6 +1,3 @@
-
-import 'package:dio/dio.dart';
-
 import '../../../core/network/api_client.dart';
 
 class QuranRemoteDataSource {
@@ -27,7 +24,9 @@ class QuranRemoteDataSource {
 
   Future<Map<String, dynamic>> fetchSurah(int surahNumber) async {
     try {
-      final response = await _client.dio.get('/surah/$surahNumber/quran-uthmani');
+      final response = await _client.dio.get(
+        '/surah/$surahNumber/quran-uthmani',
+      );
       return response.data;
     } catch (e) {
       throw Exception('Failed to load surah: $e');

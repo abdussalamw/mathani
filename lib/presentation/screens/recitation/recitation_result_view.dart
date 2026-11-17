@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
@@ -29,7 +29,10 @@ class RecitationResultView extends StatelessWidget {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded, color: AppColors.slateText),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppColors.slateText,
+                    ),
                     onPressed: () => provider.goToSetup(),
                   ),
                   const Expanded(
@@ -95,14 +98,14 @@ class RecitationResultView extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            scoreColor.withOpacity(0.1),
-            scoreColor.withOpacity(0.03),
+            scoreColor.withValues(alpha: 0.1),
+            scoreColor.withValues(alpha: 0.03),
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scoreColor.withOpacity(0.2)),
+        border: Border.all(color: scoreColor.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -121,7 +124,7 @@ class RecitationResultView extends StatelessWidget {
                     child: CircularProgressIndicator(
                       value: value,
                       strokeWidth: 8,
-                      backgroundColor: scoreColor.withOpacity(0.15),
+                      backgroundColor: scoreColor.withValues(alpha: 0.15),
                       valueColor: AlwaysStoppedAnimation(scoreColor),
                       strokeCap: StrokeCap.round,
                     ),
@@ -185,12 +188,7 @@ class RecitationResultView extends StatelessWidget {
           isDark,
         ),
         const SizedBox(width: 8),
-        _buildStatChip(
-          '${result.incorrectWords}',
-          'خطأ',
-          Colors.red,
-          isDark,
-        ),
+        _buildStatChip('${result.incorrectWords}', 'خطأ', Colors.red, isDark),
         const SizedBox(width: 8),
         _buildStatChip(
           '${result.skippedWords}',
@@ -207,7 +205,7 @@ class RecitationResultView extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -226,7 +224,7 @@ class RecitationResultView extends StatelessWidget {
               style: TextStyle(
                 fontFamily: 'Tajawal',
                 fontSize: 10,
-                color: color.withOpacity(0.8),
+                color: color.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -235,7 +233,11 @@ class RecitationResultView extends StatelessWidget {
     );
   }
 
-  Widget _buildWordByWordSection(BuildContext context, RecitationResult result, bool isDark) {
+  Widget _buildWordByWordSection(
+    BuildContext context,
+    RecitationResult result,
+    bool isDark,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -258,16 +260,19 @@ class RecitationResultView extends StatelessWidget {
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E1E22) : Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.withOpacity(0.08)),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // رقم الآية
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: AppColors.brandGold.withOpacity(0.1),
+                    color: AppColors.brandGold.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -300,25 +305,29 @@ class RecitationResultView extends StatelessWidget {
     );
   }
 
-  Widget _buildWordChip(BuildContext context, WordResult word, RecitationResult result) {
+  Widget _buildWordChip(
+    BuildContext context,
+    WordResult word,
+    RecitationResult result,
+  ) {
     Color chipColor;
     Color textColor;
 
     switch (word.verdict) {
       case WordVerdict.correct:
-        chipColor = AppColors.success.withOpacity(0.12);
+        chipColor = AppColors.success.withValues(alpha: 0.12);
         textColor = AppColors.success;
         break;
       case WordVerdict.acceptable:
-        chipColor = AppColors.warning.withOpacity(0.12);
+        chipColor = AppColors.warning.withValues(alpha: 0.12);
         textColor = const Color(0xFFE65100); // برتقالي غامق
         break;
       case WordVerdict.incorrect:
-        chipColor = Colors.red.withOpacity(0.12);
+        chipColor = Colors.red.withValues(alpha: 0.12);
         textColor = Colors.red;
         break;
       case WordVerdict.skipped:
-        chipColor = Colors.grey.withOpacity(0.1);
+        chipColor = Colors.grey.withValues(alpha: 0.1);
         textColor = AppColors.mutedText;
         break;
     }
@@ -335,7 +344,7 @@ class RecitationResultView extends StatelessWidget {
           decoration: BoxDecoration(
             color: chipColor,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: textColor.withOpacity(0.2)),
+            border: Border.all(color: textColor.withValues(alpha: 0.2)),
           ),
           child: Text(
             word.expectedWord,
@@ -351,10 +360,14 @@ class RecitationResultView extends StatelessWidget {
     );
   }
 
-  void _showComparisonDialog(BuildContext context, WordResult word, RecitationResult result) {
+  void _showComparisonDialog(
+    BuildContext context,
+    WordResult word,
+    RecitationResult result,
+  ) {
     final provider = context.read<RecitationProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -363,14 +376,23 @@ class RecitationResultView extends StatelessWidget {
           builder: (context, setState) {
             return AlertDialog(
               backgroundColor: isDark ? const Color(0xFF1E1E22) : Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Row(
                 children: [
-                  const Icon(Icons.compare_arrows_rounded, color: AppColors.brandGold),
-                  const SizedBox(width: 8),
-                  const Text(
+                  Icon(
+                    Icons.compare_arrows_rounded,
+                    color: AppColors.brandGold,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
                     'مقارنة تلاوة الكلمة',
-                    style: TextStyle(fontFamily: 'Tajawal', fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -382,7 +404,7 @@ class RecitationResultView extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.brandGold.withOpacity(0.05),
+                      color: AppColors.brandGold.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -409,7 +431,7 @@ class RecitationResultView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // تشغيل تسجيل المستخدم
                   if (result.audioPath != null) ...[
                     _buildComparisonPlayRow(
@@ -432,7 +454,7 @@ class RecitationResultView extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  
+
                   // تشغيل تلاوة الشيخ المنشاوي
                   AnimatedBuilder(
                     animation: provider,
@@ -444,7 +466,10 @@ class RecitationResultView extends StatelessWidget {
                         color: Colors.amber,
                         isPlaying: provider.isSheikhPlaying,
                         onPlay: () {
-                          provider.playSheikhAyah(word.surahNumber, word.ayahNumber);
+                          provider.playSheikhAyah(
+                            word.surahNumber,
+                            word.ayahNumber,
+                          );
                         },
                         onStop: () {
                           provider.stopSheikhAudio();
@@ -463,7 +488,11 @@ class RecitationResultView extends StatelessWidget {
                   },
                   child: const Text(
                     'إغلاق',
-                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, color: AppColors.brandGold),
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.brandGold,
+                    ),
                   ),
                 ),
               ],
@@ -489,9 +518,9 @@ class RecitationResultView extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -500,11 +529,19 @@ class RecitationResultView extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           IconButton(
-            icon: Icon(isPlaying ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded),
+            icon: Icon(
+              isPlaying
+                  ? Icons.stop_circle_rounded
+                  : Icons.play_circle_fill_rounded,
+            ),
             color: color,
             iconSize: 32,
             onPressed: isPlaying ? onStop : onPlay,
@@ -539,12 +576,18 @@ class RecitationResultView extends StatelessWidget {
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text(
               'إعادة التسميع',
-              style: TextStyle(fontFamily: 'Tajawal', fontSize: 14, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.brandGold,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
               elevation: 0,
             ),
           ),
@@ -563,8 +606,12 @@ class RecitationResultView extends StatelessWidget {
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.brandGold,
-              side: BorderSide(color: AppColors.brandGold.withOpacity(0.3)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              side: BorderSide(
+                color: AppColors.brandGold.withValues(alpha: 0.3),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
         ),

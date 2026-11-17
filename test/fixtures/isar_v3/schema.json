@@ -1,0 +1,519 @@
+[
+  {
+    "name": "Surah",
+    "embedded": false,
+    "properties": [
+      {
+        "name": "isFavorite",
+        "type": "Bool"
+      },
+      {
+        "name": "juzEnd",
+        "type": "Long"
+      },
+      {
+        "name": "juzStart",
+        "type": "Long"
+      },
+      {
+        "name": "lastReadAyah",
+        "type": "Long"
+      },
+      {
+        "name": "lastReadTime",
+        "type": "DateTime"
+      },
+      {
+        "name": "nameArabic",
+        "type": "String"
+      },
+      {
+        "name": "nameEnglish",
+        "type": "String"
+      },
+      {
+        "name": "nameEnglishTranslation",
+        "type": "String"
+      },
+      {
+        "name": "number",
+        "type": "Long"
+      },
+      {
+        "name": "numberOfAyahs",
+        "type": "Long"
+      },
+      {
+        "name": "page",
+        "type": "Long"
+      },
+      {
+        "name": "revelationType",
+        "type": "String"
+      }
+    ],
+    "idName": "id",
+    "indexes": [
+      {
+        "name": "number",
+        "unique": true,
+        "replace": false,
+        "properties": [
+          {
+            "name": "number",
+            "type": "Value",
+            "caseSensitive": false
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "embeddedSchemas": []
+  },
+  {
+    "name": "Ayah",
+    "embedded": false,
+    "properties": [
+      {
+        "name": "ayahNumber",
+        "type": "Long"
+      },
+      {
+        "name": "globalNumber",
+        "type": "Long"
+      },
+      {
+        "name": "hizbQuarter",
+        "type": "Long"
+      },
+      {
+        "name": "isBookmarked",
+        "type": "Bool"
+      },
+      {
+        "name": "isFavorite",
+        "type": "Bool"
+      },
+      {
+        "name": "juz",
+        "type": "Long"
+      },
+      {
+        "name": "manzil",
+        "type": "Long"
+      },
+      {
+        "name": "notes",
+        "type": "String"
+      },
+      {
+        "name": "page",
+        "type": "Long"
+      },
+      {
+        "name": "surahNumber",
+        "type": "Long"
+      },
+      {
+        "name": "text",
+        "type": "String"
+      },
+      {
+        "name": "textClean",
+        "type": "String"
+      },
+      {
+        "name": "textUthmani",
+        "type": "String"
+      }
+    ],
+    "idName": "id",
+    "indexes": [
+      {
+        "name": "surahNumber_ayahNumber",
+        "unique": false,
+        "replace": false,
+        "properties": [
+          {
+            "name": "surahNumber",
+            "type": "Value",
+            "caseSensitive": false
+          },
+          {
+            "name": "ayahNumber",
+            "type": "Value",
+            "caseSensitive": false
+          }
+        ]
+      },
+      {
+        "name": "textClean",
+        "unique": false,
+        "replace": false,
+        "properties": [
+          {
+            "name": "textClean",
+            "type": "Hash",
+            "caseSensitive": true
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "embeddedSchemas": []
+  },
+  {
+    "name": "UserSettings",
+    "embedded": false,
+    "properties": [
+      {
+        "name": "autoScroll",
+        "type": "Bool"
+      },
+      {
+        "name": "defaultReciter",
+        "type": "String"
+      },
+      {
+        "name": "defaultTafsir",
+        "type": "String"
+      },
+      {
+        "name": "fontFamily",
+        "type": "String"
+      },
+      {
+        "name": "fontSize",
+        "type": "Double"
+      },
+      {
+        "name": "isDarkMode",
+        "type": "Bool"
+      },
+      {
+        "name": "selectedMushafId",
+        "type": "String"
+      }
+    ],
+    "idName": "id",
+    "indexes": [],
+    "links": [],
+    "embeddedSchemas": []
+  },
+  {
+    "name": "MushafMetadata",
+    "embedded": false,
+    "properties": [
+      {
+        "name": "baseUrl",
+        "type": "String"
+      },
+      {
+        "name": "identifier",
+        "type": "String"
+      },
+      {
+        "name": "imageExtension",
+        "type": "String"
+      },
+      {
+        "name": "isDownloaded",
+        "type": "Bool"
+      },
+      {
+        "name": "localPath",
+        "type": "String"
+      },
+      {
+        "name": "nameArabic",
+        "type": "String"
+      },
+      {
+        "name": "nameEnglish",
+        "type": "String"
+      },
+      {
+        "name": "pageCount",
+        "type": "Long"
+      },
+      {
+        "name": "totalPages",
+        "type": "Long"
+      },
+      {
+        "name": "type",
+        "type": "String"
+      }
+    ],
+    "idName": "id",
+    "indexes": [
+      {
+        "name": "identifier",
+        "unique": true,
+        "replace": false,
+        "properties": [
+          {
+            "name": "identifier",
+            "type": "Hash",
+            "caseSensitive": true
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "embeddedSchemas": []
+  },
+  {
+    "name": "AudioCache",
+    "embedded": false,
+    "properties": [
+      {
+        "name": "ayahNumber",
+        "type": "Long"
+      },
+      {
+        "name": "downloadedAt",
+        "type": "DateTime"
+      },
+      {
+        "name": "fileSize",
+        "type": "Long"
+      },
+      {
+        "name": "localPath",
+        "type": "String"
+      },
+      {
+        "name": "reciter",
+        "type": "String"
+      },
+      {
+        "name": "surahNumber",
+        "type": "Long"
+      }
+    ],
+    "idName": "id",
+    "indexes": [
+      {
+        "name": "surahNumber",
+        "unique": false,
+        "replace": false,
+        "properties": [
+          {
+            "name": "surahNumber",
+            "type": "Value",
+            "caseSensitive": false
+          }
+        ]
+      },
+      {
+        "name": "ayahNumber",
+        "unique": false,
+        "replace": false,
+        "properties": [
+          {
+            "name": "ayahNumber",
+            "type": "Value",
+            "caseSensitive": false
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "embeddedSchemas": []
+  },
+  {
+    "name": "ReadingProgress",
+    "embedded": false,
+    "properties": [
+      {
+        "name": "ayahsRead",
+        "type": "Long"
+      },
+      {
+        "name": "completionPercentage",
+        "type": "Double"
+      },
+      {
+        "name": "date",
+        "type": "DateTime"
+      },
+      {
+        "name": "pagesRead",
+        "type": "Long"
+      },
+      {
+        "name": "timeSpent",
+        "type": "Long"
+      }
+    ],
+    "idName": "id",
+    "indexes": [],
+    "links": [],
+    "embeddedSchemas": []
+  },
+  {
+    "name": "Bookmark",
+    "embedded": false,
+    "properties": [
+      {
+        "name": "ayahNumber",
+        "type": "Long"
+      },
+      {
+        "name": "createdAt",
+        "type": "DateTime"
+      },
+      {
+        "name": "note",
+        "type": "String"
+      },
+      {
+        "name": "surahNumber",
+        "type": "Long"
+      }
+    ],
+    "idName": "id",
+    "indexes": [
+      {
+        "name": "surahNumber",
+        "unique": false,
+        "replace": false,
+        "properties": [
+          {
+            "name": "surahNumber",
+            "type": "Value",
+            "caseSensitive": false
+          }
+        ]
+      },
+      {
+        "name": "ayahNumber",
+        "unique": false,
+        "replace": false,
+        "properties": [
+          {
+            "name": "ayahNumber",
+            "type": "Value",
+            "caseSensitive": false
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "embeddedSchemas": []
+  },
+  {
+    "name": "Tafsir",
+    "embedded": false,
+    "properties": [
+      {
+        "name": "ayahNumber",
+        "type": "Long"
+      },
+      {
+        "name": "surahNumber",
+        "type": "Long"
+      },
+      {
+        "name": "tafsirName",
+        "type": "String"
+      },
+      {
+        "name": "text",
+        "type": "String"
+      }
+    ],
+    "idName": "id",
+    "indexes": [
+      {
+        "name": "surahNumber",
+        "unique": false,
+        "replace": false,
+        "properties": [
+          {
+            "name": "surahNumber",
+            "type": "Value",
+            "caseSensitive": false
+          }
+        ]
+      },
+      {
+        "name": "ayahNumber",
+        "unique": false,
+        "replace": false,
+        "properties": [
+          {
+            "name": "ayahNumber",
+            "type": "Value",
+            "caseSensitive": false
+          }
+        ]
+      }
+    ],
+    "links": [],
+    "embeddedSchemas": []
+  },
+  {
+    "name": "RecitationSession",
+    "embedded": false,
+    "properties": [
+      {
+        "name": "accuracyPercent",
+        "type": "Long"
+      },
+      {
+        "name": "correctWords",
+        "type": "Long"
+      },
+      {
+        "name": "createdAt",
+        "type": "DateTime"
+      },
+      {
+        "name": "durationSeconds",
+        "type": "Long"
+      },
+      {
+        "name": "endAyah",
+        "type": "Long"
+      },
+      {
+        "name": "mode",
+        "type": "String"
+      },
+      {
+        "name": "overallGrade",
+        "type": "String"
+      },
+      {
+        "name": "rawTranscript",
+        "type": "String"
+      },
+      {
+        "name": "resultJson",
+        "type": "String"
+      },
+      {
+        "name": "startAyah",
+        "type": "Long"
+      },
+      {
+        "name": "surahName",
+        "type": "String"
+      },
+      {
+        "name": "surahNumber",
+        "type": "Long"
+      },
+      {
+        "name": "totalWords",
+        "type": "Long"
+      }
+    ],
+    "idName": "id",
+    "indexes": [],
+    "links": [],
+    "embeddedSchemas": []
+  }
+]

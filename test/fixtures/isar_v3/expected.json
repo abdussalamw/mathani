@@ -1,0 +1,121 @@
+{
+  "Surah": [
+    {
+      "id": 1,
+      "isFavorite": true,
+      "juzEnd": null,
+      "juzStart": null,
+      "lastReadAyah": 4,
+      "lastReadTime": null,
+      "nameArabic": "الفاتحة",
+      "nameEnglish": "",
+      "nameEnglishTranslation": "",
+      "number": 1,
+      "numberOfAyahs": 0,
+      "page": null,
+      "revelationType": "Meccan"
+    }
+  ],
+  "Ayah": [
+    {
+      "ayahNumber": 1,
+      "globalNumber": 1,
+      "hizbQuarter": null,
+      "id": 1,
+      "isBookmarked": true,
+      "isFavorite": false,
+      "juz": 1,
+      "manzil": null,
+      "notes": "ملاحظة محفوظة",
+      "page": 1,
+      "surahNumber": 1,
+      "text": "بِسْمِ اللَّهِ",
+      "textClean": "بسم الله",
+      "textUthmani": null
+    }
+  ],
+  "UserSettings": [
+    {
+      "autoScroll": false,
+      "defaultReciter": "minshawi_murattal",
+      "defaultTafsir": "muyassar",
+      "fontFamily": "Tajawal",
+      "fontSize": 30.0,
+      "id": 1,
+      "isDarkMode": true,
+      "selectedMushafId": "qcf2_v4_woff2"
+    }
+  ],
+  "MushafMetadata": [
+    {
+      "baseUrl": null,
+      "id": 1,
+      "identifier": "qcf2_v4_woff2",
+      "imageExtension": null,
+      "isDownloaded": true,
+      "localPath": "fonts",
+      "nameArabic": "مصحف المدينة",
+      "nameEnglish": null,
+      "pageCount": 604,
+      "totalPages": 604,
+      "type": null
+    }
+  ],
+  "AudioCache": [
+    {
+      "ayahNumber": 2,
+      "downloadedAt": 1794912053212835,
+      "fileSize": 1234,
+      "id": 1,
+      "localPath": "audio/1.mp3",
+      "reciter": "minshawi",
+      "surahNumber": 1
+    }
+  ],
+  "ReadingProgress": [
+    {
+      "ayahsRead": 25,
+      "completionPercentage": 0.0,
+      "date": 1794912053212835,
+      "id": 1,
+      "pagesRead": 5,
+      "timeSpent": 600
+    }
+  ],
+  "Bookmark": [
+    {
+      "ayahNumber": 255,
+      "createdAt": 1794912053212835,
+      "id": 1,
+      "note": "مراجعة",
+      "surahNumber": 2
+    }
+  ],
+  "Tafsir": [
+    {
+      "ayahNumber": 1,
+      "id": 1,
+      "surahNumber": 1,
+      "tafsirName": "muyassar",
+      "text": "نص تفسير للاختبار"
+    }
+  ],
+  "RecitationSession": [
+    {
+      "accuracyPercent": 93,
+      "correctWords": 0,
+      "createdAt": 1794912053212835,
+      "durationSeconds": 0,
+      "endAyah": 1,
+      "id": 1,
+      "mode": "free",
+      "overallGrade": "",
+      "rawTranscript": "",
+      "resultJson": "{\"correct\":13}",
+      "startAyah": 1,
+      "surahName": "الفاتحة",
+      "surahNumber": 1,
+      "totalWords": 0
+    }
+  ]
+}

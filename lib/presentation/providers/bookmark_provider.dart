@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mathani/core/database/isar_service.dart';
 import 'package:mathani/core/database/collections.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 class BookmarkProvider extends ChangeNotifier {
   List<Bookmark> _bookmarks = [];
@@ -28,33 +28,36 @@ class BookmarkProvider extends ChangeNotifier {
     await isar.writeTxn(() async {
       await isar.collection<Bookmark>().put(bookmark);
     });
-    
+
     await _loadBookmarks();
   }
 
   Future<void> removeBookmark(int surah, int ayah) async {
     final isar = IsarService.instance.isar;
     await isar.writeTxn(() async {
-      await isar.collection<Bookmark>()
+      await isar
+          .collection<Bookmark>()
           .filter()
           .surahNumberEqualTo(surah)
           .ayahNumberEqualTo(ayah)
           .deleteAll();
     });
-    
+
     await _loadBookmarks();
   }
 
   bool isBookmarked(int surah, int ayah) {
-    return _bookmarks.any((b) => b.surahNumber == surah && b.ayahNumber == ayah);
+    return _bookmarks.any(
+      (b) => b.surahNumber == surah && b.ayahNumber == ayah,
+    );
   }
 
   // --- Page Bookmark Logic (Surah = 0, Ayah = PageNumber) ---
-  
+
   Future<void> addPageBookmark(int pageNumber) async {
     // Check if already exists to avoid duplicates
     if (isPageBookmarked(pageNumber)) return;
-    
+
     await addBookmark(0, pageNumber, note: 'Page $pageNumber');
   }
 
@@ -63,9 +66,11 @@ class BookmarkProvider extends ChangeNotifier {
   }
 
   bool isPageBookmarked(int pageNumber) {
-    return _bookmarks.any((b) => b.surahNumber == 0 && b.ayahNumber == pageNumber);
+    return _bookmarks.any(
+      (b) => b.surahNumber == 0 && b.ayahNumber == pageNumber,
+    );
   }
-  
+
   void togglePageBookmark(int pageNumber) {
     if (isPageBookmarked(pageNumber)) {
       removePageBookmark(pageNumber);

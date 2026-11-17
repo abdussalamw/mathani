@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter/material.dart';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
@@ -15,7 +16,8 @@ class RecitationRecordingView extends StatefulWidget {
   const RecitationRecordingView({Key? key}) : super(key: key);
 
   @override
-  State<RecitationRecordingView> createState() => _RecitationRecordingViewState();
+  State<RecitationRecordingView> createState() =>
+      _RecitationRecordingViewState();
 }
 
 class _RecitationRecordingViewState extends State<RecitationRecordingView>
@@ -24,12 +26,12 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
   Timer? _waveTimer;
   int _elapsedMs = 0;
   late AnimationController _pulseController;
-  
+
   // بيانات المصحف
   final GlyphDataLoader _glyphLoader = GlyphDataLoader();
   PageGlyph? _currentPageGlyph;
   bool _isLoadingPage = true;
-  
+
   // مؤشر الصوت
   final List<double> _waveformData = List.generate(30, (_) => 0.1);
   final _random = Random();
@@ -52,7 +54,7 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
   Future<void> _loadCurrentPage() async {
     if (!mounted) return;
     final provider = context.read<RecitationProvider>();
-    
+
     setState(() => _isLoadingPage = true);
     try {
       final glyph = await _glyphLoader.loadPage(provider.currentPage);
@@ -80,7 +82,9 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
       provider.updateRecordingDuration(_elapsedMs);
     });
 
-    _waveTimer = Timer.periodic(const Duration(milliseconds: 80), (timer) async {
+    _waveTimer = Timer.periodic(const Duration(milliseconds: 80), (
+      timer,
+    ) async {
       if (!mounted) return;
       final provider = context.read<RecitationProvider>();
       if (provider.isPaused) {
@@ -90,7 +94,7 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
         });
         return;
       }
-      
+
       final amp = await AudioRecorderService().getAmplitude();
       if (mounted) {
         setState(() {
@@ -163,13 +167,18 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
               const SizedBox(height: 32),
               const Text(
                 'جارٍ تحضير نموذج التسميع...',
-                style: TextStyle(fontFamily: 'Tajawal', fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'يستغرق هذا بضعة ثوانٍ فقط لأول مرة',
                 style: TextStyle(
-                  fontFamily: 'Tajawal', fontSize: 13,
+                  fontFamily: 'Tajawal',
+                  fontSize: 13,
                   color: isDark ? Colors.white54 : Colors.black45,
                 ),
               ),
@@ -197,7 +206,8 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
               child: MushafPageWidget(
                 page: _currentPageGlyph!,
                 mushafId: mushafMetadata.currentMushafId,
-                selectedSurah: provider.matchedSurah, // تلوين الآية المكتشفة لحظياً
+                selectedSurah:
+                    provider.matchedSurah, // تلوين الآية المكتشفة لحظياً
                 selectedAyah: provider.matchedAyah,
                 showInfo: true,
               ),
@@ -215,7 +225,7 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.4),
+                    Colors.black.withValues(alpha: 0.4),
                     Colors.transparent,
                   ],
                 ),
@@ -228,9 +238,12 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.8),
+                      color: Colors.red.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -238,7 +251,12 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                       children: [
                         const Text(
                           'تسميع حي',
-                          style: TextStyle(fontFamily: 'Tajawal', color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(width: 6),
                         AnimatedBuilder(
@@ -247,7 +265,9 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.5 + _pulseController.value * 0.5),
+                              color: Colors.white.withValues(
+                                alpha: 0.5 + _pulseController.value * 0.5,
+                              ),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -269,23 +289,33 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
               right: 32,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.85),
+                    color: Colors.black.withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.brandGold.withOpacity(0.5), width: 1.5),
+                    border: Border.all(
+                      color: AppColors.brandGold.withValues(alpha: 0.5),
+                      width: 1.5,
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.brandGold.withOpacity(0.2),
+                        color: AppColors.brandGold.withValues(alpha: 0.2),
                         blurRadius: 15,
                         spreadRadius: 2,
-                      )
+                      ),
                     ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.help_outline_rounded, color: AppColors.brandGold, size: 18),
+                      const Icon(
+                        Icons.help_outline_rounded,
+                        color: AppColors.brandGold,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       const Text(
                         'الكلمة التالية: ',
@@ -312,16 +342,24 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
 
           // 3. لوحة التحكم السفلية (Floating Control Panel)
           Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + 20, // رفع اللوحة بناءً على منطقة الجهاز الآمنة
+            bottom:
+                MediaQuery.of(context).padding.bottom +
+                20, // رفع اللوحة بناءً على منطقة الجهاز الآمنة
             left: 16,
             right: 16,
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? Colors.grey[900]?.withOpacity(0.98) : Colors.white.withOpacity(0.98),
+                color: isDark
+                    ? Colors.grey[900]?.withValues(alpha: 0.98)
+                    : Colors.white.withValues(alpha: 0.98),
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 25, spreadRadius: 0),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 25,
+                    spreadRadius: 0,
+                  ),
                 ],
               ),
               child: Column(
@@ -331,9 +369,24 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildStatItem('آيات', provider.matchedAyahsCount.toString(), Icons.menu_book_rounded, Colors.blue),
-                      _buildStatItem('أخطاء', provider.mistakesCount.toString(), Icons.error_outline_rounded, Colors.red),
-                      _buildStatItem('مطابق', '${((provider.overallConfidence).clamp(0.0, 1.0) * 100).round()}%', Icons.check_circle_rounded, Colors.green),
+                      _buildStatItem(
+                        'آيات',
+                        provider.matchedAyahsCount.toString(),
+                        Icons.menu_book_rounded,
+                        Colors.blue,
+                      ),
+                      _buildStatItem(
+                        'أخطاء',
+                        provider.mistakesCount.toString(),
+                        Icons.error_outline_rounded,
+                        Colors.red,
+                      ),
+                      _buildStatItem(
+                        'مطابق',
+                        '${((provider.overallConfidence).clamp(0.0, 1.0) * 100).round()}%',
+                        Icons.check_circle_rounded,
+                        Colors.green,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -343,18 +396,32 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline_rounded, color: Colors.red, size: 18),
+                          const Icon(
+                            Icons.error_outline_rounded,
+                            color: Colors.red,
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               provider.errorMessage ?? 'خطأ في المحرك',
-                              style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.red),
+                              style: const TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 11,
+                                color: Colors.red,
+                              ),
                             ),
                           ),
                           TextButton(
                             onPressed: () => provider.startRecording(),
-                            child: const Text('إعادة محاولة', style: TextStyle(fontFamily: 'Tajawal', fontSize: 11)),
-                          )
+                            child: const Text(
+                              'إعادة محاولة',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -363,23 +430,36 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                     children: [
                       Text(
                         _formatDuration(_elapsedMs),
-                        style: const TextStyle(fontFamily: 'Tajawal', fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
+                        style: const TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: SizedBox(
                           height: 25,
                           child: Row(
-                            children: _waveformData.map((v) => Expanded(
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 1),
-                                height: 4 + v * 20,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.3 + v * 0.7),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            )).toList(),
+                            children: _waveformData
+                                .map(
+                                  (v) => Expanded(
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 1,
+                                      ),
+                                      height: 4 + v * 20,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withValues(
+                                          alpha: 0.3 + v * 0.7,
+                                        ),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
                           ),
                         ),
                       ),
@@ -390,9 +470,12 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                   if (provider.liveTranscript.isNotEmpty)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.05),
+                        color: AppColors.primary.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -400,7 +483,11 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                         textAlign: TextAlign.center,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13, color: AppColors.mutedText),
+                        style: const TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 13,
+                          color: AppColors.mutedText,
+                        ),
                       ),
                     ),
                   const SizedBox(height: 16),
@@ -411,13 +498,15 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                       Container(
                         margin: const EdgeInsets.only(left: 8),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
                           onPressed: _togglePause,
                           icon: Icon(
-                            provider.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                            provider.isPaused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
                             color: AppColors.primary,
                           ),
                         ),
@@ -426,7 +515,7 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                       Container(
                         margin: const EdgeInsets.only(left: 8),
                         decoration: BoxDecoration(
-                          color: AppColors.brandGold.withOpacity(0.1),
+                          color: AppColors.brandGold.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
@@ -447,10 +536,19 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
                           icon: const Icon(Icons.stop_rounded, size: 20),
-                          label: const Text('إنهاء وبدء التحليل', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 14)),
+                          label: const Text(
+                            'إنهاء وبدء التحليل',
+                            style: TextStyle(
+                              fontFamily: 'Tajawal',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -464,21 +562,33 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Column(
       children: [
         Icon(icon, color: color, size: 18),
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(fontFamily: 'Tajawal', fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontFamily: 'Tajawal',
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         Text(
           label,
-          style: const TextStyle(fontFamily: 'Tajawal', fontSize: 10, color: AppColors.mutedText),
+          style: const TextStyle(
+            fontFamily: 'Tajawal',
+            fontSize: 10,
+            color: AppColors.mutedText,
+          ),
         ),
       ],
     );
   }
 }
-

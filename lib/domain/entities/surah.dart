@@ -22,5 +22,13 @@ class Surah extends Equatable {
   });
 
   @override
-  List<Object?> get props => [number, nameArabic, nameEnglish, revelationType, numberOfAyahs, startPage, startJuz];
+  List<Object?> get props => [
+    number,
+    nameArabic,
+    nameEnglish,
+    revelationType,
+    numberOfAyahs,
+    startPage,
+    startJuz,
+  ];
 }

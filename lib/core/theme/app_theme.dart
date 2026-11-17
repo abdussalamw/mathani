@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AppTheme {
   static ThemeData get lightTheme => ThemeData(
@@ -10,7 +10,7 @@ class AppTheme {
     scaffoldBackgroundColor: const Color(0xFFFAF8F3),
     fontFamily: 'Tajawal',
   );
-  
+
   static ThemeData get darkTheme => ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(

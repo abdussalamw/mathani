@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// وحدة تحكم التنقل العالمية
 class NavigationController {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 
   static NavigatorState? get navigator => navigatorKey.currentState;
 
@@ -12,8 +13,14 @@ class NavigationController {
   }
 
   /// التنقل والاستبدال
-  static Future<T?> navigateAndReplace<T>(String routeName, {Object? arguments}) {
-    return navigator!.pushReplacementNamed<T, void>(routeName, arguments: arguments);
+  static Future<T?> navigateAndReplace<T>(
+    String routeName, {
+    Object? arguments,
+  }) {
+    return navigator!.pushReplacementNamed<T, void>(
+      routeName,
+      arguments: arguments,
+    );
   }
 
   /// الرجوع للصفحة السابقة

@@ -1,16 +1,15 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/mushaf_metadata_provider.dart';
-import '../../providers/audio_provider.dart';
 import '../../../data/services/local_tafsir_service.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../core/database/collections.dart';
 import '../../providers/recitation_provider.dart';
 
 class DownloadCenterScreen extends StatefulWidget {
-  const DownloadCenterScreen({Key? key}) : super(key: key);
+  const DownloadCenterScreen({super.key});
 
   @override
   State<DownloadCenterScreen> createState() => _DownloadCenterScreenState();
@@ -25,7 +24,9 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF131315) : AppColors.brandBackground,
+      backgroundColor: isDark
+          ? const Color(0xFF131315)
+          : AppColors.brandBackground,
       appBar: AppBar(
         title: Text(
           l10n.indexTab, // Use a generic title or "مركز التحميل"
@@ -39,7 +40,10 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.slateText),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.slateText,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -57,7 +61,10 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                 _buildCategoryHeader(context, l10n.settingsTafsirs),
                 _buildTafsirList(context),
                 const SizedBox(height: 24),
-                _buildCategoryHeader(context, 'نماذج الذكاء الاصطناعي (التسميع)'),
+                _buildCategoryHeader(
+                  context,
+                  'نماذج الذكاء الاصطناعي (التسميع)',
+                ),
                 _buildAiModelsList(context),
                 const SizedBox(height: 24),
               ],
@@ -81,7 +88,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFCFB058).withOpacity(0.3),
+            color: const Color(0xFFCFB058).withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -89,7 +96,11 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.cloud_download_rounded, color: Colors.white, size: 40),
+          const Icon(
+            Icons.cloud_download_rounded,
+            color: Colors.white,
+            size: 40,
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -109,7 +120,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                   style: TextStyle(
                     fontFamily: 'Tajawal',
                     fontSize: 13,
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -118,7 +129,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Text(
@@ -142,18 +153,25 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
         onChanged: (v) => setState(() => searchQuery = v),
         decoration: InputDecoration(
           hintText: 'البحث عن مصحف أو تفسير...',
-          hintStyle: const TextStyle(fontFamily: 'Tajawal', fontSize: 14, color: AppColors.mutedText),
+          hintStyle: const TextStyle(
+            fontFamily: 'Tajawal',
+            fontSize: 14,
+            color: AppColors.mutedText,
+          ),
           prefixIcon: const Icon(Icons.search, color: AppColors.brandGold),
           filled: true,
           fillColor: isDark ? const Color(0xFF1E1E22) : Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.withOpacity(0.1)),
+            borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.1)),
           ),
         ),
       ),
@@ -194,18 +212,26 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
         return Column(
           children: provider.availableMushafs
               .where((m) => m.nameArabic?.contains(searchQuery) ?? true)
-              .map((m) => _buildDownloadCard(
-                    context,
-                    title: m.nameArabic ?? m.identifier!,
-                    subtitle: m.type == 'digital' ? 'مصحف رقمي' : 'مصحف مصور',
-                    isDownloaded: m.isDownloaded || m.type == 'digital',
-                    isDownloading: provider.isDownloading && provider.currentDownloadingId == m.identifier,
-                    progress: provider.isDownloading && provider.currentDownloadingId == m.identifier ? provider.downloadProgress : 0,
-                    size: m.identifier == 'shamarly_15lines' ? '74 MB' : '50 MB',
-                    onDownload: () => provider.downloadMushaf(m.identifier!),
-                    onActivate: () => provider.setMushaf(m.identifier!),
-                    isSelected: provider.currentMushafId == m.identifier,
-                  ))
+              .map(
+                (m) => _buildDownloadCard(
+                  context,
+                  title: m.nameArabic ?? m.identifier!,
+                  subtitle: m.type == 'digital' ? 'مصحف رقمي' : 'مصحف مصور',
+                  isDownloaded: m.isDownloaded || m.type == 'digital',
+                  isDownloading:
+                      provider.isDownloading &&
+                      provider.currentDownloadingId == m.identifier,
+                  progress:
+                      provider.isDownloading &&
+                          provider.currentDownloadingId == m.identifier
+                      ? provider.downloadProgress
+                      : 0,
+                  size: m.identifier == 'shamarly_15lines' ? '74 MB' : '50 MB',
+                  onDownload: () => provider.downloadMushaf(m.identifier!),
+                  onActivate: () => provider.setMushaf(m.identifier!),
+                  isSelected: provider.currentMushafId == m.identifier,
+                ),
+              )
               .toList(),
         );
       },
@@ -282,12 +308,12 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E22) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: isSelected 
-          ? Border.all(color: AppColors.brandGold, width: 1.5)
-          : Border.all(color: Colors.grey.withOpacity(0.05)),
+        border: isSelected
+            ? Border.all(color: AppColors.brandGold, width: 1.5)
+            : Border.all(color: Colors.grey.withValues(alpha: 0.05)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -300,10 +326,14 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
             width: 50,
             height: 65,
             decoration: BoxDecoration(
-              color: AppColors.brandGold.withOpacity(0.1),
+              color: AppColors.brandGold.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.menu_book_rounded, color: AppColors.brandGold, size: 24),
+            child: const Icon(
+              Icons.menu_book_rounded,
+              color: AppColors.brandGold,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 12),
           // Content
@@ -334,8 +364,10 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: progress,
-                      backgroundColor: Colors.grey.withOpacity(0.1),
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.brandGold),
+                      backgroundColor: Colors.grey.withValues(alpha: 0.1),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.brandGold,
+                      ),
                       minHeight: 4,
                     ),
                   ),
@@ -350,34 +382,56 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
             children: [
               Text(
                 size,
-                style: const TextStyle(fontSize: 10, color: AppColors.mutedText),
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.mutedText,
+                ),
               ),
               const SizedBox(height: 8),
               if (isDownloaded)
                 ElevatedButton(
                   onPressed: isSelected ? null : onActivate,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isSelected ? Colors.green.withOpacity(0.1) : AppColors.brandGold,
+                    backgroundColor: isSelected
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : AppColors.brandGold,
                     foregroundColor: isSelected ? Colors.green : Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 0,
+                    ),
                     minimumSize: const Size(60, 28),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: Text(
                     isSelected ? 'مفعل' : 'تفعيل',
-                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 )
               else if (isDownloading)
                 Text(
                   '${(progress * 100).toInt()}%',
-                  style: const TextStyle(color: AppColors.brandGold, fontWeight: FontWeight.bold, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppColors.brandGold,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 )
               else
                 IconButton(
                   onPressed: onDownload,
-                  icon: const Icon(Icons.download_for_offline_rounded, color: AppColors.brandGold, size: 28),
+                  icon: const Icon(
+                    Icons.download_for_offline_rounded,
+                    color: AppColors.brandGold,
+                    size: 28,
+                  ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),

@@ -1,9 +1,15 @@
+import '../../core/utils/async_work_pool.dart';
+
 import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+
 import 'qpc_v1_data_service.dart';
 import '../models/page_glyph.dart';
+
 import 'dart:io';
+
 import 'package:path_provider/path_provider.dart';
 
 class QPCV1LayoutService {
@@ -11,26 +17,15 @@ class QPCV1LayoutService {
   factory QPCV1LayoutService() => _instance;
   QPCV1LayoutService._internal();
 
-  static const List<String> _surahNames = [
-    "الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال", "التوبة", "يونس",
-    "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه",
-    "الأنبياء", "الحج", "المؤمنون", "النور", "الفرقان", "الشعراء", "النمل", "القصص", "العنكبوت", "الروم",
-    "لقمان", "السجدة", "الأحزاب", "سبأ", "فاطر", "يس", "الصافات", "ص", "الزمر", "غافر",
-    "فصلت", "الشورى", "الزخرف", "الدخان", "الجاثية", "الأحقاف", "محمد", "الفتح", "الحجرات", "ق",
-    "الذاريات", "الطور", "النجم", "القمر", "الرحمن", "الواقعة", "الحديد", "المجادلة", "الحشر", "الممتحنة",
-    "الصف", "الجمعة", "المنافقون", "التغابن", "الطلاق", "التحريم", "الملك", "القلم", "الحاقة", "المعارج",
-    "نوح", "الجن", "المزمل", "المدثر", "القيامة", "الإنسان", "المرسلات", "النبأ", "النازعات", "عبس",
-    "التكوير", "الإنفطار", "المطففين", "الإنشقاق", "البروج", "الطارق", "الأعلى", "الغاشية", "الفجر", "البلد",
-    "الشمس", "الليل", "الضحى", "الشرح", "التين", "العلق", "القدر", "البينة", "الزلزلة", "العاديات",
-    "القارعة", "التكاثر", "العصر", "الهمزة", "الفيل", "قريش", "الماعون", "الكوثر", "الكافرون", "النصر",
-    "المسد", "الإخلاص", "الفلق", "الناس"
-  ];
-
   Map<int, List<dynamic>>? _rawLayout;
   bool _isLoaded = false;
   bool _isLoading = false;
 
-  Future<void> _load() async {
+  final _loadWork = AsyncWorkPool<String, void>();
+
+  Future<void> _load() => _loadWork.run('layout', _loadOnce);
+
+  Future<void> _loadOnce() async {
     if (_isLoaded || _isLoading) return;
     _isLoading = true;
 
@@ -38,25 +33,31 @@ class QPCV1LayoutService {
       String jsonString;
       if (!kIsWeb) {
         final appDir = await getApplicationDocumentsDirectory();
-        final localFile = File('${appDir.path}/mushafs/madani_old_v1/qpc_v1_layout.json');
+        final localFile = File(
+          '${appDir.path}/mushafs/madani_old_v1/qpc_v1_layout.json',
+        );
         if (await localFile.exists()) {
           jsonString = await localFile.readAsString();
         } else {
           try {
-            jsonString = await rootBundle.loadString('assets/data/qpc_v1_layout.json');
+            jsonString = await rootBundle.loadString(
+              'assets/data/qpc_v1_layout.json',
+            );
           } catch (_) {
             jsonString = '[]';
           }
         }
       } else {
         try {
-          jsonString = await rootBundle.loadString('assets/data/qpc_v1_layout.json');
+          jsonString = await rootBundle.loadString(
+            'assets/data/qpc_v1_layout.json',
+          );
         } catch (_) {
           jsonString = '[]';
         }
       }
       final Map<String, dynamic> decoded = jsonDecode(jsonString);
-      
+
       _rawLayout = {};
       for (int p = 1; p <= 604; p++) {
         final pageKey = p.toString();
@@ -91,8 +92,9 @@ class QPCV1LayoutService {
         final int type = raw['t'] ?? 0;
         final int? s = raw['s'];
         final int? a = raw['a'];
-        final int? w = raw['w']; // Word ID from layout JSON (null for non-word types)
-        
+        final int? w =
+            raw['w']; // Word ID from layout JSON (null for non-word types)
+
         String code = '';
 
         if (type == 1) {
@@ -126,19 +128,12 @@ class QPCV1LayoutService {
           code = 'BSML';
         }
 
-        lineGlyphs.add(Glyph(
-          type: type,
-          surah: s,
-          ayah: a,
-          wordId: w,
-          code: code,
-        ));
+        lineGlyphs.add(
+          Glyph(type: type, surah: s, ayah: a, wordId: w, code: code),
+        );
       }
 
-      lines.add(PageLine(
-        line: i + 1,
-        glyphs: lineGlyphs,
-      ));
+      lines.add(PageLine(line: i + 1, glyphs: lineGlyphs));
     }
 
     return lines;

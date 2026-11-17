@@ -2,10 +2,10 @@
 class MushafNavigationData {
   final String mushafId;
   final int totalPages;
-  final Map<int, int> surahToPage;      // رقم السورة -> رقم الصفحة الأولى
-  final Map<int, JuzInfo> juzData;      // رقم الجزء -> معلومات الجزء
-  final Map<int, PageInfo> pageData;    // رقم الصفحة -> معلومات الصفحة
-  final Map<String, int>? ayahToPage;   // "surah:ayah" -> page (اختياري)
+  final Map<int, int> surahToPage; // رقم السورة -> رقم الصفحة الأولى
+  final Map<int, JuzInfo> juzData; // رقم الجزء -> معلومات الجزء
+  final Map<int, PageInfo> pageData; // رقم الصفحة -> معلومات الصفحة
+  final Map<String, int>? ayahToPage; // "surah:ayah" -> page (اختياري)
 
   MushafNavigationData({
     required this.mushafId,
@@ -25,13 +25,13 @@ class MushafNavigationData {
     if (ayahToPage != null) {
       return ayahToPage!['$surahNumber:$ayahNumber'];
     }
-    
+
     // Check ranges in PageData
     for (final page in pageData.values) {
       if (page.startSurah == 0) continue;
 
       bool inRange = false;
-      
+
       // Case A: Page within single Surah
       if (page.startSurah == page.endSurah) {
         if (surahNumber == page.startSurah) {

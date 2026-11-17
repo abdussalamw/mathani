@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mathani/l10n/app_localizations.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/screens/surah_list/surah_list_screen.dart';
@@ -9,13 +9,14 @@ import 'package:provider/provider.dart';
 
 /// الشاشة الرئيسية للفهرس مع 3 تبويبات
 class IndexScreen extends StatefulWidget {
-  const IndexScreen({Key? key}) : super(key: key);
+  const IndexScreen({super.key});
 
   @override
   State<IndexScreen> createState() => _IndexScreenState();
 }
 
-class _IndexScreenState extends State<IndexScreen> with SingleTickerProviderStateMixin {
+class _IndexScreenState extends State<IndexScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _lastTabIndex = 0;
 
@@ -25,7 +26,7 @@ class _IndexScreenState extends State<IndexScreen> with SingleTickerProviderStat
     final uiProvider = context.read<UiProvider>();
     _lastTabIndex = uiProvider.indexScreenTabIndex.clamp(0, 2);
     _tabController = TabController(
-      length: 3, 
+      length: 3,
       vsync: this,
       initialIndex: _lastTabIndex,
     );
@@ -45,7 +46,7 @@ class _IndexScreenState extends State<IndexScreen> with SingleTickerProviderStat
     super.didChangeDependencies();
     final uiProvider = context.watch<UiProvider>();
     final newTabIndex = uiProvider.indexScreenTabIndex.clamp(0, 2);
-    
+
     // Update tab if it changed
     if (newTabIndex != _lastTabIndex && _tabController.index != newTabIndex) {
       _lastTabIndex = newTabIndex;
@@ -62,7 +63,7 @@ class _IndexScreenState extends State<IndexScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       color: isDark ? const Color(0xFF131315) : AppColors.brandBackground,
       child: Column(

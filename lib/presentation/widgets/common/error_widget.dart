@@ -1,15 +1,12 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+
 import '../../../core/constants/app_colors.dart';
 
 class CustomErrorWidget extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
 
-  const CustomErrorWidget({
-    Key? key, 
-    required this.message, 
-    this.onRetry
-  }) : super(key: key);
+  const CustomErrorWidget({super.key, required this.message, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +16,11 @@ class CustomErrorWidget extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 60, color: Colors.amber),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 60,
+              color: Colors.amber,
+            ),
             const SizedBox(height: 16),
             Text(
               message,
@@ -33,11 +34,11 @@ class CustomErrorWidget extends StatelessWidget {
                 icon: const Icon(Icons.refresh),
                 label: const Text('إعادة المحاولة'),
                 style: ElevatedButton.styleFrom(
-                   backgroundColor: AppColors.primary,
-                   foregroundColor: Colors.white
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
                 ),
               ),
-            ]
+            ],
           ],
         ),
       ),

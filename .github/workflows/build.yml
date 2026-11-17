@@ -1,4 +1,4 @@
-name: Build and Test
+name: Generate and Test
 
 on:
   push:
@@ -11,31 +11,25 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.19.0'
+        flutter-version-file: '.fvmrc'
         channel: 'stable'
     
     - name: Install dependencies
       run: flutter pub get
+
+    - name: Generate localizations
+      run: dart run scripts/generate_localizations.dart
     
     - name: Run code generation
-      run: flutter pub run build_runner build --delete-conflicting-outputs
+      run: dart run build_runner build
     
     - name: Run analyzer
       run: flutter analyze
     
     - name: Run tests
       run: flutter test
-    
-    - name: Build APK (Release)
-      run: flutter build apk --release
-    
-    - name: Upload APK
-      uses: actions/upload-artifact@v3
-      with:
-        name: app-release
-        path: build/app/outputs/flutter-apk/app-release.apk

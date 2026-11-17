@@ -1,29 +1,23 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class SurahHeader extends StatelessWidget {
   final Surah surah;
-  
-  const SurahHeader({
-    Key? key,
-    required this.surah,
-  }) : super(key: key);
+
+  const SurahHeader({super.key, required this.surah});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            AppColors.golden05,
-            Colors.transparent,
-          ],
+          colors: [AppColors.golden05, Colors.transparent],
         ),
       ),
       child: Column(
@@ -45,9 +39,9 @@ class SurahHeader extends StatelessWidget {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // معلومات السورة
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -80,7 +74,7 @@ class SurahHeader extends StatelessWidget {
               ),
             ],
           ),
-          
+
           // البسملة (إلا التوبة - رقم 9)
           // ملاحظة: الفاتحة (1) عادة تعرض البسملة كآية رقم 1، ولكن للتنسيق هنا سنعرضها كترويسة إذا لم تكن مكررة
           if (surah.number != 9) ...[
@@ -91,11 +85,11 @@ class SurahHeader extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildBasmala() {
-    return Text(
+    return const Text(
       'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'KFGQPC_HAFS',
         fontSize: 24,
         color: AppColors.darkBrown,

@@ -1,23 +1,23 @@
 // lib/core/constants/app_colors.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AppColors {
   // الألوان الأساسية
   static const Color primary = Color(0xFFCFB058); // Gold (Updated from Red)
-  static const Color brandGold = Color(0xFFCFB058); 
+  static const Color brandGold = Color(0xFFCFB058);
   static const Color brandBackground = Color(0xFFF8F9FA);
   static const Color slateText = Color(0xFF1F2937);
   static const Color mutedText = Color(0xFF9CA3AF);
-  
+
   static const Color golden = Color(0xFFCFB058); // Unified golden
   static const Color darkBrown = Color(0xFF2C1810); // القرآن
   static const Color white = Color(0xFFFFFFFF);
   static const Color cream = Color(0xFFFDF6E3);
   static const Color backgroundLight = Color(0xFFF8F9FA); // Updated
   static const Color cardLight = Color(0xFFFFFFFF);
-  
-  static const Color secondary = Color(0xFFCFB058); 
-  
+
+  static const Color secondary = Color(0xFFCFB058);
+
   // الوضع الليلي
   static const Color darkBackground = Color(0xFF1A1A1A);
   static const Color backgroundDark = Color(0xFF1A1A1A); // alias
@@ -36,7 +36,7 @@ class AppColors {
   static const Color grey10 = Color(0x1A9E9E9E); // 10%
   static const Color grey05 = Color(0x0D9E9E9E); // 5%
   static const Color darkBrown70 = Color(0xB22C1810); // 70%
-  
+
   // ألوان إضافية
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFF9800);
@@ -44,7 +44,7 @@ class AppColors {
   static const Color greyLight = Color(0xFFF5F5F5);
   static const Color greyMedium = Color(0xFF9E9E9E);
   static const Color greyDark = Color(0xFF424242);
-  
+
   // ألوان التجويد (للميزات المتقدمة)
   static const Color idgham = Color(0xFF4CAF50); // إدغام
   static const Color ikhfa = Color(0xFFFFEB3B); // إخفاء

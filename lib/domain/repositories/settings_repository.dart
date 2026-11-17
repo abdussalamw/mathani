@@ -1,5 +1,7 @@
 import 'package:fpdart/fpdart.dart';
+
 import '../entities/user_settings.dart';
+
 import 'package:mathani/core/errors/failures.dart';
 
 abstract class SettingsRepository {

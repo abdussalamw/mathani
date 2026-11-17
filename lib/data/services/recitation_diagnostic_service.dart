@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -37,13 +38,15 @@ class DiagnosticReport {
     final sb = StringBuffer();
     sb.writeln('═══════════════════════════════');
     sb.writeln('تقرير تشخيص نظام التسميع');
-    sb.writeln('${timestamp.toIso8601String()}');
+    sb.writeln(timestamp.toIso8601String());
     sb.writeln('═══════════════════════════════');
     for (final c in checks) {
       sb.writeln('${c.icon} ${c.name}');
       sb.writeln('   ${c.detail}');
       if (c.errorMessage != null) sb.writeln('   ⚠️ ${c.errorMessage}');
-      if (c.duration != null) sb.writeln('   ⏱ ${c.duration!.inMilliseconds}ms');
+      if (c.duration != null) {
+        sb.writeln('   ⏱ ${c.duration!.inMilliseconds}ms');
+      }
       sb.writeln();
     }
     sb.writeln('النتيجة: $passedCount/${checks.length} اجتازت');
@@ -238,17 +241,18 @@ class RecitationDiagnosticService {
       final encoderSize = await File(encoderPath).length();
       final decoderSize = await File(decoderPath).length();
       final tokensSize = await File(tokensPath).length();
-      
-      final sizesOk = encoderSize > 1024 * 1024 && // > 1MB
-                       decoderSize > 1024 * 1024 && // > 1MB
-                       tokensSize > 100;            // > 100 bytes
+
+      final sizesOk =
+          encoderSize > 1024 * 1024 && // > 1MB
+          decoderSize > 1024 * 1024 && // > 1MB
+          tokensSize > 100; // > 100 bytes
 
       String provider = 'nnapi';
       if (Platform.isWindows) provider = 'directml';
       if (Platform.isIOS || Platform.isMacOS) provider = 'coreml';
 
       stopwatch.stop();
-      
+
       return DiagnosticCheckResult(
         name: 'محرك Sherpa ONNX',
         passed: sizesOk,
@@ -262,7 +266,9 @@ class RecitationDiagnosticService {
           'المسرّع المستهدف: $provider',
           '⚠️ تم تخطي إنشاء Recognizer (فحص مسارات فقط لتجنب تعارض الموارد)',
         ].join('\n   '),
-        errorMessage: sizesOk ? null : 'أحد الملفات صغير جداً أو تالف — أعد تحميل النموذج',
+        errorMessage: sizesOk
+            ? null
+            : 'أحد الملفات صغير جداً أو تالف — أعد تحميل النموذج',
         duration: stopwatch.elapsed,
       );
     } catch (e) {
@@ -343,8 +349,10 @@ class RecitationDiagnosticService {
       // إيجاد data chunk
       int dataOffset = -1;
       for (int i = 12; i < bytes.length - 8; i++) {
-        if (bytes[i] == 0x64 && bytes[i + 1] == 0x61 &&
-            bytes[i + 2] == 0x74 && bytes[i + 3] == 0x61) {
+        if (bytes[i] == 0x64 &&
+            bytes[i + 1] == 0x61 &&
+            bytes[i + 2] == 0x74 &&
+            bytes[i + 3] == 0x61) {
           dataOffset = i;
           break;
         }
@@ -383,7 +391,8 @@ class RecitationDiagnosticService {
       return DiagnosticCheckResult(
         name: 'رابط نموذج تدبر',
         passed: ok,
-        detail: 'HTTP ${response.statusCode} — ${ok ? "الرابط يعمل" : "الرابط معطوب"}',
+        detail:
+            'HTTP ${response.statusCode} — ${ok ? "الرابط يعمل" : "الرابط معطوب"}',
         errorMessage: ok ? null : 'تحقق من روابط GitHub Release',
       );
     } catch (e) {
@@ -409,7 +418,9 @@ class RecitationDiagnosticService {
           .head(Uri.parse(_tajweedModelUrl))
           .timeout(const Duration(seconds: 8));
       final urlOk = response.statusCode == 200 || response.statusCode == 302;
-      details.add('رابط GitHub: HTTP ${response.statusCode} ${urlOk ? "✓" : "✗ (404)"}');
+      details.add(
+        'رابط GitHub: HTTP ${response.statusCode} ${urlOk ? "✓" : "✗ (404)"}',
+      );
     } catch (e) {
       details.add('رابط GitHub: تعذر الاتصال');
     }
@@ -423,7 +434,9 @@ class RecitationDiagnosticService {
         for (final f in files) {
           if (f is File && f.path.endsWith('.tflite')) {
             final sz = await f.length();
-            details.add('ملف محلي: ${f.path.split(Platform.pathSeparator).last} (${(sz / 1024).toStringAsFixed(0)} KB)');
+            details.add(
+              'ملف محلي: ${f.path.split(Platform.pathSeparator).last} (${(sz / 1024).toStringAsFixed(0)} KB)',
+            );
             localFileExists = true;
           }
         }
@@ -435,13 +448,16 @@ class RecitationDiagnosticService {
       details.add('خطأ في فحص الملف المحلي: $e');
     }
 
-    details.add('ملاحظة: نموذج التجويد يعمل بمحاكاة (Mock Data) للتطوير البصري وسيربط بـ TFLite لاحقاً.');
+    details.add(
+      'ملاحظة: نموذج التجويد يعمل بمحاكاة (Mock Data) للتطوير البصري وسيربط بـ TFLite لاحقاً.',
+    );
 
     if (localFileExists) {
       return DiagnosticCheckResult(
         name: 'نموذج التجويد (tflite)',
         passed: true,
-        detail: details.join('\n   ') + '\n   [حالة الملف]: متوفر محلياً وجاهز (تم إنشاء ملف placeholder للتوافق)',
+        detail:
+            '${details.join('\n   ')}\n   [حالة الملف]: متوفر محلياً وجاهز (تم إنشاء ملف placeholder للتوافق)',
       );
     } else {
       return DiagnosticCheckResult(

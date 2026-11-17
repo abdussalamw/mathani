@@ -1,13 +1,15 @@
 import 'dart:io';
 
 void main() {
-  final file = File('c:/Projects/New app/mathani/lib/presentation/screens/settings/settings_screen.dart');
+  final file = File(
+    'c:/Projects/New app/mathani/lib/presentation/screens/settings/settings_screen.dart',
+  );
   var content = file.readAsStringSync();
-  
+
   // 1. Fix the `isDownloaded` assignment
   content = content.replaceFirst(
     "final isDownloaded = mushaf.isDownloaded || mushaf.type == 'font_v2' || mushaf.type == 'digital';",
-    "final isDownloaded = mushaf.isDownloaded || mushaf.type == 'digital';"
+    "final isDownloaded = mushaf.isDownloaded || mushaf.type == 'digital';",
   );
 
   // 2. Add size estimate to the item creation
@@ -36,9 +38,9 @@ void main() {
                         sizeEstimate: sizeEstimate,
                         onActivate: () => provider.setMushaf(mushaf.identifier!),
                         onDownload: () => provider.downloadMushaf(mushaf.identifier!),
-                      );'''
+                      );''',
   );
-  
+
   // 3. Update the _CompactSettingItem constructor & fields
   content = content.replaceFirst(
     '''
@@ -75,7 +77,7 @@ class _CompactSettingItem extends StatelessWidget {
     this.sizeEstimate,
     required this.onActivate,
     required this.onDownload,
-  });'''
+  });''',
   );
 
   // 4. Update the _CompactSettingItem build method to show progress/size
@@ -151,8 +153,9 @@ class _CompactSettingItem extends StatelessWidget {
                 )
               else 
                  const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
-''');
+''',
+  );
 
   file.writeAsStringSync(content);
-  print('Settings Screen patched successfully!');
+  stdout.writeln('Settings Screen patched successfully!');
 }

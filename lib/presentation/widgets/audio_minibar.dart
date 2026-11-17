@@ -1,19 +1,19 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/presentation/providers/audio_provider.dart';
 import 'package:mathani/presentation/providers/quran_provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
-import 'package:mathani/presentation/widgets/audio_player_sheet.dart';
 import 'package:mathani/presentation/providers/ui_provider.dart'; // Added
-import 'package:mathani/data/providers/mushaf_navigation_provider.dart'; // Added
+
+// Added
 
 class AudioMinibar extends StatelessWidget {
-  const AudioMinibar({Key? key}) : super(key: key);
+  const AudioMinibar({super.key});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Consumer<AudioProvider>(
       builder: (context, audio, child) {
         // Smart Visibility: Logic based on AudioProvider.showMinibar
@@ -33,39 +33,41 @@ class AudioMinibar extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
               border: Border.all(
-                color: AppColors.brandGold.withOpacity(0.2),
+                color: AppColors.brandGold.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
             child: Row(
               children: [
-                  // 1. Play/Pause
+                // 1. Play/Pause
                 _ControlButton(
-                   // If no context, show 'Play' icon (to start from page), not headphones which implies passive mode
-                   icon: audio.isPlaying ? Icons.pause : Icons.play_arrow, 
-                   onPressed: () {
-                     if (audio.isPlaying) {
-                       audio.pause();
-                     } else if (hasContext) {
-                       // استئناف من حيث توقف
-                       audio.resumeOrPlay();
-                     } else {
-                       // ★ ابدأ من موقع القراءة الحالي (readingSurah مُحدّث دائماً)
-                       final quran = context.read<QuranProvider>();
-                       final surah = quran.readingSurah;
-                       final ayah = quran.readingAyah > 0 ? quran.readingAyah : 1;
-                       audio.playAyah(surah, ayah);
-                     }
-                   },
-                   isPrimary: true,
+                  // If no context, show 'Play' icon (to start from page), not headphones which implies passive mode
+                  icon: audio.isPlaying ? Icons.pause : Icons.play_arrow,
+                  onPressed: () {
+                    if (audio.isPlaying) {
+                      audio.pause();
+                    } else if (hasContext) {
+                      // استئناف من حيث توقف
+                      audio.resumeOrPlay();
+                    } else {
+                      // ★ ابدأ من موقع القراءة الحالي (readingSurah مُحدّث دائماً)
+                      final quran = context.read<QuranProvider>();
+                      final surah = quran.readingSurah;
+                      final ayah = quran.readingAyah > 0
+                          ? quran.readingAyah
+                          : 1;
+                      audio.playAyah(surah, ayah);
+                    }
+                  },
+                  isPrimary: true,
                 ),
-                
+
                 const SizedBox(width: 8),
 
                 // 2. Info (Middle) - Compacted
@@ -77,9 +79,11 @@ class AudioMinibar extends StatelessWidget {
                       Consumer<QuranProvider>(
                         builder: (context, quran, _) {
                           // ★ استخدم readingSurah كـ fallback إذا currentSurah فارغ
-                          final displaySurah = audio.currentSurah ?? quran.readingSurah;
+                          final displaySurah =
+                              audio.currentSurah ?? quran.readingSurah;
                           String surahName = _getSurahName(quran, displaySurah);
-                          final displayAyah = audio.currentAyah ?? quran.readingAyah;
+                          final displayAyah =
+                              audio.currentAyah ?? quran.readingAyah;
                           return Text(
                             'سورة $surahName ($displayAyah)',
                             style: TextStyle(
@@ -91,28 +95,35 @@ class AudioMinibar extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           );
-                        }
+                        },
                       ),
                       Builder(
                         builder: (context) {
-                          final hasError = audio.lastError != null && !audio.isPlaying && !audio.isLoading;
+                          final hasError =
+                              audio.lastError != null &&
+                              !audio.isPlaying &&
+                              !audio.isLoading;
                           return Text(
-                            hasError ? audio.lastError! : (audio.currentReciter?.name ?? ''),
+                            hasError
+                                ? audio.lastError!
+                                : (audio.currentReciter?.name ?? ''),
                             style: TextStyle(
                               fontFamily: 'Tajawal',
                               fontSize: hasError ? 9 : 10,
                               color: hasError ? Colors.red : Colors.grey[500],
-                              fontWeight: hasError ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: hasError
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           );
-                        }
+                        },
                       ),
                     ],
                   ),
                 ),
-                
+
                 // 3. Navigation Controls
                 if (hasContext) ...[
                   // Prev (Right arrow → plays previous Ayah)
@@ -120,10 +131,15 @@ class AudioMinibar extends StatelessWidget {
                     icon: Icons.skip_next_rounded, // Mirrored icon
                     onPressed: () {
                       if (audio.player.hasPrevious) {
-                         audio.player.seekToPrevious();
-                      } else if (audio.currentSurah != null && audio.currentAyah != null && audio.currentAyah! > 1) {
-                         // Fallback if not in playlist
-                         audio.playAyah(audio.currentSurah!, audio.currentAyah! - 1);
+                        audio.player.seekToPrevious();
+                      } else if (audio.currentSurah != null &&
+                          audio.currentAyah != null &&
+                          audio.currentAyah! > 1) {
+                        // Fallback if not in playlist
+                        audio.playAyah(
+                          audio.currentSurah!,
+                          audio.currentAyah! - 1,
+                        );
                       }
                     },
                   ),
@@ -132,10 +148,14 @@ class AudioMinibar extends StatelessWidget {
                     icon: Icons.skip_previous_rounded, // Mirrored icon
                     onPressed: () {
                       if (audio.player.hasNext) {
-                         audio.player.seekToNext();
-                      } else if (audio.currentSurah != null && audio.currentAyah != null) {
-                         // Fallback
-                         audio.playAyah(audio.currentSurah!, audio.currentAyah! + 1);
+                        audio.player.seekToNext();
+                      } else if (audio.currentSurah != null &&
+                          audio.currentAyah != null) {
+                        // Fallback
+                        audio.playAyah(
+                          audio.currentSurah!,
+                          audio.currentAyah! + 1,
+                        );
                       }
                     },
                   ),
@@ -144,7 +164,7 @@ class AudioMinibar extends StatelessWidget {
                 ],
 
                 const SizedBox(width: 8),
-                
+
                 // 4. Close (Stop & Hide)
                 _SmallButton(
                   icon: Icons.close_rounded,
@@ -175,7 +195,11 @@ class _ControlButton extends StatelessWidget {
   final VoidCallback onPressed;
   final bool isPrimary;
 
-  const _ControlButton({required this.icon, required this.onPressed, this.isPrimary = false});
+  const _ControlButton({
+    required this.icon,
+    required this.onPressed,
+    this.isPrimary = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -189,9 +213,9 @@ class _ControlButton extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Icon(
-          icon, 
-          color: isPrimary ? Colors.white : AppColors.brandGold, 
-          size: 24
+          icon,
+          color: isPrimary ? Colors.white : AppColors.brandGold,
+          size: 24,
         ),
       ),
     );
@@ -204,7 +228,12 @@ class _SmallButton extends StatelessWidget {
   final Color? color;
   final bool isCircular;
 
-  const _SmallButton({required this.icon, required this.onPressed, this.color, this.isCircular = false});
+  const _SmallButton({
+    required this.icon,
+    required this.onPressed,
+    this.color,
+    this.isCircular = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +277,10 @@ class _RepeatButton extends StatelessWidget {
                 top: -6,
                 right: -8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(8),

@@ -43,5 +43,11 @@ class UserSettings extends Equatable {
   }
 
   @override
-  List<Object?> get props => [isDarkMode, fontSize, selectedMushafId, defaultReciterId, defaultTafsirId];
+  List<Object?> get props => [
+    isDarkMode,
+    fontSize,
+    selectedMushafId,
+    defaultReciterId,
+    defaultTafsirId,
+  ];
 }

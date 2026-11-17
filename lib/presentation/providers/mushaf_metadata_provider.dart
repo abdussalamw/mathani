@@ -1,22 +1,25 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:flutter/foundation.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/database/collections.dart' as db_models; // Alias
 import '../../core/database/isar_service.dart';
-import '../../data/services/mushaf_downloader_service.dart' as mushaf_downloader;
+import '../../data/services/mushaf_downloader_service.dart'
+    as mushaf_downloader;
 import '../../core/di/service_locator.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/entities/user_settings.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../data/services/qcf4_font_downloader.dart';
 
 class MushafMetadataProvider extends ChangeNotifier {
   final SettingsRepository _settingsRepository = sl<SettingsRepository>();
-  
+
   // القائمة الثابتة كـ Fallback في حال فشل الداتابيز
   final List<db_models.MushafMetadata> _fallbackMushafs = [
     // 1. Madani New Script (Default & Vector/Font)
@@ -26,7 +29,8 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..nameArabic = 'مصحف المدينة - الرسم الجديد'
       ..nameEnglish = 'Madani Mushaf - New Script'
       ..type = 'font_v2'
-      ..baseUrl = null  // Bundled assets
+      ..baseUrl =
+          null // Bundled assets
       ..localPath = 'assets/fonts/qcf2'
       ..isDownloaded = false,
 
@@ -36,9 +40,11 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..identifier = 'madani_old_v1'
       ..nameArabic = 'مصحف المدينة ـ الرسم القديم'
       ..nameEnglish = 'Madani Mushaf - Old Script'
-      ..type = 'page_font' // New type for QPC V1
+      ..type =
+          'page_font' // New type for QPC V1
       ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/qpc_v1_by_page.woff.zip'
-      ..localPath = 'mushafs/madani_old_v1' // Extracted path
+      ..localPath =
+          'mushafs/madani_old_v1' // Extracted path
       ..pageCount = 604
       ..isDownloaded = false,
 
@@ -50,7 +56,7 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..nameArabic = 'مصحف المدينة موافق للشمرلي'
       ..nameEnglish = 'Madani Matching Shamarly'
       ..type = 'image'
-      ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_images_shamrly.zip' 
+      ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_images_shamrly.zip'
       ..imageExtension = 'png'
       ..pageCount = 521
       ..isDownloaded = false,
@@ -62,7 +68,7 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..nameArabic = 'المصحف الإلكتروني (نص رقمي)'
       ..nameEnglish = 'Digital Mushaf (System Text)'
       ..type = 'digital'
-      ..isDownloaded = true, 
+      ..isDownloaded = true,
   ];
 
   // Helper to maintain sort order
@@ -83,21 +89,23 @@ class MushafMetadataProvider extends ChangeNotifier {
   List<db_models.MushafMetadata> _availableMushafs = [];
   // Filter out 'digital' type from the UI list as requested
   List<db_models.MushafMetadata> get availableMushafs {
-    final list = _availableMushafs.isNotEmpty ? _availableMushafs : _fallbackMushafs;
+    final list = _availableMushafs.isNotEmpty
+        ? _availableMushafs
+        : _fallbackMushafs;
     return list.where((m) => m.type != 'digital').toList();
   }
 
   String? _currentMushafId;
   // Default to 'qcf2_v4_woff2' (Madani New Script)
   String get currentMushafId => _currentMushafId ?? 'qcf2_v4_woff2';
-  
+
   String get currentMushafType {
     if (_currentMushafId == null) return 'digital';
-    
+
     // Find in available list
     try {
       final mushaf = _availableMushafs.firstWhere(
-        (m) => m.identifier == _currentMushafId
+        (m) => m.identifier == _currentMushafId,
       );
       return mushaf.type ?? 'digital';
     } catch (_) {
@@ -107,13 +115,13 @@ class MushafMetadataProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
-  
+
   bool _isDownloading = false;
   bool get isDownloading => _isDownloading;
-  
+
   String? _currentDownloadingId;
   String? get currentDownloadingId => _currentDownloadingId;
-  
+
   double _downloadProgress = 0.0;
   double get downloadProgress => _downloadProgress;
 
@@ -139,44 +147,47 @@ class MushafMetadataProvider extends ChangeNotifier {
       }
 
       final isar = IsarService.instance.isar;
-      final prefs = await SharedPreferences.getInstance();
-      final areFontsDownloaded = prefs.getBool('fonts_downloaded') ?? false;
-      
+
       // جلب البيانات من الداتا بيز
-      var mushafs = await isar.collection<db_models.MushafMetadata>().where().findAll();
+      var mushafs = await isar
+          .collection<db_models.MushafMetadata>()
+          .where()
+          .findAll();
 
       // تزامن البيانات: تأكد من أن كل المصاحف المعرفة في الكود موجودة ومحدثة في قاعدة البيانات
       await isar.writeTxn(() async {
         for (var fallback in _fallbackMushafs) {
-          final existing = mushafs.firstWhere(
-            (m) => m.identifier == fallback.identifier,
-            orElse: () => fallback, // يرجع fallback نفسها علامة على عدم الوجود (للمقارنة بالمعرف)
-          );
-
           // إذا لم يكن موجوداً، أو إذا نحتاج لتحديث الروابط
           // نلاحظ هنا المقارنة بالـ identifier لأن fallback المرجع هو كائن جديد
-          final isNew = !mushafs.any((m) => m.identifier == fallback.identifier);
-          
+          final isNew = !mushafs.any(
+            (m) => m.identifier == fallback.identifier,
+          );
+
           if (isNew) {
             await isar.collection<db_models.MushafMetadata>().put(fallback);
           } else {
             // تحديث البيانات الأساسية (URL, Name, e.g.) للموجود
-             final existingItem = mushafs.firstWhere((m) => m.identifier == fallback.identifier);
-             
-             // فقط نحدث الحقول التي قد تتغير من الكود
-             existingItem.baseUrl = fallback.baseUrl;
-             existingItem.imageExtension = fallback.imageExtension;
-             existingItem.nameArabic = fallback.nameArabic; 
-             existingItem.type = fallback.type;
-             existingItem.pageCount = fallback.pageCount;
-             
-             await isar.collection<db_models.MushafMetadata>().put(existingItem);
+            final existingItem = mushafs.firstWhere(
+              (m) => m.identifier == fallback.identifier,
+            );
+
+            // فقط نحدث الحقول التي قد تتغير من الكود
+            existingItem.baseUrl = fallback.baseUrl;
+            existingItem.imageExtension = fallback.imageExtension;
+            existingItem.nameArabic = fallback.nameArabic;
+            existingItem.type = fallback.type;
+            existingItem.pageCount = fallback.pageCount;
+
+            await isar.collection<db_models.MushafMetadata>().put(existingItem);
           }
         }
       });
-      
+
       // إعادة الجلب بعد التحديث
-      mushafs = await isar.collection<db_models.MushafMetadata>().where().findAll();
+      mushafs = await isar
+          .collection<db_models.MushafMetadata>()
+          .where()
+          .findAll();
 
       // تحديث القائمة في الذاكرة
       if (mushafs.isNotEmpty) {
@@ -188,12 +199,9 @@ class MushafMetadataProvider extends ChangeNotifier {
       }
 
       final result = await _settingsRepository.getSettings();
-      result.fold(
-        (failure) => _currentMushafId = 'qcf2_v4_woff2',
-        (settings) {
-           _currentMushafId = settings.selectedMushafId ?? 'qcf2_v4_woff2';
-        }, 
-      );
+      result.fold((failure) => _currentMushafId = 'qcf2_v4_woff2', (settings) {
+        _currentMushafId = settings.selectedMushafId;
+      });
       await syncWithDownloadedFonts();
     } catch (e) {
       debugPrint('MushafProvider Error: $e');
@@ -210,32 +218,19 @@ class MushafMetadataProvider extends ChangeNotifier {
     await _init();
   }
 
-  Future<void> _seedDefaultMushafs(Isar isar) async {
-    try {
-      await isar.writeTxn(() async {
-        for (var mushaf in _fallbackMushafs) {
-           // نستخدم put لضمان الكتابة
-           await isar.collection<db_models.MushafMetadata>().put(mushaf);
-        }
-      });
-    } catch (e) {
-      debugPrint('Seeding failed: $e');
-    }
-  }
-
   Future<void> setMushaf(String identifier) async {
     final result = await _settingsRepository.getSettings();
-    
+
     // We get current settings, modify them, and save
     final currentSettings = result.fold(
-      (l) => UserSettings.defaults(), 
-      (r) => r
+      (l) => UserSettings.defaults(),
+      (r) => r,
     ); // Fix getOrElse by using fold
-    
+
     final newSettings = currentSettings.copyWith(selectedMushafId: identifier);
-    
+
     await _settingsRepository.saveSettings(newSettings);
-    
+
     _currentMushafId = identifier;
     notifyListeners();
   }
@@ -243,7 +238,7 @@ class MushafMetadataProvider extends ChangeNotifier {
   Future<void> downloadMushaf(String identifier) async {
     final mushaf = _availableMushafs.firstWhere(
       (m) => m.identifier == identifier,
-      orElse: () => _availableMushafs.first
+      orElse: () => _availableMushafs.first,
     );
 
     if (identifier != 'qcf2_v4_woff2' && mushaf.baseUrl == null) return;
@@ -256,36 +251,38 @@ class MushafMetadataProvider extends ChangeNotifier {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       String targetPath = '${appDir.path}/mushafs/$identifier';
-      
+
       if (identifier == 'qcf2_v4_woff2') {
-         await QCF4FontDownloader.downloadAllFonts(
-           onProgress: (progress) {
-             _downloadProgress = progress;
-             notifyListeners();
-           },
-           onStatusChanged: (_) {}
-         );
-         targetPath = '${appDir.path}/fonts';
+        await QCF4FontDownloader.downloadAllFonts(
+          onProgress: (progress) {
+            _downloadProgress = progress;
+            notifyListeners();
+          },
+          onStatusChanged: (_) {},
+        );
+        targetPath = '${appDir.path}/fonts';
       } else {
-         await mushaf_downloader.MushafDownloaderService.downloadAndExtract(
-           url: mushaf.baseUrl!,
-           destinationPath: targetPath,
-           onProgress: (progress) {
-             _downloadProgress = identifier == 'madani_old_v1' ? progress * 0.9 : progress;
-             notifyListeners();
-           },
-         );
-         
-         if (identifier == 'madani_old_v1') {
-           await mushaf_downloader.MushafDownloaderService.downloadAndExtract(
-             url: 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/qpc_v1_json_data.zip',
-             destinationPath: targetPath,
-             onProgress: (p) {
-                _downloadProgress = 0.9 + (p * 0.1);
-                notifyListeners();
-             },
-           );
-         }
+        await mushaf_downloader.MushafDownloaderService.downloadAndExtract(
+          url: mushaf.baseUrl!,
+          destinationPath: targetPath,
+          onProgress: (progress) {
+            _downloadProgress = identifier == 'madani_old_v1'
+                ? progress * 0.9
+                : progress;
+            notifyListeners();
+          },
+        );
+
+        if (identifier == 'madani_old_v1') {
+          await mushaf_downloader.MushafDownloaderService.downloadAndExtract(
+            url: 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/qpc_v1_json_data.zip',
+            destinationPath: targetPath,
+            onProgress: (p) {
+              _downloadProgress = 0.9 + (p * 0.1);
+              notifyListeners();
+            },
+          );
+        }
       }
 
       // Update metadata
@@ -293,22 +290,22 @@ class MushafMetadataProvider extends ChangeNotifier {
       await isar.writeTxn(() async {
         mushaf.isDownloaded = true;
         mushaf.localPath = targetPath;
-        
+
         // Update in DB
-        final existing = await isar.collection<db_models.MushafMetadata>()
+        final existing = await isar
+            .collection<db_models.MushafMetadata>()
             .filter()
             .identifierEqualTo(identifier)
             .findFirst();
-            
+
         if (existing != null) {
-           existing.isDownloaded = true;
-           existing.localPath = targetPath;
-           await isar.collection<db_models.MushafMetadata>().put(existing);
+          existing.isDownloaded = true;
+          existing.localPath = targetPath;
+          await isar.collection<db_models.MushafMetadata>().put(existing);
         }
       });
-      
+
       notifyListeners();
-      
     } catch (e) {
       debugPrint('Download failed: $e');
       // Show error via snackbar or other UI mechanism if possible
@@ -320,31 +317,20 @@ class MushafMetadataProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _saveSettings() async {
-    if (_currentMushafId == null) return;
-    try {
-      final result = await _settingsRepository.getSettings();
-      final currentSettings = result.fold(
-        (l) => UserSettings.defaults(), 
-        (r) => r
-      );
-      final newSettings = currentSettings.copyWith(selectedMushafId: _currentMushafId);
-      await _settingsRepository.saveSettings(newSettings);
-    } catch (e) {
-      debugPrint('Error saving settings: $e');
-    }
-  }
-
   Future<void> syncWithDownloadedFonts() async {
     try {
       final isar = IsarService.instance.isar;
       final appDir = await getApplicationDocumentsDirectory();
       final prefs = await SharedPreferences.getInstance();
-      
+
       await isar.writeTxn(() async {
         // 1. Check QCF2 Fonts
         final areFontsDownloaded = prefs.getBool('fonts_downloaded') ?? false;
-        final qcf2 = await isar.collection<db_models.MushafMetadata>().filter().identifierEqualTo('qcf2_v4_woff2').findFirst();
+        final qcf2 = await isar
+            .collection<db_models.MushafMetadata>()
+            .filter()
+            .identifierEqualTo('qcf2_v4_woff2')
+            .findFirst();
         if (qcf2 != null && areFontsDownloaded) {
           qcf2.isDownloaded = true;
           qcf2.localPath = '${appDir.path}/fonts';
@@ -352,17 +338,20 @@ class MushafMetadataProvider extends ChangeNotifier {
         }
 
         // 2. Check other directories
-        final mushafs = await isar.collection<db_models.MushafMetadata>().where().findAll();
+        final mushafs = await isar
+            .collection<db_models.MushafMetadata>()
+            .where()
+            .findAll();
         for (var m in mushafs) {
           if (m.identifier == 'qcf2_v4_woff2' || m.type == 'digital') continue;
-          
+
           final dir = Directory('${appDir.path}/mushafs/${m.identifier}');
           if (await dir.exists()) {
             final files = dir.listSync();
             if (files.isNotEmpty) {
-               m.isDownloaded = true;
-               m.localPath = dir.path;
-               await isar.collection<db_models.MushafMetadata>().put(m);
+              m.isDownloaded = true;
+              m.localPath = dir.path;
+              await isar.collection<db_models.MushafMetadata>().put(m);
             }
           }
         }

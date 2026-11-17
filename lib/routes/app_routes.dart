@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+
 import '../presentation/screens/splash/splash_screen.dart';
 import '../presentation/screens/home/main_shell_screen.dart';
 import '../presentation/screens/surah_list/surah_list_screen.dart';

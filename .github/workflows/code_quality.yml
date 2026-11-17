@@ -6,8 +6,12 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: subosito/flutter-action@v2
+      with:
+        flutter-version-file: '.fvmrc'
+        channel: 'stable'
     - run: flutter pub get
+    - run: dart run scripts/generate_localizations.dart
     - run: flutter analyze
-    - run: dart format --set-exit-if-changed .
+    - run: dart format --output=none --set-exit-if-changed lib test

@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+
 import '../../../data/services/recitation_diagnostic_service.dart';
 import '../../../core/constants/app_colors.dart';
 
@@ -54,7 +55,10 @@ class _RecitationDiagnosticScreenState
     Clipboard.setData(ClipboardData(text: _report!.toText()));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('تم نسخ التقرير', style: TextStyle(fontFamily: 'Tajawal')),
+        content: Text(
+          'تم نسخ التقرير',
+          style: TextStyle(fontFamily: 'Tajawal'),
+        ),
         backgroundColor: Colors.green,
         duration: Duration(seconds: 2),
       ),
@@ -66,7 +70,9 @@ class _RecitationDiagnosticScreenState
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0D0D0D) : const Color(0xFFF8F8F8),
+      backgroundColor: isDark
+          ? const Color(0xFF0D0D0D)
+          : const Color(0xFFF8F8F8),
       appBar: AppBar(
         title: const Text(
           '🔬 تشخيص نظام التسميع',
@@ -96,23 +102,29 @@ class _RecitationDiagnosticScreenState
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  disabledBackgroundColor: AppColors.primary.withValues(
+                    alpha: 0.5,
+                  ),
                 ),
                 icon: _isRunning
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.play_circle_rounded, size: 22),
                 label: Text(
                   _isRunning ? _currentCheck : 'تشغيل التشخيص الكامل',
                   style: const TextStyle(
-                      fontFamily: 'Tajawal',
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold),
+                    fontFamily: 'Tajawal',
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -124,7 +136,10 @@ class _RecitationDiagnosticScreenState
               // ملخص
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: _report!.allPassed
                       ? Colors.green.withValues(alpha: 0.12)
@@ -174,24 +189,34 @@ class _RecitationDiagnosticScreenState
                 child: OutlinedButton.icon(
                   onPressed: _copyReport,
                   icon: const Icon(Icons.copy_rounded, size: 18),
-                  label: const Text('نسخ التقرير الكامل',
-                      style: TextStyle(fontFamily: 'Tajawal')),
+                  label: const Text(
+                    'نسخ التقرير الكامل',
+                    style: TextStyle(fontFamily: 'Tajawal'),
+                  ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
             ] else if (!_isRunning) ...[
               const Spacer(),
-              const Icon(Icons.health_and_safety_rounded,
-                  size: 72, color: Colors.grey),
+              const Icon(
+                Icons.health_and_safety_rounded,
+                size: 72,
+                color: Colors.grey,
+              ),
               const SizedBox(height: 16),
               const Text(
                 'اضغط الزر أعلاه لبدء فحص جميع مكونات التسميع',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontFamily: 'Tajawal', fontSize: 14, color: Colors.grey),
+                style: TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
               ),
               const Spacer(),
             ],
@@ -223,9 +248,10 @@ class _CheckCard extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.35)),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 2)),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Theme(
@@ -245,15 +271,19 @@ class _CheckCard extends StatelessWidget {
           title: Text(
             check.name,
             style: const TextStyle(
-                fontFamily: 'Tajawal',
-                fontWeight: FontWeight.bold,
-                fontSize: 14),
+              fontFamily: 'Tajawal',
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
           ),
           subtitle: check.duration != null
               ? Text(
                   '${check.duration!.inMilliseconds} ms',
                   style: const TextStyle(
-                      fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey),
+                    fontFamily: 'Tajawal',
+                    fontSize: 11,
+                    color: Colors.grey,
+                  ),
                 )
               : null,
           children: [
@@ -288,7 +318,9 @@ class _CheckCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.red.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: Colors.red.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,

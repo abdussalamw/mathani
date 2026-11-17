@@ -1,14 +1,14 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
 
   const CustomBottomNavBar({
-    Key? key,
+    super.key,
     required this.currentIndex,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -24,10 +24,7 @@ class CustomBottomNavBar extends StatelessWidget {
           icon: Icon(Icons.library_books_rounded),
           label: 'المصاحف',
         ),
-        NavigationDestination(
-          icon: Icon(Icons.book_rounded),
-          label: 'المصحف',
-        ),
+        NavigationDestination(icon: Icon(Icons.book_rounded), label: 'المصحف'),
         NavigationDestination(
           icon: Icon(Icons.settings_rounded),
           label: 'الإعدادات',

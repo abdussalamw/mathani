@@ -1,10 +1,11 @@
 name: mathani
 description: تطبيق قراءة وتدبر القرآن الكريم - مثاني
 publish_to: 'none'
-version: 1.0.1+3
+version: 1.0.2+11
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.14.0 <4.0.0'
+  flutter: '>=3.50.0'
 
 dependencies:
   flutter:
@@ -13,10 +14,10 @@ dependencies:
     sdk: flutter
   
   # قاعدة البيانات (أساسي)
-  isar: ^3.1.0
-  isar_flutter_libs: ^3.1.0
+  isar_community: 3.4.1
+  isar_community_flutter_libs: 3.4.1
   path_provider: ^2.1.0
-  sqflite: ^2.3.0 # Added for QPC V1 Layout
+  sqflite: ^2.4.6 # Added for QPC V1 Layout
   path: ^1.9.1
   
   # الشبكة (أساسي)
@@ -27,41 +28,44 @@ dependencies:
   provider: ^6.0.5
   
   # الواجهة (أساسي)
-  google_fonts: ^6.1.0
-  flutter_svg: ^2.0.7
+  google_fonts: ^9.0.0
+  flutter_svg: ^2.4.0
+  material_ui: ^1.0.0
+  cupertino_ui: ^1.0.0
   
   # الأدوات (أساسي)
   intl: ^0.20.2
-  archive: ^4.0.9 # Essential for Mushaf Zip
+  archive: ^4.7.1 # Essential for Mushaf Zip
   
   # Architecture & Core (Added for Phase 3)
-  get_it: ^7.6.0
+  get_it: ^9.3.0
   fpdart: ^1.1.0
   equatable: ^2.0.5
   shared_preferences: ^2.5.4
   just_audio: ^0.10.5
-  wakelock_plus: ^1.1.0
-  package_info_plus: ^8.0.0 
-  share_plus: ^10.1.0  
+  wakelock_plus: ^1.8.2
+  package_info_plus: ^10.2.2
+  share_plus: ^13.3.1
   screenshot: ^3.0.0 
   just_audio_background: ^0.0.1-beta.17
   csv: 6.0.0
-  record: ^6.2.0
+  record: 6.2.0
   web_socket_channel: ^3.0.3
-  sherpa_onnx: ^1.13.2
-  permission_handler: ^11.3.0
+  sherpa_onnx: 1.13.2
+  # 13.x requires Android SDK 37; retain compatibility with compileSdk 36.
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   # integration_test:
   #   sdk: flutter
-  build_runner: ^2.4.6
-  isar_generator: ^3.1.0
-  flutter_lints: ^2.0.0
-  flutter_launcher_icons: ^0.13.1
+  build_runner: 2.16.2
+  isar_community_generator: 3.4.1
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
-flutter_icons:
+flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/icons/icon.jpg"
@@ -76,7 +80,6 @@ flutter:
     - assets/data/quran_metadata.json
     - assets/data/quran_advanced.json
     - assets/data/reciters.json
-    - assets/images/
     - assets/images/
 
   fonts:

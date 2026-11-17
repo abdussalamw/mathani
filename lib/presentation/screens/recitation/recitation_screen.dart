@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
+
 import 'recitation_setup_view.dart';
 import 'recitation_recording_view.dart';
 import 'recitation_analysis_view.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
-import 'package:isar/isar.dart';
+import 'package:isar_community/isar.dart';
 import 'package:mathani/core/database/isar_service.dart';
 import 'package:mathani/data/data_sources/local/quran_local_data_source.dart';
 import 'package:mathani/data/models/surah.dart';
@@ -12,46 +12,48 @@ import 'package:mathani/core/utils/text_utils.dart';
 class QuranRepositoryImpl implements QuranRepository {
   final QuranLocalDataSource _localDataSource;
   final Isar? _injectedIsar;
-  
+
   // Lazy getter allows delay of access until initialization is complete
   Isar get _isar => _injectedIsar ?? IsarService.instance.isar;
-  
-  QuranRepositoryImpl({
-    QuranLocalDataSource? localDataSource,
-    Isar? isar,
-  })  : _localDataSource = localDataSource ?? QuranLocalDataSource.instance,
-        _injectedIsar = isar;
-  
+
+  QuranRepositoryImpl({QuranLocalDataSource? localDataSource, Isar? isar})
+    : _localDataSource = localDataSource ?? QuranLocalDataSource.instance,
+      _injectedIsar = isar;
+
   @override
   Future<Either<Failure, List<Surah>>> getAllSurahs() async {
     try {
       if (kIsWeb) {
-         // On Web, skip DB and load directly from assets
-         final surahs = await _localDataSource.loadAllSurahs();
-         return Right(surahs);
+        // On Web, skip DB and load directly from assets
+        final surahs = await _localDataSource.loadAllSurahs();
+        return Right(surahs);
       }
 
       // تحقق من قاعدة البيانات أولاً
       final localSurahs = await _isar.surahs.where().findAll();
-      
+
       // Check if we have data AND if the data is valid (has page numbers populated)
       // AND NEW CHECK: Check if Ayahs have textClean populated (Migration)
-      bool isDataValid = localSurahs.isNotEmpty && 
-                         localSurahs.any((s) => s.page != null && s.page! > 0);
+      bool isDataValid =
+          localSurahs.isNotEmpty &&
+          localSurahs.any((s) => s.page != null && s.page! > 0);
 
       if (isDataValid) {
         // Migration Check: Check if data is corrupted (e.g. all ayahs have ayahNumber=1)
         final checkAyah = await _isar.ayahs.where().offset(5).findFirst();
-        if (checkAyah != null && (checkAyah.textClean.isEmpty || checkAyah.ayahNumber == 1)) {
-           isDataValid = false; // Force reload to fix ayahNumber bug
-           debugPrint('Migration: triggering reload to fix corrupted ayahNumber');
+        if (checkAyah != null &&
+            (checkAyah.textClean.isEmpty || checkAyah.ayahNumber == 1)) {
+          isDataValid = false; // Force reload to fix ayahNumber bug
+          debugPrint(
+            'Migration: triggering reload to fix corrupted ayahNumber',
+          );
         }
       }
 
       if (isDataValid) {
         return Right(localSurahs);
       }
-      
+
       // If data is invalid/stale, clear it before reloading
       if (localSurahs.isNotEmpty) {
         await _isar.writeTxn(() async {
@@ -59,23 +61,23 @@ class QuranRepositoryImpl implements QuranRepository {
           await _isar.ayahs.clear(); // Clear Ayahs too ensuring full reload
         });
       }
-      
+
       // جلب من assets المحلية
       final surahs = await _localDataSource.loadAllSurahs();
-      
+
       // حفظ السور في قاعدة البيانات
       await _isar.writeTxn(() async {
         await _isar.surahs.putAll(surahs);
       });
 
-      // Also trigger loading of all Ayahs to populate the DB immediately 
+      // Also trigger loading of all Ayahs to populate the DB immediately
       // (Optional but good for search availability)
-      // For now, we rely on lazy loading or user opening Surahs, BUT for search to work globally, 
+      // For now, we rely on lazy loading or user opening Surahs, BUT for search to work globally,
       // we really should have all Ayahs loaded.
       // Let's load them in background or just wait for user interaction?
       // Better: Load all Ayahs now if we are doing a full reset.
-      _loadAllAyahsToDb(); 
-      
+      _loadAllAyahsToDb();
+
       return Right(surahs);
     } catch (e) {
       return Left(CacheFailure(e.toString()));
@@ -84,12 +86,12 @@ class QuranRepositoryImpl implements QuranRepository {
 
   Future<void> _loadAllAyahsToDb() async {
     try {
-       final allAyahs = await _localDataSource.loadAllAyahs();
-       if (allAyahs.isNotEmpty) {
-          await _isar.writeTxn(() async {
-            await _isar.ayahs.putAll(allAyahs);
-          });
-       }
+      final allAyahs = await _localDataSource.loadAllAyahs();
+      if (allAyahs.isNotEmpty) {
+        await _isar.writeTxn(() async {
+          await _isar.ayahs.putAll(allAyahs);
+        });
+      }
     } catch (e) {
       debugPrint('Error loading all ayahs: $e');
     }
@@ -100,23 +102,23 @@ class QuranRepositoryImpl implements QuranRepository {
     try {
       // Normalize query
       final normalizedQuery = TextUtils.normalizeQuranText(query);
-      
+
       if (kIsWeb) {
         // Web fallback
-        return const Right([]); 
+        return const Right([]);
       }
 
       final results = await _isar.ayahs
           .filter()
           .textCleanContains(normalizedQuery, caseSensitive: false)
           .findAll();
-          
+
       return Right(results);
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }
   }
-  
+
   @override
   Future<Either<Failure, Surah?>> getSurahByNumber(int number) async {
     try {
@@ -139,12 +141,15 @@ class QuranRepositoryImpl implements QuranRepository {
       return Left(CacheFailure(e.toString()));
     }
   }
-  
+
   @override
-  Future<Either<Failure, Ayah?>> getAyah(int surahNumber, int ayahNumber) async {
+  Future<Either<Failure, Ayah?>> getAyah(
+    int surahNumber,
+    int ayahNumber,
+  ) async {
     try {
       if (kIsWeb) {
-         // Not optimized for web single fetch yet, uses bulk load
+        // Not optimized for web single fetch yet, uses bulk load
         final ayahs = await _localDataSource.loadAyahsForSurah(surahNumber);
         try {
           final ayah = ayahs.firstWhere((a) => a.ayahNumber == ayahNumber);
@@ -160,7 +165,7 @@ class QuranRepositoryImpl implements QuranRepository {
           .and()
           .ayahNumberEqualTo(ayahNumber)
           .findFirst();
-          
+
       return Right(ayah);
     } catch (e) {
       return Left(CacheFailure(e.toString()));
@@ -180,27 +185,30 @@ class QuranRepositoryImpl implements QuranRepository {
           .filter()
           .surahNumberEqualTo(surahNumber)
           .findAll();
-      
+
       if (localAyahs.isNotEmpty) {
         return Right(localAyahs);
       }
-      
+
       // جلب من assets المحلية
       final ayahs = await _localDataSource.loadAyahsForSurah(surahNumber);
-      
+
       // حفظ في قاعدة البيانات
       await _isar.writeTxn(() async {
         await _isar.ayahs.putAll(ayahs);
       });
-      
+
       return Right(ayahs);
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }
   }
-  
+
   @override
-  Future<Either<Failure, void>> updateLastRead(int surahNumber, int ayahNumber) async {
+  Future<Either<Failure, void>> updateLastRead(
+    int surahNumber,
+    int ayahNumber,
+  ) async {
     try {
       if (kIsWeb) return const Right(null); // No persistence on web for now
 
@@ -208,23 +216,23 @@ class QuranRepositoryImpl implements QuranRepository {
           .filter()
           .numberEqualTo(surahNumber)
           .findFirst();
-      
+
       if (surah != null) {
         surah.lastReadAyah = ayahNumber;
         surah.lastReadTime = DateTime.now();
-        
+
         await _isar.writeTxn(() async {
           await _isar.surahs.put(surah);
         });
         return const Right(null);
       } else {
-        return Left(CacheFailure('Surah not found'));
+        return const Left(CacheFailure('Surah not found'));
       }
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }
   }
-  
+
   @override
   Future<Either<Failure, void>> toggleFavorite(int surahNumber) async {
     try {
@@ -234,16 +242,16 @@ class QuranRepositoryImpl implements QuranRepository {
           .filter()
           .numberEqualTo(surahNumber)
           .findFirst();
-      
+
       if (surah != null) {
         surah.isFavorite = !surah.isFavorite;
-        
+
         await _isar.writeTxn(() async {
           await _isar.surahs.put(surah);
         });
         return const Right(null);
       } else {
-         return Left(CacheFailure('Surah not found'));
+        return const Left(CacheFailure('Surah not found'));
       }
     } catch (e) {
       return Left(CacheFailure(e.toString()));
@@ -269,11 +277,11 @@ class QuranRepositoryImpl implements QuranRepository {
           .filter()
           .pageEqualTo(pageNumber)
           .findAll();
-      
+
       if (localAyahs.isNotEmpty) {
         return Right(localAyahs);
       }
-      
+
       // Fallback
       final ayahs = await _localDataSource.loadAyahsForPage(pageNumber);
       return Right(ayahs);
@@ -283,22 +291,27 @@ class QuranRepositoryImpl implements QuranRepository {
   }
 
   @override
-  Future<Either<Failure, List<Ayah>>> getAyahsCountRange(int startSurah, int startAyah, int endSurah, int endAyah) async {
+  Future<Either<Failure, List<Ayah>>> getAyahsCountRange(
+    int startSurah,
+    int startAyah,
+    int endSurah,
+    int endAyah,
+  ) async {
     try {
       if (kIsWeb) {
-        return const Right([]); 
+        return const Right([]);
       }
 
       // Simple Logic for Range:
       List<Ayah> results = [];
-      
+
       // 1. Get Start Surah Ayahs
       final startAyahs = await _isar.ayahs
           .filter()
           .surahNumberEqualTo(startSurah)
           .ayahNumberGreaterThan(startAyah - 1)
           .findAll();
-          
+
       results.addAll(startAyahs);
 
       // 2. Get In-Between Surahs (if any)
@@ -321,15 +334,17 @@ class QuranRepositoryImpl implements QuranRepository {
             .findAll();
         results.addAll(endAyahs);
       }
-      
+
       // Filter out if startSurah == endSurah (we added too many in step 1, need to clip)
       if (startSurah == endSurah) {
         results = results.where((a) => a.ayahNumber <= endAyah).toList();
       }
-      
+
       // Sort by Surah then Ayah
       results.sort((a, b) {
-        if (a.surahNumber != b.surahNumber) return a.surahNumber.compareTo(b.surahNumber);
+        if (a.surahNumber != b.surahNumber) {
+          return a.surahNumber.compareTo(b.surahNumber);
+        }
         return a.ayahNumber.compareTo(b.ayahNumber);
       });
 

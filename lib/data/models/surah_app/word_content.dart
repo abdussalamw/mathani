@@ -1,6 +1,3 @@
-
-import 'package:flutter/foundation.dart';
-
 class WordContent {
   final int suraNumber;
   final String suraName;

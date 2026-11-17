@@ -1,5 +1,7 @@
 import 'package:fpdart/fpdart.dart';
+
 import '../repositories/quran_repository.dart';
+
 import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/core/errors/failures.dart';
 

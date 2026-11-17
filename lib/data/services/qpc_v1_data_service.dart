@@ -1,7 +1,10 @@
 import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+
 import 'dart:io';
+
 import 'package:path_provider/path_provider.dart';
 
 class QPCV1DataService {
@@ -21,32 +24,38 @@ class QPCV1DataService {
       String jsonString;
       if (!kIsWeb) {
         final appDir = await getApplicationDocumentsDirectory();
-        final localFile = File('${appDir.path}/mushafs/madani_old_v1/qpc_v1_glyphs.json');
+        final localFile = File(
+          '${appDir.path}/mushafs/madani_old_v1/qpc_v1_glyphs.json',
+        );
         if (await localFile.exists()) {
           jsonString = await localFile.readAsString();
         } else {
           try {
-            jsonString = await rootBundle.loadString('assets/data/qpc_v1_glyphs.json');
+            jsonString = await rootBundle.loadString(
+              'assets/data/qpc_v1_glyphs.json',
+            );
           } catch (_) {
             jsonString = '{}'; // Fallback to empty if both fail
           }
         }
       } else {
         try {
-          jsonString = await rootBundle.loadString('assets/data/qpc_v1_glyphs.json');
+          jsonString = await rootBundle.loadString(
+            'assets/data/qpc_v1_glyphs.json',
+          );
         } catch (_) {
           jsonString = '{}';
         }
       }
       // Running map conversion in isolate to avoid UI jank
       final Map<String, dynamic> rawMap = await compute(_parseJson, jsonString);
-      
+
       // Convert to Map<String, String> and optimize
       // The JSON structure is: "S:A:W": { "text": "GLYPH", ... }
       // We only need the "text" field.
-      
+
       _glyphMap = await compute(_parseGlyphMap, rawMap);
-      
+
       _isLoaded = true;
     } catch (e) {
       debugPrint('Error loading QPC V1 Glyphs: $e');
@@ -74,6 +83,6 @@ class QPCV1DataService {
     final key = '$surah:$ayah:$word';
     return _glyphMap[key];
   }
-  
+
   bool get isLoaded => _isLoaded;
 }

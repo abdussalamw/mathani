@@ -1,8 +1,9 @@
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:mathani/l10n/app_localization_delegates.dart';
+
 import 'l10n/app_localizations.dart';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -10,40 +11,40 @@ import 'core/database/isar_service.dart';
 import 'core/database/collections.dart';
 import 'core/di/service_locator.dart';
 import 'core/theme/app_theme.dart';
-
+import 'core/services/frame_performance_monitor.dart';
 
 import 'presentation/providers/settings_provider.dart';
 import 'presentation/providers/quran_provider.dart';
 import 'presentation/providers/mushaf_metadata_provider.dart';
 import 'data/providers/mushaf_navigation_provider.dart';
 import 'presentation/providers/audio_provider.dart'; // Add import
+
 import 'package:mathani/presentation/providers/bookmark_provider.dart';
+
 import 'presentation/providers/surah_content_provider.dart';
 import 'presentation/providers/ui_provider.dart';
 import 'presentation/providers/tafsir_provider.dart';
 import 'presentation/providers/recitation_provider.dart';
-import 'data/models/recitation_session.dart';
 import 'data/services/local_tafsir_service.dart';
 import 'presentation/screens/splash/splash_screen.dart';
 import 'presentation/screens/home/main_shell_screen.dart';
 import 'presentation/screens/mushaf/mushaf_screen.dart';
+
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import 'presentation/screens/startup/initial_download_screen.dart';
 import 'presentation/screens/settings/download_center_screen.dart';
 
-
-
-
 import 'package:just_audio_background/just_audio_background.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FramePerformanceMonitor.instance.start();
 
   // ─── تهيئة Sherpa-ONNX (يجب أن تكون أول شيء) ───
   sherpa.initBindings();
   debugPrint('✅ sherpa_onnx bindings initialized');
-  
+
   try {
     await JustAudioBackground.init(
       androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
@@ -53,26 +54,26 @@ void main() async {
   } catch (e) {
     debugPrint('Failed to initialize JustAudioBackground: $e');
   }
-  
+
   try {
     // تهيئة قاعدة البيانات
     if (!kIsWeb) {
       await IsarService.instance.init();
     }
-    
+
     // تهيئة حقن التبعيات
     await initServiceLocator();
-    
+
     // إعداد افتراضي
     if (!kIsWeb) {
       try {
         final isar = IsarService.instance.isar;
-        
+
         await isar.writeTxn(() async {
           final count = await isar.collection<UserSettings>().count();
           if (count == 0) {
             await isar.collection<UserSettings>().put(
-              UserSettings()..selectedMushafId = 'madani_font_v1'
+              UserSettings()..selectedMushafId = 'madani_font_v1',
             );
           }
         });
@@ -81,23 +82,23 @@ void main() async {
         // Continue anyway - settings will use defaults
       }
     }
-    
+
     // إعدادات النظام
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
-    
+
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
       ),
     );
-    
+
     final settingsProvider = SettingsProvider();
     await settingsProvider.init();
-    
+
     runApp(MathaniApp(settingsProvider: settingsProvider));
   } catch (e, stackTrace) {
     debugPrint('CRITICAL ERROR in main(): $e');
@@ -112,10 +113,10 @@ class MathaniApp extends StatelessWidget {
   final SettingsProvider? settingsProvider;
 
   const MathaniApp({
-    Key? key,
+    super.key,
     this.initializationError,
     this.settingsProvider,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +136,11 @@ class MathaniApp extends StatelessWidget {
                   const SizedBox(height: 24),
                   const Text(
                     'فشل تهيئة التطبيق',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Tajawal'),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Tajawal',
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -148,7 +153,11 @@ class MathaniApp extends StatelessWidget {
                     child: SingleChildScrollView(
                       child: Text(
                         initializationError!,
-                        style: const TextStyle(fontSize: 12, color: Colors.black87, fontFamily: 'monospace'),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black87,
+                          fontFamily: 'monospace',
+                        ),
                         textAlign: TextAlign.left,
                       ),
                     ),
@@ -156,9 +165,14 @@ class MathaniApp extends StatelessWidget {
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: initializationError!));
+                      Clipboard.setData(
+                        ClipboardData(text: initializationError!),
+                      );
                     },
-                    child: const Text('نسخ تفاصيل الخطأ', style: TextStyle(fontFamily: 'Tajawal')),
+                    child: const Text(
+                      'نسخ تفاصيل الخطأ',
+                      style: TextStyle(fontFamily: 'Tajawal'),
+                    ),
                   ),
                 ],
               ),
@@ -170,10 +184,15 @@ class MathaniApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(value: settingsProvider ?? SettingsProvider()),
+        ChangeNotifierProvider.value(
+          value: settingsProvider ?? SettingsProvider(),
+        ),
         ChangeNotifierProvider(create: (_) => QuranProvider()),
         ChangeNotifierProvider(create: (_) => MushafMetadataProvider()),
-        ChangeNotifierProxyProvider<MushafMetadataProvider, MushafNavigationProvider>(
+        ChangeNotifierProxyProvider<
+          MushafMetadataProvider,
+          MushafNavigationProvider
+        >(
           create: (_) => MushafNavigationProvider(),
           update: (_, metadata, navigation) {
             navigation!.updateMushaf(metadata.currentMushafId);
@@ -196,12 +215,12 @@ class MathaniApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-            
+
             // Localization Setup
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             locale: settings.locale,
-            
+
             // Error handling
             builder: (context, widget) {
               ErrorWidget.builder = (FlutterErrorDetails errorDetails) {
@@ -213,17 +232,27 @@ class MathaniApp extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.error_outline, size: 80, color: Colors.red),
+                          const Icon(
+                            Icons.error_outline,
+                            size: 80,
+                            color: Colors.red,
+                          ),
                           const SizedBox(height: 24),
                           const Text(
                             'حدث خطأ في التطبيق',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             errorDetails.exception.toString(),
-                            style: const TextStyle(fontSize: 14, color: Colors.grey),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -234,10 +263,10 @@ class MathaniApp extends StatelessWidget {
               };
               return widget!;
             },
-            
+
             // الصفحة الأولى حسب حالة الخطوط
             home: const SplashScreen(),
-            
+
             routes: {
               '/home': (context) => const MainShellScreen(),
               '/mushaf': (context) => const MushafScreen(),

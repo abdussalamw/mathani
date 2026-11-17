@@ -1,11 +1,10 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
 
 class MushafDownloaderService {
-  
   static Future<void> downloadAndExtract({
     required String url,
     required String destinationPath,
@@ -24,13 +23,13 @@ class MushafDownloaderService {
       final response = await httpClient.send(request);
 
       if (response.statusCode != 200) {
-         throw Exception('Failed to download: ${response.statusCode}');
+        throw Exception('Failed to download: ${response.statusCode}');
       }
-      
+
       final totalBytes = response.contentLength ?? 0;
       int receivedBytes = 0;
       final List<int> allBytes = [];
-      
+
       await for (final chunk in response.stream) {
         allBytes.addAll(chunk);
         receivedBytes += chunk.length;
@@ -40,15 +39,18 @@ class MushafDownloaderService {
         }
       }
       httpClient.close();
-      
+
       // 3. Handle Archive vs Direct File
-      final isArchive = url.endsWith('.zip') || url.endsWith('.tar.bz2') || url.endsWith('.tar.gz');
-      
+      final isArchive =
+          url.endsWith('.zip') ||
+          url.endsWith('.tar.bz2') ||
+          url.endsWith('.tar.gz');
+
       if (isArchive) {
         onProgress(0.75);
         if (!kIsWeb) {
           await compute(_extractArchive, {
-            'bytes': allBytes, 
+            'bytes': allBytes,
             'path': destinationPath,
             'url': url,
           });
@@ -61,12 +63,11 @@ class MushafDownloaderService {
         await outFile.parent.create(recursive: true);
         await outFile.writeAsBytes(allBytes);
       }
-      
+
       onProgress(1.0);
-      
     } catch (e) {
       debugPrint('Mushaf Download Error: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -74,33 +75,33 @@ class MushafDownloaderService {
     final bytes = args['bytes'] as List<int>;
     final targetPath = args['path'] as String;
     final url = args['url'] as String;
-    
+
     Archive archive;
-    
+
     if (url.endsWith('.tar.bz2')) {
-       final decompressed = BZip2Decoder().decodeBytes(bytes);
-       archive = TarDecoder().decodeBytes(decompressed);
+      final decompressed = BZip2Decoder().decodeBytes(bytes);
+      archive = TarDecoder().decodeBytes(decompressed);
     } else {
-       // Default to ZIP
-       archive = ZipDecoder().decodeBytes(bytes);
+      // Default to ZIP
+      archive = ZipDecoder().decodeBytes(bytes);
     }
-    
+
     for (final file in archive) {
       final filename = file.name;
       if (file.isFile) {
         final data = file.content as List<int>;
-        
+
         // Handle potential nested folders in ZIP/Tar: flatten or preserve?
-        // For Mushaf images, we usually want them in the root of targetPath 
+        // For Mushaf images, we usually want them in the root of targetPath
         // to match ImagePageLoader expectations (001.webp).
         // Check if filename has digits
         final nameParts = filename.split('/');
         final actualName = nameParts.last;
-        
+
         if (actualName.isNotEmpty && !actualName.startsWith('.')) {
-             final outFile = File('$targetPath/$actualName');
-             outFile.parent.createSync(recursive: true);
-             outFile.writeAsBytesSync(data);
+          final outFile = File('$targetPath/$actualName');
+          outFile.parent.createSync(recursive: true);
+          outFile.writeAsBytesSync(data);
         }
       }
     }

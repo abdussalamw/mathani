@@ -62,6 +62,8 @@ secrets.json
 # Database
 *.isar
 *.isar.lock
+*.isar-lck
+!/test/fixtures/isar_v3/default.isar
 
 # Audio cache
 audio_cache/

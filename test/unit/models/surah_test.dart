@@ -10,7 +10,7 @@ void main() {
         ..nameArabic = 'الفاتحة'
         ..nameEnglish = 'Al-Fatihah'
         ..numberOfAyahs = 7;
-      
+
       // Act & Assert
       expect(surah.number, 1);
       expect(surah.nameArabic, 'الفاتحة');

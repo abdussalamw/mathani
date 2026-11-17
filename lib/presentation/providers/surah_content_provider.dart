@@ -1,5 +1,5 @@
+import 'package:material_ui/material_ui.dart';
 
-import 'package:flutter/material.dart';
 import '../../data/models/surah_app/aya_content.dart';
 import '../../data/models/surah_app/word_content.dart';
 import '../../data/services/surah_app_api_service.dart';
@@ -25,12 +25,16 @@ class SurahContentProvider extends ChangeNotifier {
   int? _selectedAyah;
   int? _selectedWordCount;
 
-  Future<void> fetchContent(int suraNumber, int ayaNumber, int wordCount) async {
+  Future<void> fetchContent(
+    int suraNumber,
+    int ayaNumber,
+    int wordCount,
+  ) async {
     _isLoading = true;
     _selectedSurah = suraNumber;
     _selectedAyah = ayaNumber;
     _selectedWordCount = wordCount;
-    
+
     // Clear previous
     _currentAyaContent = null;
     _currentAyaWords = [];
@@ -41,16 +45,15 @@ class SurahContentProvider extends ChangeNotifier {
       final results = await Future.wait([
         _fetchAyaContentLogic(suraNumber, ayaNumber, _selectedTafsirSlug),
         _apiService.getAyahWordsContent(
-          suraNumber: suraNumber, 
-          ayaNumber: ayaNumber, 
+          suraNumber: suraNumber,
+          ayaNumber: ayaNumber,
           wordCount: wordCount,
-          slug: 'meaning-word', 
+          slug: 'meaning-word',
         ),
       ]);
 
       _currentAyaContent = results[0] as AyaContent?;
       _currentAyaWords = results[1] as List<WordContent>;
-
     } catch (e) {
       debugPrint('Error fetching content: $e');
     } finally {
@@ -59,36 +62,49 @@ class SurahContentProvider extends ChangeNotifier {
     }
   }
 
-  Future<AyaContent?> _fetchAyaContentLogic(int suraNumber, int ayaNumber, String slug) async {
-     // Migrate old identifier to new one for local tafsir
-     if (slug == 'muyassar' || slug == 'w-moyassar') {
-        final localText = await LocalTafsirService.instance.getTafsir(suraNumber, ayaNumber);
-        if (localText != null && localText.trim().isNotEmpty) {
-           return AyaContent(
-             suraNumber: suraNumber,
-             suraName: '', 
-             ayaNumber: ayaNumber,
-             ayaText: '',
-             content: localText,
-           );
-        }
-        // User requested: No internet fallback for Muyassar. 
-        // If not local, it stays null.
-        return null;
-     }
-     
-     // Other tafsirs still use the API
-     return await _apiService.getAyaContent(
-       suraNumber: suraNumber,
-       ayaNumber: ayaNumber,
-       slug: slug,
-     );
+  Future<AyaContent?> _fetchAyaContentLogic(
+    int suraNumber,
+    int ayaNumber,
+    String slug,
+  ) async {
+    // Migrate old identifier to new one for local tafsir
+    if (slug == 'muyassar' || slug == 'w-moyassar') {
+      final localText = await LocalTafsirService.instance.getTafsir(
+        suraNumber,
+        ayaNumber,
+      );
+      if (localText != null && localText.trim().isNotEmpty) {
+        return AyaContent(
+          suraNumber: suraNumber,
+          suraName: '',
+          ayaNumber: ayaNumber,
+          ayaText: '',
+          content: localText,
+        );
+      }
+      // User requested: No internet fallback for Muyassar.
+      // If not local, it stays null.
+      return null;
+    }
+
+    // Other tafsirs still use the API
+    return await _apiService.getAyaContent(
+      suraNumber: suraNumber,
+      ayaNumber: ayaNumber,
+      slug: slug,
+    );
   }
 
   Future<String?> fetchTafsirForAyah(int suraNumber, int ayaNumber) async {
     try {
-      final slug = _selectedTafsirSlug.isNotEmpty ? _selectedTafsirSlug : 'muyassar';
-      final ayaContent = await _fetchAyaContentLogic(suraNumber, ayaNumber, slug);
+      final slug = _selectedTafsirSlug.isNotEmpty
+          ? _selectedTafsirSlug
+          : 'muyassar';
+      final ayaContent = await _fetchAyaContentLogic(
+        suraNumber,
+        ayaNumber,
+        slug,
+      );
       return ayaContent?.content;
     } catch (e) {
       debugPrint('Error fetching specific tafsir: $e');
@@ -102,13 +118,15 @@ class SurahContentProvider extends ChangeNotifier {
     _selectedTafsirSlug = newSlug;
     notifyListeners();
     // Refetch full content if context is available
-    if (_selectedSurah != null && _selectedAyah != null && _selectedWordCount != null) {
+    if (_selectedSurah != null &&
+        _selectedAyah != null &&
+        _selectedWordCount != null) {
       await fetchContent(_selectedSurah!, _selectedAyah!, _selectedWordCount!);
     }
   }
 
   void setTafsirSlug(String slug, {bool shouldNotify = false}) {
     _selectedTafsirSlug = slug;
-    if (shouldNotify) notifyListeners(); 
+    if (shouldNotify) notifyListeners();
   }
 }

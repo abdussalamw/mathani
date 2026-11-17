@@ -7,7 +7,7 @@ part of 'juz.dart';
 // **************************************************************************
 
 // coverage:ignore-file
-// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types, experimental_member_use
 
 extension GetJuzCollection on Isar {
   IsarCollection<Juz> get juzs => this.collection();
@@ -17,21 +17,9 @@ const JuzSchema = CollectionSchema(
   name: r'Juz',
   id: -4102876579624723299,
   properties: {
-    r'endAyah': PropertySchema(
-      id: 0,
-      name: r'endAyah',
-      type: IsarType.long,
-    ),
-    r'endSurah': PropertySchema(
-      id: 1,
-      name: r'endSurah',
-      type: IsarType.long,
-    ),
-    r'number': PropertySchema(
-      id: 2,
-      name: r'number',
-      type: IsarType.long,
-    ),
+    r'endAyah': PropertySchema(id: 0, name: r'endAyah', type: IsarType.long),
+    r'endSurah': PropertySchema(id: 1, name: r'endSurah', type: IsarType.long),
+    r'number': PropertySchema(id: 2, name: r'number', type: IsarType.long),
     r'startAyah': PropertySchema(
       id: 3,
       name: r'startAyah',
@@ -41,8 +29,9 @@ const JuzSchema = CollectionSchema(
       id: 4,
       name: r'startSurah',
       type: IsarType.long,
-    )
+    ),
   },
+
   estimateSize: _juzEstimateSize,
   serialize: _juzSerialize,
   deserialize: _juzDeserialize,
@@ -59,16 +48,17 @@ const JuzSchema = CollectionSchema(
           name: r'number',
           type: IndexType.value,
           caseSensitive: false,
-        )
+        ),
       ],
-    )
+    ),
   },
   links: {},
   embeddedSchemas: {},
+
   getId: _juzGetId,
   getLinks: _juzGetLinks,
   attach: _juzAttach,
-  version: '3.1.0+1',
+  version: '3.4.1',
 );
 
 int _juzEstimateSize(
@@ -162,10 +152,7 @@ extension JuzQueryWhereSort on QueryBuilder<Juz, Juz, QWhere> {
 extension JuzQueryWhere on QueryBuilder<Juz, Juz, QWhereClause> {
   QueryBuilder<Juz, Juz, QAfterWhereClause> idEqualTo(Id id) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: id,
-        upper: id,
-      ));
+      return query.addWhereClause(IdWhereClause.between(lower: id, upper: id));
     });
   }
 
@@ -191,8 +178,10 @@ extension JuzQueryWhere on QueryBuilder<Juz, Juz, QWhereClause> {
     });
   }
 
-  QueryBuilder<Juz, Juz, QAfterWhereClause> idGreaterThan(Id id,
-      {bool include = false}) {
+  QueryBuilder<Juz, Juz, QAfterWhereClause> idGreaterThan(
+    Id id, {
+    bool include = false,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.greaterThan(lower: id, includeLower: include),
@@ -200,8 +189,10 @@ extension JuzQueryWhere on QueryBuilder<Juz, Juz, QWhereClause> {
     });
   }
 
-  QueryBuilder<Juz, Juz, QAfterWhereClause> idLessThan(Id id,
-      {bool include = false}) {
+  QueryBuilder<Juz, Juz, QAfterWhereClause> idLessThan(
+    Id id, {
+    bool include = false,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         IdWhereClause.lessThan(upper: id, includeUpper: include),
@@ -216,21 +207,22 @@ extension JuzQueryWhere on QueryBuilder<Juz, Juz, QWhereClause> {
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IdWhereClause.between(
-        lower: lowerId,
-        includeLower: includeLower,
-        upper: upperId,
-        includeUpper: includeUpper,
-      ));
+      return query.addWhereClause(
+        IdWhereClause.between(
+          lower: lowerId,
+          includeLower: includeLower,
+          upper: upperId,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<Juz, Juz, QAfterWhereClause> numberEqualTo(int number) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'number',
-        value: [number],
-      ));
+      return query.addWhereClause(
+        IndexWhereClause.equalTo(indexName: r'number', value: [number]),
+      );
     });
   }
 
@@ -238,32 +230,40 @@ extension JuzQueryWhere on QueryBuilder<Juz, Juz, QWhereClause> {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'number',
-              lower: [],
-              upper: [number],
-              includeUpper: false,
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'number',
-              lower: [number],
-              includeLower: false,
-              upper: [],
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'number',
+                lower: [],
+                upper: [number],
+                includeUpper: false,
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'number',
+                lower: [number],
+                includeLower: false,
+                upper: [],
+              ),
+            );
       } else {
         return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'number',
-              lower: [number],
-              includeLower: false,
-              upper: [],
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'number',
-              lower: [],
-              upper: [number],
-              includeUpper: false,
-            ));
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'number',
+                lower: [number],
+                includeLower: false,
+                upper: [],
+              ),
+            )
+            .addWhereClause(
+              IndexWhereClause.between(
+                indexName: r'number',
+                lower: [],
+                upper: [number],
+                includeUpper: false,
+              ),
+            );
       }
     });
   }
@@ -273,12 +273,14 @@ extension JuzQueryWhere on QueryBuilder<Juz, Juz, QWhereClause> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'number',
-        lower: [number],
-        includeLower: include,
-        upper: [],
-      ));
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'number',
+          lower: [number],
+          includeLower: include,
+          upper: [],
+        ),
+      );
     });
   }
 
@@ -287,12 +289,14 @@ extension JuzQueryWhere on QueryBuilder<Juz, Juz, QWhereClause> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'number',
-        lower: [],
-        upper: [number],
-        includeUpper: include,
-      ));
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'number',
+          lower: [],
+          upper: [number],
+          includeUpper: include,
+        ),
+      );
     });
   }
 
@@ -303,13 +307,15 @@ extension JuzQueryWhere on QueryBuilder<Juz, Juz, QWhereClause> {
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'number',
-        lower: [lowerNumber],
-        includeLower: includeLower,
-        upper: [upperNumber],
-        includeUpper: includeUpper,
-      ));
+      return query.addWhereClause(
+        IndexWhereClause.between(
+          indexName: r'number',
+          lower: [lowerNumber],
+          includeLower: includeLower,
+          upper: [upperNumber],
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 }
@@ -317,10 +323,9 @@ extension JuzQueryWhere on QueryBuilder<Juz, Juz, QWhereClause> {
 extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
   QueryBuilder<Juz, Juz, QAfterFilterCondition> endAyahEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'endAyah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'endAyah', value: value),
+      );
     });
   }
 
@@ -329,11 +334,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'endAyah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'endAyah',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -342,11 +349,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'endAyah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'endAyah',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -357,22 +366,23 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'endAyah',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'endAyah',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<Juz, Juz, QAfterFilterCondition> endSurahEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'endSurah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'endSurah', value: value),
+      );
     });
   }
 
@@ -381,11 +391,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'endSurah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'endSurah',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -394,11 +406,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'endSurah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'endSurah',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -409,22 +423,23 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'endSurah',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'endSurah',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<Juz, Juz, QAfterFilterCondition> idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'id', value: value),
+      );
     });
   }
 
@@ -433,11 +448,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -446,11 +463,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'id',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'id',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -461,22 +480,23 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'id',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'id',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<Juz, Juz, QAfterFilterCondition> numberEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'number',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'number', value: value),
+      );
     });
   }
 
@@ -485,11 +505,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'number',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'number',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -498,11 +520,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'number',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'number',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -513,22 +537,23 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'number',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'number',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<Juz, Juz, QAfterFilterCondition> startAyahEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'startAyah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'startAyah', value: value),
+      );
     });
   }
 
@@ -537,11 +562,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'startAyah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'startAyah',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -550,11 +577,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'startAyah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'startAyah',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -565,22 +594,23 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'startAyah',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'startAyah',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 
   QueryBuilder<Juz, Juz, QAfterFilterCondition> startSurahEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'startSurah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'startSurah', value: value),
+      );
     });
   }
 
@@ -589,11 +619,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'startSurah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'startSurah',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -602,11 +634,13 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'startSurah',
-        value: value,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'startSurah',
+          value: value,
+        ),
+      );
     });
   }
 
@@ -617,13 +651,15 @@ extension JuzQueryFilter on QueryBuilder<Juz, Juz, QFilterCondition> {
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'startSurah',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'startSurah',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
     });
   }
 }

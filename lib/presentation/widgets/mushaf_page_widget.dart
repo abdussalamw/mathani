@@ -1,16 +1,17 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+
 import '../../data/models/page_glyph.dart';
 import '../../data/models/ayah.dart';
 import '../../core/constants/app_colors.dart';
 import 'page_line_widget.dart';
+
 import 'dart:collection';
-import 'package:flutter/gestures.dart';
+
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../data/services/qcf4_font_downloader.dart';
 import '../../data/services/qpc_v1_font_downloader.dart'; // Added
-import '../../data/services/qpc_v1_data_service.dart'; // Added
+// Added
 import '../../data/services/qpc_v1_layout_service.dart'; // Fixed: Added missing import
 import '../../data/services/qcf4_alignment_service.dart'; // QUL alignment data
 import '../../data/services/qpc_v1_alignment_service.dart'; // QUL V1 alignment data
@@ -19,7 +20,7 @@ import '../../presentation/providers/settings_provider.dart';
 import '../../presentation/providers/bookmark_provider.dart';
 import '../../presentation/providers/ui_provider.dart';
 import '../../data/providers/mushaf_navigation_provider.dart';
-import '../../presentation/providers/audio_provider.dart'; // Added
+// Added
 import '../../core/constants/responsive_constants.dart';
 
 /// Widget لعرض صفحة كاملة من المصحف
@@ -32,12 +33,12 @@ class MushafPageWidget extends StatefulWidget {
   final bool showInfo;
   final bool isDigital;
   final bool
-      hideContent; // إضافة خاصية لإخفاء المحتوى عند الحاجة (للشريط الثابت)
+  hideContent; // إضافة خاصية لإخفاء المحتوى عند الحاجة (للشريط الثابت)
 
   final String? mushafId; // Added to distinguish between QCF4 and QPC V1
 
   const MushafPageWidget({
-    Key? key,
+    super.key,
     required this.page,
     this.mushafId,
     this.selectedSurah,
@@ -47,7 +48,7 @@ class MushafPageWidget extends StatefulWidget {
     this.showInfo = true,
     this.isDigital = false,
     this.hideContent = false, // القيمة الافتراضية هي إظهار المحتوى
-  }) : super(key: key);
+  });
 
   @override
   State<MushafPageWidget> createState() => _MushafPageWidgetState();
@@ -57,7 +58,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   bool _isFontLoaded = false;
   List<Ayah>? _digitalAyahs;
   bool _isLoadingDigital = false;
-  Map<int, List<String>> _lineWordsMap = {};
+  int _loadGeneration = 0;
+  final Map<int, List<String>> _lineWordsMap = {};
 
   @override
   void initState() {
@@ -79,12 +81,24 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   List<PageLine>? _v1Lines;
 
   Future<void> _loadData() async {
+    final generation = ++_loadGeneration;
     if (mounted) setState(() => _isLoadingDigital = true);
 
     final isV1 = widget.mushafId == 'madani_old_v1';
     final pageNum = widget.page.page;
 
     try {
+      if (widget.hideContent) {
+        final ayahs = await context.read<QuranProvider>().getAyahsForPage(
+          pageNum,
+        );
+        if (!mounted || generation != _loadGeneration) return;
+        setState(() {
+          _digitalAyahs = ayahs;
+          _isLoadingDigital = false;
+        });
+        return;
+      }
       // === تحميل متوازٍ لكل العمليات المستقلة ===
       late List<Ayah> ayahs;
       late bool fontLoaded;
@@ -93,10 +107,12 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       if (isV1) {
         // V1: تحميل الآيات + المحاذاة + Layout + الخط بالتوازي
         final results = await Future.wait([
-          context.read<QuranProvider>().getAyahsForPage(pageNum),       // [0] ayahs
-          QPCV1AlignmentService().load(),                               // [1] alignment
-          QPCV1LayoutService().getLinesForPage(pageNum),                 // [2] v1Lines (يستدعي DataService.load داخلياً)
-          QPCV1FontDownloader.loadPageFont(pageNum),                    // [3] font
+          context.read<QuranProvider>().getAyahsForPage(pageNum), // [0] ayahs
+          QPCV1AlignmentService().load(), // [1] alignment
+          QPCV1LayoutService().getLinesForPage(
+            pageNum,
+          ), // [2] v1Lines (يستدعي DataService.load داخلياً)
+          QPCV1FontDownloader.loadPageFont(pageNum), // [3] font
         ]);
         ayahs = results[0] as List<Ayah>;
         v1Lines = results[2] as List<PageLine>;
@@ -104,9 +120,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       } else {
         // V4: تحميل الآيات + المحاذاة + الخط بالتوازي
         final results = await Future.wait([
-          context.read<QuranProvider>().getAyahsForPage(pageNum),       // [0] ayahs
-          QCF4AlignmentService().load(),                                // [1] alignment
-          QCF4FontDownloader.loadPageFont(pageNum),                     // [2] font
+          context.read<QuranProvider>().getAyahsForPage(pageNum), // [0] ayahs
+          QCF4AlignmentService().load(), // [1] alignment
+          QCF4FontDownloader.loadPageFont(pageNum), // [2] font
         ]);
         ayahs = results[0] as List<Ayah>;
         fontLoaded = results[2] as bool;
@@ -114,6 +130,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       }
 
       // === تحديث الواجهة مرة واحدة فقط بعد اكتمال كل شيء ===
+      if (!mounted || generation != _loadGeneration) return;
       if (mounted) {
         setState(() {
           _digitalAyahs = ayahs;
@@ -128,10 +145,11 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
       // === تحميل مسبق للصفحات المجاورة (في الخلفية - بدون انتظار) ===
       _prefetchAdjacentPages(pageNum, isV1);
-
     } catch (e) {
       debugPrint('Error loading page metadata: $e');
-      if (mounted) setState(() => _isLoadingDigital = false);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _isLoadingDigital = false);
+      }
     }
   }
 
@@ -198,8 +216,10 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () => _loadData(),
-            child: const Text('إعادة المحاولة',
-                style: TextStyle(fontFamily: 'Tajawal')),
+            child: const Text(
+              'إعادة المحاولة',
+              style: TextStyle(fontFamily: 'Tajawal'),
+            ),
           ),
         ],
       ),
@@ -232,8 +252,10 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       // Right Side: Juz Name
@@ -242,15 +264,17 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                           alignment: Alignment.centerRight,
                           child: Consumer<MushafNavigationProvider>(
                             builder: (context, navProvider, child) {
-                              final pageInfo =
-                                  navProvider.getPageInfo(widget.page.page);
+                              final pageInfo = navProvider.getPageInfo(
+                                widget.page.page,
+                              );
                               final juzNumber = pageInfo?.juz ?? 1;
                               final int juzCodePoint = 0xF1D8 + (juzNumber - 1);
                               return InkWell(
                                 onTap: () {
-                                  Provider.of<UiProvider>(context,
-                                          listen: false)
-                                      .setTabIndex(0, indexScreenTab: 1);
+                                  Provider.of<UiProvider>(
+                                    context,
+                                    listen: false,
+                                  ).setTabIndex(0, indexScreenTab: 1);
                                 },
                                 child: Padding(
                                   padding: const EdgeInsets.all(4),
@@ -275,19 +299,22 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                         child: Center(
                           child: Consumer<MushafNavigationProvider>(
                             builder: (context, navProvider, child) {
-                              final pageInfo =
-                                  navProvider.getPageInfo(widget.page.page);
+                              final pageInfo = navProvider.getPageInfo(
+                                widget.page.page,
+                              );
                               final surahs = pageInfo?.surahs ?? [];
-                              final surahNumber =
-                                  surahs.isNotEmpty ? surahs.first : null;
+                              final surahNumber = surahs.isNotEmpty
+                                  ? surahs.first
+                                  : null;
                               if (surahNumber != null) {
                                 final int surahCodePoint =
                                     0xF100 + (surahNumber - 1);
                                 return InkWell(
                                   onTap: () {
-                                    Provider.of<UiProvider>(context,
-                                            listen: false)
-                                        .setTabIndex(0);
+                                    Provider.of<UiProvider>(
+                                      context,
+                                      listen: false,
+                                    ).setTabIndex(0);
                                   },
                                   child: Padding(
                                     padding: const EdgeInsets.all(4),
@@ -322,8 +349,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                               InkWell(
                                 onTap: () => settings.toggleDarkMode(),
                                 child: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
                                   child: Icon(
                                     isDark ? Icons.light_mode : Icons.dark_mode,
                                     size: 22,
@@ -354,27 +382,35 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                                       }
                                     }
                                   }
-                                  final isBookmarked = targetSurah != null &&
+                                  final isBookmarked =
+                                      targetSurah != null &&
                                       targetAyah != null &&
                                       bookmarks.isBookmarked(
-                                          targetSurah, targetAyah);
+                                        targetSurah,
+                                        targetAyah,
+                                      );
                                   return InkWell(
                                     onTap: () {
                                       if (targetSurah != null &&
                                           targetAyah != null) {
                                         if (isBookmarked) {
                                           bookmarks.removeBookmark(
-                                              targetSurah, targetAyah);
+                                            targetSurah,
+                                            targetAyah,
+                                          );
                                         } else {
                                           bookmarks.addBookmark(
-                                              targetSurah, targetAyah,
-                                              note: 'صفحة ${widget.page.page}');
+                                            targetSurah,
+                                            targetAyah,
+                                            note: 'صفحة ${widget.page.page}',
+                                          );
                                         }
                                       }
                                     },
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 4),
+                                        horizontal: 4,
+                                      ),
                                       child: Icon(
                                         isBookmarked
                                             ? Icons.bookmark
@@ -394,7 +430,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                                 onTap: () => _showPageJumpDialog(context),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   child: Text(
                                     _convertToArabicNumbers(widget.page.page),
                                     style: const TextStyle(
@@ -425,42 +463,54 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                   child: widget.isDigital && _isLoadingDigital
                       ? const Center(child: CircularProgressIndicator())
                       : (widget.mushafId == 'madani_old_v1' &&
-                              !_isFontLoaded &&
-                              !_isLoadingDigital
-                          ? _buildErrorState(
-                              'فشل تحميل خطوط المصحف. يرجى التأكد من تحميله من المكتبة.')
-                          : (!_isFontLoaded
-                              ? const Center(
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2))
-                              : Container(
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  padding: EdgeInsets.only(
-                                      top: widget.showInfo
-                                          ? ResponsiveConstants.safetyMarginTop
-                                          : 0.0, // تصفير الهامش للتلاحم التام
-                                      bottom: widget.showInfo
-                                          ? (ResponsiveConstants
-                                                  .getBottomBarHeight(context) +
-                                              ResponsiveConstants
-                                                  .safetyMarginBottom)
-                                          : 0.0, // تصفير الهامش للتلاحم التام
-                                      left: 16,
-                                      right: 16),
-                                  child: (widget.mushafId == 'madani_old_v1' &&
-                                          (_v1Lines == null ||
-                                              _v1Lines!.isEmpty) &&
-                                          !_isLoadingDigital)
-                                      ? _buildErrorState(
-                                          'فشل تحميل بيانات المصحف القديم. يرجى التأكد من تحميله من المكتبة.')
-                                      : (ResponsiveConstants.getDeviceType(
-                                                  context) ==
-                                              DeviceType.mobile
-                                          ? _buildMobileLayout(widget.showInfo)
-                                          : _buildTabletLayout(
-                                              widget.showInfo)),
-                                ))),
+                                !_isFontLoaded &&
+                                !_isLoadingDigital
+                            ? _buildErrorState(
+                                'فشل تحميل خطوط المصحف. يرجى التأكد من تحميله من المكتبة.',
+                              )
+                            : (!_isFontLoaded
+                                  ? const Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Container(
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      padding: EdgeInsets.only(
+                                        top: widget.showInfo
+                                            ? ResponsiveConstants
+                                                  .safetyMarginTop
+                                            : 0.0, // تصفير الهامش للتلاحم التام
+                                        bottom: widget.showInfo
+                                            ? (ResponsiveConstants.getBottomBarHeight(
+                                                    context,
+                                                  ) +
+                                                  ResponsiveConstants
+                                                      .safetyMarginBottom)
+                                            : 0.0, // تصفير الهامش للتلاحم التام
+                                        left: 16,
+                                        right: 16,
+                                      ),
+                                      child:
+                                          (widget.mushafId == 'madani_old_v1' &&
+                                              (_v1Lines == null ||
+                                                  _v1Lines!.isEmpty) &&
+                                              !_isLoadingDigital)
+                                          ? _buildErrorState(
+                                              'فشل تحميل بيانات المصحف القديم. يرجى التأكد من تحميله من المكتبة.',
+                                            )
+                                          : (ResponsiveConstants.getDeviceType(
+                                                      context,
+                                                    ) ==
+                                                    DeviceType.mobile
+                                                ? _buildMobileLayout(
+                                                    widget.showInfo,
+                                                  )
+                                                : _buildTabletLayout(
+                                                    widget.showInfo,
+                                                  )),
+                                    ))),
                 ),
               ),
             ),
@@ -478,15 +528,16 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
     return Column(
       mainAxisAlignment: useSpaceBetween
           ? MainAxisAlignment.spaceBetween
-          : (!showInfo 
-              ? MainAxisAlignment.spaceAround 
-              : (displayLines.length < 10
-                  ? MainAxisAlignment.spaceEvenly
-                  : MainAxisAlignment.center)),
+          : (!showInfo
+                ? MainAxisAlignment.spaceAround
+                : (displayLines.length < 10
+                      ? MainAxisAlignment.spaceEvenly
+                      : MainAxisAlignment.center)),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: displayLines.map((line) {
-        final verticalPadding =
-            useSpaceBetween ? 0.0 : (displayLines.length < 10 ? 16.0 : 0.0);
+        final verticalPadding = useSpaceBetween
+            ? 0.0
+            : (displayLines.length < 10 ? 16.0 : 0.0);
 
         final lineWidget = PageLineWidget(
           line: line,
@@ -501,13 +552,17 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           mushafId: widget.mushafId,
           isCentered: widget.mushafId != 'madani_old_v1'
               ? (widget.page.page <= 2
-                  ? true
-                  : QCF4AlignmentService()
-                      .isCentered(widget.page.page, line.line))
+                    ? true
+                    : QCF4AlignmentService().isCentered(
+                        widget.page.page,
+                        line.line,
+                      ))
               : (widget.page.page <= 2
-                  ? true
-                  : QPCV1AlignmentService()
-                      .isCentered(widget.page.page, line.line)),
+                    ? true
+                    : QPCV1AlignmentService().isCentered(
+                        widget.page.page,
+                        line.line,
+                      )),
         );
 
         if (useSpaceBetween) {
@@ -520,9 +575,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
         return Expanded(
           child: Padding(
             padding: EdgeInsets.symmetric(vertical: verticalPadding),
-            child: Center(
-              child: lineWidget,
-            ),
+            child: Center(child: lineWidget),
           ),
         );
       }).toList(),
@@ -556,21 +609,23 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                   mainAxisAlignment: !showInfo
                       ? MainAxisAlignment.spaceAround
                       : (displayLines.length < 10
-                          ? MainAxisAlignment.spaceEvenly
-                          : (displayLines.length < 13
-                              ? MainAxisAlignment.center
-                              : MainAxisAlignment.spaceEvenly)),
+                            ? MainAxisAlignment.spaceEvenly
+                            : (displayLines.length < 13
+                                  ? MainAxisAlignment.center
+                                  : MainAxisAlignment.spaceEvenly)),
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: displayLines.map((line) {
                     final verticalPadding =
                         (!showInfo || displayLines.length >= 13)
-                            ? 0.0
-                            : (displayLines.length < 10 ? 24.0 : 0.0);
+                        ? 0.0
+                        : (displayLines.length < 10 ? 24.0 : 0.0);
                     return Container(
                       padding: (showInfo && widget.page.lines.length < 13)
                           ? EdgeInsets.symmetric(
-                              vertical:
-                                  verticalPadding > 0 ? verticalPadding : 12.0)
+                              vertical: verticalPadding > 0
+                                  ? verticalPadding
+                                  : 12.0,
+                            )
                           : EdgeInsets.zero,
                       child: PageLineWidget(
                         line: line,
@@ -581,18 +636,23 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                         onAyahSelected: widget.onAyahSelected,
                         onAyahLongPress: widget.onAyahLongPress,
                         isDigital: widget.isDigital,
-                        digitalWords:
-                            widget.isDigital ? _lineWordsMap[line.line] : null,
+                        digitalWords: widget.isDigital
+                            ? _lineWordsMap[line.line]
+                            : null,
                         mushafId: widget.mushafId,
                         isCentered: widget.mushafId != 'madani_old_v1'
                             ? (widget.page.page <= 2
-                                ? true
-                                : QCF4AlignmentService()
-                                    .isCentered(widget.page.page, line.line))
+                                  ? true
+                                  : QCF4AlignmentService().isCentered(
+                                      widget.page.page,
+                                      line.line,
+                                    ))
                             : (widget.page.page <= 2
-                                ? true
-                                : QPCV1AlignmentService()
-                                    .isCentered(widget.page.page, line.line)),
+                                  ? true
+                                  : QPCV1AlignmentService().isCentered(
+                                      widget.page.page,
+                                      line.line,
+                                    )),
                       ),
                     );
                   }).toList(),
@@ -606,16 +666,20 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   }
 
   void _showPageJumpDialog(BuildContext context) {
-    final navProvider =
-        Provider.of<MushafNavigationProvider>(context, listen: false);
+    final navProvider = Provider.of<MushafNavigationProvider>(
+      context,
+      listen: false,
+    );
     final maxPages = navProvider.totalPages;
     showDialog(
       context: context,
       builder: (context) {
         int? selectedPage;
         return AlertDialog(
-          title: const Text('الانتقال إلى صفحة',
-              style: TextStyle(fontFamily: 'Tajawal')),
+          title: const Text(
+            'الانتقال إلى صفحة',
+            style: TextStyle(fontFamily: 'Tajawal'),
+          ),
           content: TextField(
             keyboardType: TextInputType.number,
             autofocus: true,
@@ -626,22 +690,27 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
               if (selectedPage != null &&
                   navProvider.isValidPage(selectedPage!)) {
                 Navigator.pop(context);
-                Provider.of<UiProvider>(context, listen: false)
-                    .jumpToPage(selectedPage!);
+                Provider.of<UiProvider>(
+                  context,
+                  listen: false,
+                ).jumpToPage(selectedPage!);
               }
             },
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('إلغاء')),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء'),
+            ),
             TextButton(
               onPressed: () {
                 if (selectedPage != null &&
                     navProvider.isValidPage(selectedPage!)) {
                   Navigator.pop(context);
-                  Provider.of<UiProvider>(context, listen: false)
-                      .jumpToPage(selectedPage!);
+                  Provider.of<UiProvider>(
+                    context,
+                    listen: false,
+                  ).jumpToPage(selectedPage!);
                 }
               },
               child: const Text('انتقال'),

@@ -12,20 +12,41 @@ void main() {
       expect(norm, 'بسم الله الرحمن الرحيم');
     });
 
-    test('should match Uthmanic spellings with standard phonetic equivalents', () {
-      // الصلوة vs الصلاة
-      expect(TextUtils.calculateSimilarity('الصلاة', 'ٱلصَّلَوٰةَ'), greaterThanOrEqualTo(0.95));
-      // الزكاة vs الزكوة
-      expect(TextUtils.calculateSimilarity('الزكاة', 'ٱلزَّكَوٰةَ'), greaterThanOrEqualTo(0.95));
-      // هذا vs هاذا
-      expect(TextUtils.calculateSimilarity('هاذا', 'هَٰذَا'), greaterThanOrEqualTo(0.95));
-      // إبراهيم vs إبرٰهم
-      expect(TextUtils.calculateSimilarity('ابراهيم', 'إِبْرَٰهِـۧمَ'), greaterThanOrEqualTo(0.95));
-      // الرحمن vs الرحمٰن
-      expect(TextUtils.calculateSimilarity('الرحمن', 'ٱلرَّحْمَٰنِ'), greaterThanOrEqualTo(0.95));
-      // سماوات vs سمٰوٰت
-      expect(TextUtils.calculateSimilarity('سماوات', 'سَمَٰوَٰتِ'), greaterThanOrEqualTo(0.95));
-    });
+    test(
+      'should match Uthmanic spellings with standard phonetic equivalents',
+      () {
+        // الصلوة vs الصلاة
+        expect(
+          TextUtils.calculateSimilarity('الصلاة', 'ٱلصَّلَوٰةَ'),
+          greaterThanOrEqualTo(0.95),
+        );
+        // الزكاة vs الزكوة
+        expect(
+          TextUtils.calculateSimilarity('الزكاة', 'ٱلزَّكَوٰةَ'),
+          greaterThanOrEqualTo(0.95),
+        );
+        // هذا vs هاذا
+        expect(
+          TextUtils.calculateSimilarity('هاذا', 'هَٰذَا'),
+          greaterThanOrEqualTo(0.95),
+        );
+        // إبراهيم vs إبرٰهم
+        expect(
+          TextUtils.calculateSimilarity('ابراهيم', 'إِبْرَٰهِـۧمَ'),
+          greaterThanOrEqualTo(0.95),
+        );
+        // الرحمن vs الرحمٰن
+        expect(
+          TextUtils.calculateSimilarity('الرحمن', 'ٱلرَّحْمَٰنِ'),
+          greaterThanOrEqualTo(0.95),
+        );
+        // سماوات vs سمٰوٰت
+        expect(
+          TextUtils.calculateSimilarity('سماوات', 'سَمَٰوَٰتِ'),
+          greaterThanOrEqualTo(0.95),
+        );
+      },
+    );
   });
 
   group('TextMatchingService Alignment Tests', () {
@@ -37,7 +58,7 @@ void main() {
         2: 'ٱللَّهُ ٱلصَّمَدُ',
         3: 'لَمْ يَلِدْ وَلَمْ يُولَدْ',
         4: 'وَلَمْ يَكُن لَّهُۥ كُفُوًا أَحَدٌۢ',
-      }
+      },
     };
 
     final quranFatiha = {
@@ -45,7 +66,7 @@ void main() {
         1: 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
         2: 'ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ',
         3: 'ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
-      }
+      },
     };
 
     test('Perfect recitation aligns 100% of words as correct', () async {
@@ -187,10 +208,7 @@ void main() {
         const AsrWord(text: 'العالمين', startMs: 600, endMs: 800),
       ];
 
-      final multiSurahText = {
-        1: quranFatiha[1]!,
-        112: quranIkhlas[112]!,
-      };
+      final multiSurahText = {1: quranFatiha[1]!, 112: quranIkhlas[112]!};
 
       final result = await service.matchTranscript(
         asrWords: asrWords,
@@ -198,7 +216,14 @@ void main() {
       );
 
       expect(result.surahNumber, 1);
-      expect(result.matchedWords.any((w) => w.expectedWord.contains('ٱلْحَمْدُ') && w.verdict == WordVerdict.correct), isTrue);
+      expect(
+        result.matchedWords.any(
+          (w) =>
+              w.expectedWord.contains('ٱلْحَمْدُ') &&
+              w.verdict == WordVerdict.correct,
+        ),
+        isTrue,
+      );
     });
   });
 }

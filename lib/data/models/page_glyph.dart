@@ -2,12 +2,9 @@
 class PageGlyph {
   final int page;
   final List<PageLine> lines;
-  
-  PageGlyph({
-    required this.page,
-    required this.lines,
-  });
-  
+
+  PageGlyph({required this.page, required this.lines});
+
   factory PageGlyph.fromJson(Map<String, dynamic> json) {
     return PageGlyph(
       page: json['page'] as int,
@@ -16,12 +13,9 @@ class PageGlyph {
           .toList(),
     );
   }
-  
+
   Map<String, dynamic> toJson() {
-    return {
-      'page': page,
-      'lines': lines.map((line) => line.toJson()).toList(),
-    };
+    return {'page': page, 'lines': lines.map((line) => line.toJson()).toList()};
   }
 }
 
@@ -29,12 +23,9 @@ class PageGlyph {
 class PageLine {
   final int line;
   final List<Glyph> glyphs;
-  
-  PageLine({
-    required this.line,
-    required this.glyphs,
-  });
-  
+
+  PageLine({required this.line, required this.glyphs});
+
   factory PageLine.fromJson(Map<String, dynamic> json) {
     return PageLine(
       line: json['line'] as int,
@@ -43,7 +34,7 @@ class PageLine {
           .toList(),
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'line': line,
@@ -56,12 +47,13 @@ class PageLine {
 class Glyph {
   final int? id;
   final String code;
-  final int type; // 1=word, 2=ayah_end, 3=pause, 4=sajdah, 6=basmala, 8=surah_name
+  final int
+  type; // 1=word, 2=ayah_end, 3=pause, 4=sajdah, 6=basmala, 8=surah_name
   final int? order;
   final int? surah;
   final int? ayah;
   final int? wordId;
-  
+
   Glyph({
     this.id,
     required this.code,
@@ -71,12 +63,12 @@ class Glyph {
     this.ayah,
     this.wordId,
   });
-  
+
   factory Glyph.fromJson(Map<String, dynamic> json) {
     // Determine surah/ayah keys if multiple variants exist
     final surahVal = json['sura'] ?? json['surah'];
     final ayahVal = json['ayah'] ?? json['aya'];
-    
+
     return Glyph(
       id: json['id'] as int?,
       code: json['code'] as String? ?? '',
@@ -87,7 +79,7 @@ class Glyph {
       wordId: json['word_id'] as int?,
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -99,7 +91,7 @@ class Glyph {
       if (wordId != null) 'word_id': wordId,
     };
   }
-  
+
   /// التحقق من نوع العنصر
   bool get isWord => type == 1;
   bool get isAyahEnd => type == 2;

@@ -3,7 +3,7 @@
 <div align="center">
   <img src="assets/images/logo/app_logo.png" width="150" />
   
-  [![Flutter Version](https://img.shields.io/badge/Flutter-3.19+-blue.svg)](https://flutter.dev/)
+  [![Flutter Version](https://img.shields.io/badge/Flutter-3.50.0-blue.svg)](https://flutter.dev/)
   [![License](https://img.shields.io/badge/License-GPL--3.0-green.svg)](LICENSE)
   [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS-lightgrey.svg)](https://flutter.dev/)
 </div>
@@ -39,8 +39,8 @@
 ## 🚀 البدء السريع
 
 ### المتطلبات
-- Flutter 3.19.0 أو أحدث
-- Dart 3.0.0 أو أحدث
+- Flutter 3.50.0 (الإصدار المثبت في `.fvmrc` والمستخدم في CI)
+- Dart 3.14.0 المرفق مع Flutter
 - Android Studio / VS Code
 
 ### التثبيت
@@ -51,9 +51,10 @@ cd mathani
 
 # 2. تثبيت المكتبات
 flutter pub get
+dart run scripts/generate_localizations.dart
 
 # 3. توليد ملفات قاعدة البيانات
-flutter pub run build_runner build --delete-conflicting-outputs
+dart run build_runner build
 
 # 4. تشغيل التطبيق
 flutter run

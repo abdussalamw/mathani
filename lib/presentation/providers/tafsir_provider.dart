@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:http/http.dart' as http;
+
 import 'dart:convert';
+
 import '../../data/services/local_tafsir_service.dart';
 
 class TafsirProvider with ChangeNotifier {
@@ -19,7 +21,10 @@ class TafsirProvider with ChangeNotifier {
     if (_lastFetchedSurah == surah && _lastFetchedAyah == ayah) return;
 
     // 1. Try local offline Tafsir first
-    final localTafsir = await LocalTafsirService.instance.getTafsir(surah, ayah);
+    final localTafsir = await LocalTafsirService.instance.getTafsir(
+      surah,
+      ayah,
+    );
     if (localTafsir != null) {
       _tafsirContent = localTafsir;
       _lastFetchedSurah = surah;
@@ -36,7 +41,9 @@ class TafsirProvider with ChangeNotifier {
 
     try {
       final response = await http.get(
-        Uri.parse('https://api.quran.com/api/v4/quran/tafsirs/$tafsirId?verse_key=$surah:$ayah'),
+        Uri.parse(
+          'https://api.quran.com/api/v4/quran/tafsirs/$tafsirId?verse_key=$surah:$ayah',
+        ),
       );
 
       if (response.statusCode == 200) {

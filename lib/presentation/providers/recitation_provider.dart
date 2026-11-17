@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:mathani/core/di/service_locator.dart';
 import 'package:mathani/domain/repositories/quran_repository.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -8,49 +9,75 @@ import 'package:mathani/data/services/text_matching_service.dart';
 import 'package:mathani/data/services/audio_recorder_service.dart';
 import 'package:mathani/data/models/recitation_result.dart';
 import 'package:mathani/data/models/recitation_session.dart';
+import 'package:mathani/domain/entities/review_summary.dart';
 import 'package:mathani/data/services/mushaf_downloader_service.dart';
 import 'package:path_provider/path_provider.dart';
+
 import 'dart:io';
-import 'package:isar/isar.dart';
+
+import 'package:isar_community/isar.dart';
 import 'package:mathani/core/database/isar_service.dart';
 import 'package:just_audio/just_audio.dart';
+
 import 'dart:convert';
+
 import 'package:mathani/data/providers/mushaf_navigation_provider.dart';
 
 /// حالات شاشة التسميع
 enum RecitationState {
-  idle,       // حالة الانتظار
-  setup,      // اختيار السورة/الآيات
-  recording,  // جارٍ التسجيل
-  analyzing,  // جارٍ التحليل
-  result,     // عرض النتائج
-  history,    // سجل الجلسات السابقة
-  analytics,  // لوحة التحليلات المتقدمة
-  error,      // حالة الخطأ
+  idle, // حالة الانتظار
+  setup, // اختيار السورة/الآيات
+  recording, // جارٍ التسجيل
+  analyzing, // جارٍ التحليل
+  result, // عرض النتائج
+  history, // سجل الجلسات السابقة
+  analytics, // لوحة التحليلات المتقدمة
+  error, // حالة الخطأ
 }
 
 /// وضع التسميع
 enum RecitationMode {
-  free,       // حر — يبدأ من أي مكان والنظام يكتشف
-  selected,   // محدد — يختار السورة والآيات
+  free, // حر — يبدأ من أي مكان والنظام يكتشف
+  selected, // محدد — يختار السورة والآيات
 }
 
 /// مزود حالة قسم التسميع
 class RecitationProvider extends ChangeNotifier {
+  bool _disposed = false;
+  ReviewSummary get reviewSummary => ReviewSummary.fromSessions(_allSessions);
+
+  Future<bool> prepareSuggestedReview(RecitationSession session) async {
+    final result = await _quranRepository.getSurahByNumber(session.surahNumber);
+    final surah = result.fold((_) => null, (value) => value);
+    if (_disposed || surah == null || surah.numberOfAyahs < 1) return false;
+    await _prepareQuranText(surah.number);
+    if (_disposed || (_quranTextCache[surah.number]?.isEmpty ?? true)) {
+      return false;
+    }
+    _mode = RecitationMode.selected;
+    _selectedSurah = surah.number;
+    _selectedSurahName = surah.nameArabic;
+    _totalAyahs = surah.numberOfAyahs;
+    _startAyah = session.startAyah.clamp(1, _totalAyahs);
+    _endAyah = session.endAyah.clamp(_startAyah, _totalAyahs);
+    goToSetup();
+    return true;
+  }
+
   final QuranRepository _quranRepository = sl<QuranRepository>();
-  
+
   // الحالات والأخطاء
   RecitationState _state = RecitationState.idle;
   String? _errorMessage;
   RecitationMode _mode = RecitationMode.free;
-  
+
   // إعداد التسميع
   int? _selectedSurah;
   String _selectedSurahName = '';
   int _startAyah = 1;
   int _endAyah = 1;
   int _totalAyahs = 0;
-  
+
   // ذاكرة مؤقتة لنصوص القرآن للمطابقة
   final Map<int, Map<int, String>> _quranTextCache = {};
 
@@ -146,11 +173,12 @@ class RecitationProvider extends ChangeNotifier {
   final AsrService _asrService = AsrService();
   final TextMatchingService _matchingService = TextMatchingService();
   final AudioRecorderService _audioRecorder = AudioRecorderService();
-  static const String _asrModelZipUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/tadabur-whisper-mobile.zip';
-  static const String _asrTokensUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/tokens.txt';
-  
+  static const String _asrModelZipUrl =
+      'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/tadabur-whisper-mobile.zip';
+  static const String _asrTokensUrl =
+      'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/tokens.txt';
+
   // نموذج التجويد
-  static const String _tajweedModelUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/tajweed_classifier.tflite';
 
   RecitationProvider() {
     checkModelsState();
@@ -176,10 +204,10 @@ class RecitationProvider extends ChangeNotifier {
     _totalAyahs = totalAyahs;
     _startAyah = 1;
     _endAyah = totalAyahs;
-    
+
     // جلب نصوص السورة وتخزينها للمطابقة
     await _prepareQuranText(surahNumber);
-    
+
     notifyListeners();
   }
 
@@ -193,7 +221,7 @@ class RecitationProvider extends ChangeNotifier {
           ayahMap[a.ayahNumber] = a.text;
         }
         _quranTextCache[surahNumber] = ayahMap;
-      }
+      },
     );
   }
 
@@ -225,10 +253,10 @@ class RecitationProvider extends ChangeNotifier {
           .where()
           .sortByCreatedAtDesc()
           .findAll();
-      
+
       _allSessions.clear();
       _allSessions.addAll(savedSessions);
-      
+
       _sessions.clear();
       _sessions.addAll(savedSessions.take(3));
       notifyListeners();
@@ -256,7 +284,7 @@ class RecitationProvider extends ChangeNotifier {
   Future<void> checkModelsState() async {
     try {
       final directory = await getApplicationSupportDirectory();
-      
+
       // التحقق من نماذج ASR (نبحث عن الملفات الأساسية وحجمها)
       final asrDir = Directory('${directory.path}/ai_models/asr');
       bool asrExists = false;
@@ -267,7 +295,8 @@ class RecitationProvider extends ChangeNotifier {
         for (var f in files) {
           if (f is File) {
             final size = await f.length();
-            if (size > 1024 * 1024) { // ملفات النموذج أكبر من 1 ميجابايت (عادة 90 ميجا و190 ميجا)
+            if (size > 1024 * 1024) {
+              // ملفات النموذج أكبر من 1 ميجابايت (عادة 90 ميجا و190 ميجا)
               if (f.path.endsWith('.onnx')) {
                 onnxCount++;
               }
@@ -281,15 +310,17 @@ class RecitationProvider extends ChangeNotifier {
         asrExists = onnxCount >= 2 && hasTokens;
       }
       _isAsrModelDownloaded = asrExists;
-      debugPrint('🔍 ASR Model: $_isAsrModelDownloaded | ONNX=$onnxCount | tokens=$hasTokens | path=${asrDir.path}');
-    
+      debugPrint(
+        '🔍 ASR Model: $_isAsrModelDownloaded | ONNX=$onnxCount | tokens=$hasTokens | path=${asrDir.path}',
+      );
+
       // التحقق من الـ NPU (NNAPI على أندرويد)
       if (Platform.isAndroid) {
         _isNpuSupported = await _asrService.checkNpuSupport();
       } else {
         _isNpuSupported = true;
       }
-      
+
       // التحقق من نموذج التجويد (حد الحجم 1KB فقط — الملف قد يكون أصغر من 1MB)
       final tajweedDir = Directory('${directory.path}/ai_models/tajweed');
       if (await tajweedDir.exists()) {
@@ -298,7 +329,9 @@ class RecitationProvider extends ChangeNotifier {
         for (var f in files) {
           if (f is File) {
             final size = await f.length();
-            debugPrint('📂 Tajweed file: ${f.path.split('/').last} | ${(size/1024).toStringAsFixed(1)} KB');
+            debugPrint(
+              '📂 Tajweed file: ${f.path.split('/').last} | ${(size / 1024).toStringAsFixed(1)} KB',
+            );
             if (size > 1024 && f.path.endsWith('.tflite')) {
               tajweedExists = true;
             }
@@ -309,7 +342,7 @@ class RecitationProvider extends ChangeNotifier {
         _isTajweedModelDownloaded = false;
       }
       debugPrint('🔍 Tajweed Model: $_isTajweedModelDownloaded');
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error checking models state: $e');
@@ -321,7 +354,7 @@ class RecitationProvider extends ChangeNotifier {
       // Request microphone permission at runtime (required for Android 6.0+)
       final status = await Permission.microphone.request();
       _hasMicrophonePermission = status.isGranted;
-      
+
       if (!status.isGranted) {
         _errorMessage = 'الرجاء منح إذونات الميكروفون من إعدادات التطبيق.';
       } else {
@@ -337,7 +370,7 @@ class RecitationProvider extends ChangeNotifier {
 
   Future<void> downloadAsrModel() async {
     if (_isAsrDownloading || _isAsrModelDownloaded) return;
-    
+
     _isAsrDownloading = true;
     _asrDownloadProgress = 0.0;
     notifyListeners();
@@ -379,15 +412,12 @@ class RecitationProvider extends ChangeNotifier {
 
   Future<void> downloadTajweedModel() async {
     if (_isTajweedDownloading || _isTajweedModelDownloaded) return;
-    
+
     _isTajweedDownloading = true;
     _tajweedDownloadProgress = 0.0;
     notifyListeners();
 
     try {
-      final directory = await getApplicationSupportDirectory();
-      final destinationPath = '${directory.path}/ai_models/tajweed';
-
       // فحص جودة تحميل ملف التجويد
       await checkModelsState();
     } catch (e) {
@@ -481,7 +511,8 @@ class RecitationProvider extends ChangeNotifier {
         if (!status.isGranted) {
           _isModelLoading = false;
           _state = RecitationState.error;
-          _errorMessage = 'لا يمكن التسجيل بدون إذن الميكروفون. يرجى منح الإذونات.';
+          _errorMessage =
+              'لا يمكن التسجيل بدون إذن الميكروفون. يرجى منح الإذونات.';
           notifyListeners();
           return;
         }
@@ -492,11 +523,12 @@ class RecitationProvider extends ChangeNotifier {
 
       if (!success) {
         _state = RecitationState.error;
-        _errorMessage = 'فشل تحميل نموذج الذكاء الاصطناعي. تأكد من اكتمال النماذج.';
+        _errorMessage =
+            'فشل تحميل نموذج الذكاء الاصطناعي. تأكد من اكتمال النماذج.';
         notifyListeners();
         return;
       }
-      
+
       final path = await _audioRecorder.startRecording();
       if (path != null) {
         _state = RecitationState.recording;
@@ -523,7 +555,9 @@ class RecitationProvider extends ChangeNotifier {
 
   void _startLiveAnalysisLoop() {
     _liveAnalysisTimer?.cancel();
-    _liveAnalysisTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+    _liveAnalysisTimer = Timer.periodic(const Duration(seconds: 15), (
+      timer,
+    ) async {
       // قفل ضد التكدس: إذا كان التحليل السابق لا يزال جارياً، نتخطى هذه الدورة
       if (!_isRecording || _isLiveAnalyzing) {
         if (!_isRecording) timer.cancel();
@@ -567,8 +601,11 @@ class RecitationProvider extends ChangeNotifier {
           // تحديث تلوين الكلمات اللحظي (تقييم التجويد مؤجل للتحليل النهائي)
           for (int i = 0; i < match.matchedWords.length; i++) {
             final mw = match.matchedWords[i];
-            final key = "${mw.surahNumber}_${mw.ayahNumber}_${mw.wordIndex + 1}";
-            final verdict = mw.similarity > 0.6 ? WordVerdict.correct : WordVerdict.incorrect;
+            final key =
+                "${mw.surahNumber}_${mw.ayahNumber}_${mw.wordIndex + 1}";
+            final verdict = mw.similarity > 0.6
+                ? WordVerdict.correct
+                : WordVerdict.incorrect;
             if (verdict == WordVerdict.incorrect) _mistakesCount++;
             _liveWordVerdicts[key] = verdict;
           }
@@ -613,7 +650,7 @@ class RecitationProvider extends ChangeNotifier {
           }
           _quranTextCache[a.surahNumber]![a.ayahNumber] = a.text;
         }
-      }
+      },
     );
   }
 
@@ -624,7 +661,7 @@ class RecitationProvider extends ChangeNotifier {
     _analysisStep = 'جاري التحليل النهائي...';
     _analysisProgress = 0.1;
     notifyListeners();
-    
+
     final audioPath = await _audioRecorder.stopRecording();
     if (audioPath == null) {
       _state = RecitationState.setup;
@@ -638,12 +675,14 @@ class RecitationProvider extends ChangeNotifier {
       notifyListeners();
 
       final asrResult = await _asrService.transcribe(audioPath);
-      
+
       _analysisStep = 'المطابقة مع المصحف...';
       _analysisProgress = 0.7;
       notifyListeners();
 
-      if (_mode == RecitationMode.selected && _selectedSurah != null && !_quranTextCache.containsKey(_selectedSurah)) {
+      if (_mode == RecitationMode.selected &&
+          _selectedSurah != null &&
+          !_quranTextCache.containsKey(_selectedSurah)) {
         await _prepareQuranText(_selectedSurah!);
       } else if (_mode == RecitationMode.free && _quranTextCache.isEmpty) {
         await _prepareAllQuranText();
@@ -660,7 +699,8 @@ class RecitationProvider extends ChangeNotifier {
       await _finishAnalysis(matchResult, asrResult.fullText, audioPath);
     } catch (e) {
       debugPrint('Final ASR Error: $e');
-      _errorMessage = 'تعذر تحليل الصوت: تأكد من تسجيل صوت واضح أو جرب على هاتف حقيقي (${e.toString()})';
+      _errorMessage =
+          'تعذر تحليل الصوت: تأكد من تسجيل صوت واضح أو جرب على هاتف حقيقي (${e.toString()})';
       _state = RecitationState.setup;
       notifyListeners();
     }
@@ -706,7 +746,11 @@ class RecitationProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> _finishAnalysis(MatchResult matchResult, String rawTranscript, String? audioPath) async {
+  Future<void> _finishAnalysis(
+    MatchResult matchResult,
+    String rawTranscript,
+    String? audioPath,
+  ) async {
     _analysisStep = 'إعداد النتائج...';
     _analysisProgress = 0.9;
     notifyListeners();
@@ -714,7 +758,9 @@ class RecitationProvider extends ChangeNotifier {
     // حل اسم السورة المفقود في الوضع الحر
     String resolvedSurahName = _selectedSurahName;
     if (resolvedSurahName.isEmpty) {
-      final surahRes = await _quranRepository.getSurahByNumber(matchResult.surahNumber);
+      final surahRes = await _quranRepository.getSurahByNumber(
+        matchResult.surahNumber,
+      );
       surahRes.fold(
         (l) => resolvedSurahName = 'غير محدد',
         (surah) => resolvedSurahName = surah?.nameArabic ?? 'غير محدد',
@@ -885,7 +931,10 @@ class RecitationProvider extends ChangeNotifier {
     final ayahText = surahMap[ayah];
     if (ayahText == null) return null;
 
-    final words = ayahText.split(' ').where((w) => w.trim().isNotEmpty).toList();
+    final words = ayahText
+        .split(' ')
+        .where((w) => w.trim().isNotEmpty)
+        .toList();
     if (nextWordIdx < words.length) {
       return words[nextWordIdx];
     } else {
@@ -893,7 +942,10 @@ class RecitationProvider extends ChangeNotifier {
       final nextAyah = ayah + 1;
       final nextAyahText = surahMap[nextAyah];
       if (nextAyahText != null) {
-        final nextWords = nextAyahText.split(' ').where((w) => w.trim().isNotEmpty).toList();
+        final nextWords = nextAyahText
+            .split(' ')
+            .where((w) => w.trim().isNotEmpty)
+            .toList();
         if (nextWords.isNotEmpty) {
           return nextWords.first;
         }
@@ -917,7 +969,12 @@ class RecitationProvider extends ChangeNotifier {
   }
 
   // تشغيل تسجيل المستخدم للكلمة
-  Future<void> playUserWordAudio(String audioPath, int wordIndex, int totalWords, int durationMs) async {
+  Future<void> playUserWordAudio(
+    String audioPath,
+    int wordIndex,
+    int totalWords,
+    int durationMs,
+  ) async {
     try {
       await _localPlayer.stop();
       if (!await File(audioPath).exists()) {
@@ -925,7 +982,7 @@ class RecitationProvider extends ChangeNotifier {
         return;
       }
       await _localPlayer.setFilePath(audioPath);
-      
+
       if (totalWords > 0) {
         final startMs = ((wordIndex / totalWords) * durationMs).toInt();
         await _localPlayer.seek(Duration(milliseconds: startMs));
@@ -948,7 +1005,8 @@ class RecitationProvider extends ChangeNotifier {
   Future<void> playSheikhAyah(int surah, int ayah) async {
     try {
       await _sheikhPlayer.stop();
-      final url = 'https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/murattal/${surah.toString().padLeft(3, '0')}${ayah.toString().padLeft(3, '0')}.mp3';
+      final url =
+          'https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/murattal/${surah.toString().padLeft(3, '0')}${ayah.toString().padLeft(3, '0')}.mp3';
       await _sheikhPlayer.setUrl(url);
       _isSheikhPlaying = true;
       notifyListeners();
@@ -987,20 +1045,22 @@ class RecitationProvider extends ChangeNotifier {
         final Map<String, dynamic> json = jsonDecode(session.resultJson!);
         _currentResult = RecitationResult(
           words: (json['words'] as List<dynamic>)
-              .map((w) => WordResult(
-                    spokenWord: w['spoken'] ?? '',
-                    expectedWord: w['expected'] ?? '',
-                    surahNumber: w['surah'] ?? 1,
-                    ayahNumber: w['ayah'] ?? 1,
-                    wordIndex: w['wordIndex'] ?? 0,
-                    verdict: WordVerdict.values.firstWhere(
-                      (v) => v.name == w['verdict'],
-                      orElse: () => WordVerdict.skipped,
-                    ),
-                    confidence: w['confidence'] ?? 1.0,
-                    startTimeMs: w['startMs'],
-                    endTimeMs: w['endMs'],
-                  ))
+              .map(
+                (w) => WordResult(
+                  spokenWord: w['spoken'] ?? '',
+                  expectedWord: w['expected'] ?? '',
+                  surahNumber: w['surah'] ?? 1,
+                  ayahNumber: w['ayah'] ?? 1,
+                  wordIndex: w['wordIndex'] ?? 0,
+                  verdict: WordVerdict.values.firstWhere(
+                    (v) => v.name == w['verdict'],
+                    orElse: () => WordVerdict.skipped,
+                  ),
+                  confidence: w['confidence'] ?? 1.0,
+                  startTimeMs: w['startMs'],
+                  endTimeMs: w['endMs'],
+                ),
+              )
               .toList(),
           surahNumber: json['surah'] ?? 1,
           surahName: json['surahName'] ?? '',
@@ -1011,7 +1071,7 @@ class RecitationProvider extends ChangeNotifier {
           analyzedAt: DateTime.parse(json['analyzedAt']),
           audioPath: json['audioPath'],
         );
-        
+
         // إعادة ملء التلوين
         _liveWordVerdicts.clear();
         for (var w in _currentResult!.words) {
@@ -1043,21 +1103,32 @@ class RecitationProvider extends ChangeNotifier {
 
   int get currentStreak {
     if (_allSessions.isEmpty) return 0;
-    
-    final dates = _allSessions
-        .map((s) => DateTime(s.createdAt.year, s.createdAt.month, s.createdAt.day))
-        .toSet()
-        .toList()
-      ..sort((a, b) => b.compareTo(a));
-      
-    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+
+    final dates =
+        _allSessions
+            .map(
+              (s) => DateTime(
+                s.createdAt.year,
+                s.createdAt.month,
+                s.createdAt.day,
+              ),
+            )
+            .toSet()
+            .toList()
+          ..sort((a, b) => b.compareTo(a));
+
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
     final yesterday = today.subtract(const Duration(days: 1));
-    
+
     if (dates.isEmpty) return 0;
     if (dates.first != today && dates.first != yesterday) {
       return 0;
     }
-    
+
     int streak = 1;
     for (int i = 0; i < dates.length - 1; i++) {
       final diff = dates[i].difference(dates[i + 1]).inDays;
@@ -1081,15 +1152,17 @@ class RecitationProvider extends ChangeNotifier {
 
   List<Map<String, dynamic>> get hotspotSurahs {
     if (_allSessions.isEmpty) return [];
-    
+
     final Map<int, List<int>> surahAccuracies = {};
     final Map<int, String> surahNames = {};
-    
+
     for (var s in _allSessions) {
-      surahAccuracies.putIfAbsent(s.surahNumber, () => []).add(s.accuracyPercent);
+      surahAccuracies
+          .putIfAbsent(s.surahNumber, () => [])
+          .add(s.accuracyPercent);
       surahNames[s.surahNumber] = s.surahName;
     }
-    
+
     final List<Map<String, dynamic>> hotspots = [];
     surahAccuracies.forEach((surahNum, accuracies) {
       final avgAcc = accuracies.reduce((a, b) => a + b) / accuracies.length;
@@ -1099,8 +1172,10 @@ class RecitationProvider extends ChangeNotifier {
         'accuracy': avgAcc.round(),
       });
     });
-    
-    hotspots.sort((a, b) => (a['accuracy'] as num).compareTo(b['accuracy'] as num));
+
+    hotspots.sort(
+      (a, b) => (a['accuracy'] as num).compareTo(b['accuracy'] as num),
+    );
     return hotspots.take(5).toList();
   }
 
@@ -1120,6 +1195,7 @@ class RecitationProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _liveAnalysisTimer?.cancel();
     _audioRecorder.dispose();
     _localPlayer.dispose();

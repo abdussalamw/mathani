@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import '../../core/utils/text_utils.dart';
 import '../models/recitation_result.dart';
 import 'asr_service.dart';
@@ -24,13 +23,13 @@ class _TargetWord {
 
 /// نتيجة المطابقة لكلمة واحدة
 class MatchedWord {
-  final String spokenWord;     // الكلمة المنطوقة (أو فارغة إن لم تُقرأ)
-  final String expectedWord;   // الكلمة الصحيحة من المصحف
+  final String spokenWord; // الكلمة المنطوقة (أو فارغة إن لم تُقرأ)
+  final String expectedWord; // الكلمة الصحيحة من المصحف
   final int surahNumber;
   final int ayahNumber;
-  final int wordIndex;         // ترتيب الكلمة في الآية
-  final double similarity;     // نسبة التشابه (0.0 - 1.0)
-  final WordVerdict verdict;    // تقييم الكلمة
+  final int wordIndex; // ترتيب الكلمة في الآية
+  final double similarity; // نسبة التشابه (0.0 - 1.0)
+  final WordVerdict verdict; // تقييم الكلمة
   final int? startMs;
   final int? endMs;
 
@@ -67,7 +66,7 @@ class MatchResult {
 }
 
 /// خدمة المطابقة والمحاذاة النصية المتقدمة للقرآن الكريم
-/// 
+///
 /// تستخدم خوارزمية Needleman-Wunsch Dynamic Programming Alignment
 /// لربط النص المستخرج من ASR بكلمات المصحف كلمة بكلمة
 /// مع معالجة حالات الحذف (Skipped)، الزيادة (Inserted)، والاستبدال (Incorrect).
@@ -106,18 +105,23 @@ class TextMatchingService {
       if (hintEndAyah != null && ayahNum > hintEndAyah) continue;
 
       final ayahText = targetAyahsMap[ayahNum] ?? '';
-      final words = ayahText.split(RegExp(r'\s+')).where((w) => w.trim().isNotEmpty).toList();
+      final words = ayahText
+          .split(RegExp(r'\s+'))
+          .where((w) => w.trim().isNotEmpty)
+          .toList();
 
       for (int i = 0; i < words.length; i++) {
         final w = words[i].trim();
-        expectedWords.add(_TargetWord(
-          surahNumber: targetSurah,
-          ayahNumber: ayahNum,
-          wordIndex: i,
-          text: w,
-          normalized: TextUtils.normalizeQuranText(w),
-          phonetic: TextUtils.normalizePhonetic(w),
-        ));
+        expectedWords.add(
+          _TargetWord(
+            surahNumber: targetSurah,
+            ayahNumber: ayahNum,
+            wordIndex: i,
+            text: w,
+            normalized: TextUtils.normalizeQuranText(w),
+            phonetic: TextUtils.normalizePhonetic(w),
+          ),
+        );
       }
     }
 
@@ -142,7 +146,9 @@ class TextMatchingService {
         evaluatedWordsCount++;
       }
     }
-    final confidence = evaluatedWordsCount > 0 ? (totalSim / evaluatedWordsCount) : 0.0;
+    final confidence = evaluatedWordsCount > 0
+        ? (totalSim / evaluatedWordsCount)
+        : 0.0;
 
     final firstAyah = expectedWords.first.ayahNumber;
     final lastAyah = expectedWords.last.ayahNumber;
@@ -168,15 +174,19 @@ class TextMatchingService {
 
     // إذا لم ينطق المستخدم أي كلمة، فجميع الكلمات تم تجاوزها (Skipped)
     if (m == 0) {
-      return expected.map((e) => MatchedWord(
-        spokenWord: '',
-        expectedWord: e.text,
-        surahNumber: e.surahNumber,
-        ayahNumber: e.ayahNumber,
-        wordIndex: e.wordIndex,
-        similarity: 0.0,
-        verdict: WordVerdict.skipped,
-      )).toList();
+      return expected
+          .map(
+            (e) => MatchedWord(
+              spokenWord: '',
+              expectedWord: e.text,
+              surahNumber: e.surahNumber,
+              ayahNumber: e.ayahNumber,
+              wordIndex: e.wordIndex,
+              similarity: 0.0,
+              verdict: WordVerdict.skipped,
+            ),
+          )
+          .toList();
     }
 
     // مصفوفة البرمجة الديناميكية
@@ -185,7 +195,7 @@ class TextMatchingService {
 
     // عقوبة التخطي والإضافة
     const double gapPenaltyExpected = -1.0; // كلمة في المصحف لم تُقرأ
-    const double gapPenaltySpoken = -0.6;   // كلمة زائدة قالها المستخدم
+    const double gapPenaltySpoken = -0.6; // كلمة زائدة قالها المستخدم
 
     for (int i = 1; i <= n; i++) {
       dp[i][0] = dp[i - 1][0] + gapPenaltyExpected;
@@ -200,8 +210,11 @@ class TextMatchingService {
       for (int j = 1; j <= m; j++) {
         final spkWord = spoken[j - 1];
 
-        final double sim = TextUtils.calculateSimilarity(spkWord.text, expWord.text);
-        
+        final double sim = TextUtils.calculateSimilarity(
+          spkWord.text,
+          expWord.text,
+        );
+
         // حساب وزن التطابق
         double matchScore;
         if (sim >= 0.85) {
@@ -218,7 +231,11 @@ class TextMatchingService {
         final scoreSkipExpected = dp[i - 1][j] + gapPenaltyExpected;
         final scoreExtraSpoken = dp[i][j - 1] + gapPenaltySpoken;
 
-        dp[i][j] = [scoreMatch, scoreSkipExpected, scoreExtraSpoken].reduce((a, b) => a > b ? a : b);
+        dp[i][j] = [
+          scoreMatch,
+          scoreSkipExpected,
+          scoreExtraSpoken,
+        ].reduce((a, b) => a > b ? a : b);
       }
     }
 
@@ -232,7 +249,10 @@ class TextMatchingService {
       if (i > 0 && j > 0) {
         final expWord = expected[i - 1];
         final spkWord = spoken[j - 1];
-        final double sim = TextUtils.calculateSimilarity(spkWord.text, expWord.text);
+        final double sim = TextUtils.calculateSimilarity(
+          spkWord.text,
+          expWord.text,
+        );
 
         double matchScore;
         if (sim >= 0.85) {
@@ -259,31 +279,35 @@ class TextMatchingService {
             verdict = WordVerdict.incorrect;
           }
 
-          result.add(MatchedWord(
-            spokenWord: spkWord.text,
-            expectedWord: expWord.text,
-            surahNumber: expWord.surahNumber,
-            ayahNumber: expWord.ayahNumber,
-            wordIndex: expWord.wordIndex,
-            similarity: sim,
-            verdict: verdict,
-            startMs: spkWord.startMs,
-            endMs: spkWord.endMs,
-          ));
+          result.add(
+            MatchedWord(
+              spokenWord: spkWord.text,
+              expectedWord: expWord.text,
+              surahNumber: expWord.surahNumber,
+              ayahNumber: expWord.ayahNumber,
+              wordIndex: expWord.wordIndex,
+              similarity: sim,
+              verdict: verdict,
+              startMs: spkWord.startMs,
+              endMs: spkWord.endMs,
+            ),
+          );
           i--;
           j--;
           continue;
         } else if ((dp[i][j] - scoreSkipExpected).abs() < 1e-4) {
           // كلمة في المصحف تم تجاوزها
-          result.add(MatchedWord(
-            spokenWord: '',
-            expectedWord: expWord.text,
-            surahNumber: expWord.surahNumber,
-            ayahNumber: expWord.ayahNumber,
-            wordIndex: expWord.wordIndex,
-            similarity: 0.0,
-            verdict: WordVerdict.skipped,
-          ));
+          result.add(
+            MatchedWord(
+              spokenWord: '',
+              expectedWord: expWord.text,
+              surahNumber: expWord.surahNumber,
+              ayahNumber: expWord.ayahNumber,
+              wordIndex: expWord.wordIndex,
+              similarity: 0.0,
+              verdict: WordVerdict.skipped,
+            ),
+          );
           i--;
           continue;
         } else {
@@ -294,15 +318,17 @@ class TextMatchingService {
       } else if (i > 0) {
         // بقية كلمات المصحف تم تجاوزها
         final expWord = expected[i - 1];
-        result.add(MatchedWord(
-          spokenWord: '',
-          expectedWord: expWord.text,
-          surahNumber: expWord.surahNumber,
-          ayahNumber: expWord.ayahNumber,
-          wordIndex: expWord.wordIndex,
-          similarity: 0.0,
-          verdict: WordVerdict.skipped,
-        ));
+        result.add(
+          MatchedWord(
+            spokenWord: '',
+            expectedWord: expWord.text,
+            surahNumber: expWord.surahNumber,
+            ayahNumber: expWord.ayahNumber,
+            wordIndex: expWord.wordIndex,
+            similarity: 0.0,
+            verdict: WordVerdict.skipped,
+          ),
+        );
         i--;
       } else if (j > 0) {
         j--;
@@ -314,10 +340,16 @@ class TextMatchingService {
   }
 
   /// اكتشاف السورة الأقرب للنص المنطوق في الوضع الحر
-  int _detectBestSurah(List<AsrWord> spoken, Map<int, Map<int, String>> allQuran) {
+  int _detectBestSurah(
+    List<AsrWord> spoken,
+    Map<int, Map<int, String>> allQuran,
+  ) {
     if (spoken.isEmpty) return 1;
 
-    final spokenSample = spoken.take(8).map((w) => TextUtils.normalizePhonetic(w.text)).join(' ');
+    final spokenSample = spoken
+        .take(8)
+        .map((w) => TextUtils.normalizePhonetic(w.text))
+        .join(' ');
 
     int bestSurah = 1;
     double bestScore = -1.0;

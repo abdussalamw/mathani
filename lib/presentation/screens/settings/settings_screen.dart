@@ -1,10 +1,13 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
+
 import '../../providers/settings_provider.dart';
 import '../../providers/mushaf_metadata_provider.dart';
 import '../../providers/audio_provider.dart';
 import '../../../core/constants/app_colors.dart';
+
 import 'package:package_info_plus/package_info_plus.dart';
+
 import '../../../data/models/reciter.dart';
 import '../../../data/services/local_tafsir_service.dart';
 import '../../../core/database/collections.dart'; // Needed for MushafMetadata
@@ -13,7 +16,7 @@ import 'recitation_diagnostic_screen.dart';
 import '../recitation/recitation_setup_view.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -45,120 +48,180 @@ class _SettingsScreenState extends State<SettingsScreen> {
       color: isDark ? const Color(0xFF131315) : AppColors.brandBackground,
       child: ListView(
         padding: EdgeInsets.only(
-          left: 12, 
-          right: 12, 
-          top: MediaQuery.of(context).padding.top + kToolbarHeight + 16, 
-          bottom: 120
+          left: 12,
+          right: 12,
+          top: MediaQuery.of(context).padding.top + kToolbarHeight + 16,
+          bottom: 120,
         ),
         children: [
           // 0. مركز التحميل
           _buildDownloadCenterLink(context, isDark),
-          
+
           const SizedBox(height: 8),
 
           // 0b. تشخيص نظام التسميع
           _buildDiagnosticLink(context, isDark),
-          
+
           const SizedBox(height: 8),
 
           // 0c. إعدادات التسميع
           _buildRecitationSettingsLink(context, isDark),
-          
+
           const SizedBox(height: 16),
 
           // 1. الإعدادات العامة (اللغة والمظهر)
           Container(
-             margin: const EdgeInsets.only(bottom: 24),
-             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-             decoration: BoxDecoration(
-               color: isDark ? const Color(0xFF1E1E22) : Colors.white,
-               borderRadius: BorderRadius.circular(16),
-               border: Border.all(color: AppColors.brandGold.withOpacity(0.1)),
-             ),
-             child: Column(
-               children: [
-                 // اللغة (Language)
-                 _buildInlineSettingRow(
-                   context,
-                   AppLocalizations.of(context)!.language,
-                   Container(
-                     padding: const EdgeInsets.all(2),
-                     decoration: BoxDecoration(
-                       color: isDark ? Colors.grey[800] : Colors.grey[200],
-                       borderRadius: BorderRadius.circular(8),
-                     ),
-                     child: Row(
-                       children: [
-                          Expanded(child: _CompactThemeButton(title: 'العربية', isSelected: settings.localeCode == 'ar', onTap: () => settings.setLanguage('ar'))),
-                          Expanded(child: _CompactThemeButton(title: 'English', isSelected: settings.localeCode == 'en', onTap: () => settings.setLanguage('en'))),
-                       ],
-                     ),
-                   ),
-                 ),
-                 
-                 const Divider(height: 16),
-                 
-                 // المظهر (Appearance)
-                 _buildInlineSettingRow(
-                   context,
-                   AppLocalizations.of(context)!.appearance,
-                   Container(
-                     padding: const EdgeInsets.all(2),
-                     decoration: BoxDecoration(
-                       color: isDark ? Colors.grey[800] : Colors.grey[200],
-                       borderRadius: BorderRadius.circular(8),
-                     ),
-                     child: Row(
-                       children: [
-                          Expanded(child: _CompactThemeButton(title: AppLocalizations.of(context)!.lightMode, icon: Icons.wb_sunny, isSelected: !isDark, onTap: () => settings.setDarkMode(false))),
-                          Expanded(child: _CompactThemeButton(title: AppLocalizations.of(context)!.darkMode, icon: Icons.nightlight_round, isSelected: isDark, onTap: () => settings.setDarkMode(true))),
-                       ],
-                     ),
-                   ),
-                 ),
-                 
-               ],
-             ),
+            margin: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E22) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.brandGold.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Column(
+              children: [
+                // اللغة (Language)
+                _buildInlineSettingRow(
+                  context,
+                  AppLocalizations.of(context)!.language,
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[800] : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _CompactThemeButton(
+                            title: 'العربية',
+                            isSelected: settings.localeCode == 'ar',
+                            onTap: () => settings.setLanguage('ar'),
+                          ),
+                        ),
+                        Expanded(
+                          child: _CompactThemeButton(
+                            title: 'English',
+                            isSelected: settings.localeCode == 'en',
+                            onTap: () => settings.setLanguage('en'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const Divider(height: 16),
+
+                // المظهر (Appearance)
+                _buildInlineSettingRow(
+                  context,
+                  AppLocalizations.of(context)!.appearance,
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[800] : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _CompactThemeButton(
+                            title: AppLocalizations.of(context)!.lightMode,
+                            icon: Icons.wb_sunny,
+                            isSelected: !isDark,
+                            onTap: () => settings.setDarkMode(false),
+                          ),
+                        ),
+                        Expanded(
+                          child: _CompactThemeButton(
+                            title: AppLocalizations.of(context)!.darkMode,
+                            icon: Icons.nightlight_round,
+                            isSelected: isDark,
+                            onTap: () => settings.setDarkMode(true),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          
+
           const Divider(height: 24),
 
           // 2. المحتوى (Compact + Dual Buttons)
-          _buildSectionTitle(context, AppLocalizations.of(context)!.settingsMushafs),
+          _buildSectionTitle(
+            context,
+            AppLocalizations.of(context)!.settingsMushafs,
+          ),
           const SizedBox(height: 8),
 
           // Mushafs
           _CompactExpandableCard(
             title: AppLocalizations.of(context)!.mushaf,
-            subtitle: context.read<MushafMetadataProvider>().availableMushafs
-                .firstWhere((m) => m.identifier == context.read<MushafMetadataProvider>().currentMushafId, 
-                    orElse: () => context.read<MushafMetadataProvider>().availableMushafs.first).nameArabic ?? '',
+            subtitle:
+                context
+                    .read<MushafMetadataProvider>()
+                    .availableMushafs
+                    .firstWhere(
+                      (m) =>
+                          m.identifier ==
+                          context
+                              .read<MushafMetadataProvider>()
+                              .currentMushafId,
+                      orElse: () => context
+                          .read<MushafMetadataProvider>()
+                          .availableMushafs
+                          .first,
+                    )
+                    .nameArabic ??
+                '',
             icon: Icons.menu_book,
             color: AppColors.golden,
             children: [
               Consumer<MushafMetadataProvider>(
                 builder: (context, provider, _) {
                   return Column(
-                    children: provider.availableMushafs.map<Widget>((MushafMetadata mushaf) {
-                      final isSelected = provider.currentMushafId == mushaf.identifier;
-                      final isDownloaded = mushaf.isDownloaded || mushaf.type == 'digital';
-                      final isDownloading = provider.isDownloading && provider.currentDownloadingId == mushaf.identifier;
-                      
+                    children: provider.availableMushafs.map<Widget>((
+                      MushafMetadata mushaf,
+                    ) {
+                      final isSelected =
+                          provider.currentMushafId == mushaf.identifier;
+                      final isDownloaded =
+                          mushaf.isDownloaded || mushaf.type == 'digital';
+                      final isDownloading =
+                          provider.isDownloading &&
+                          provider.currentDownloadingId == mushaf.identifier;
+
                       String sizeEstimate = '';
-                      if (mushaf.identifier == 'qcf2_v4_woff2') sizeEstimate = '58 MB';
-                      if (mushaf.identifier == 'madani_old_v1') sizeEstimate = '50 MB';
-                      if (mushaf.identifier == 'shamarly_15lines') sizeEstimate = '74 MB';
+                      if (mushaf.identifier == 'qcf2_v4_woff2') {
+                        sizeEstimate = '58 MB';
+                      }
+                      if (mushaf.identifier == 'madani_old_v1') {
+                        sizeEstimate = '50 MB';
+                      }
+                      if (mushaf.identifier == 'shamarly_15lines') {
+                        sizeEstimate = '74 MB';
+                      }
 
                       // حالة العنصر حسب النوع
                       String statusText;
                       if (isDownloading) {
-                        statusText = '${(provider.downloadProgress * 100).toInt()}%';
+                        statusText =
+                            '${(provider.downloadProgress * 100).toInt()}%';
                       } else if (mushaf.type == 'digital') {
-                        statusText = AppLocalizations.of(context)!.settingsReady;
+                        statusText = AppLocalizations.of(context)!
+                            .settingsReady;
                       } else if (isDownloaded) {
-                        statusText = AppLocalizations.of(context)!.settingsDownloaded;
+                        statusText = AppLocalizations.of(context)!
+                            .settingsDownloaded;
                       } else {
-                        statusText = AppLocalizations.of(context)!.settingsNotDownloaded;
+                        statusText = AppLocalizations.of(context)!
+                            .settingsNotDownloaded;
                       }
                       return _CompactSettingItem(
                         title: mushaf.nameArabic ?? mushaf.identifier!,
@@ -168,16 +231,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         isDownloading: isDownloading,
                         progress: provider.downloadProgress,
                         sizeEstimate: sizeEstimate,
-                        onActivate: () => provider.setMushaf(mushaf.identifier!),
-                        onDownload: () => provider.downloadMushaf(mushaf.identifier!),
+                        onActivate: () =>
+                            provider.setMushaf(mushaf.identifier!),
+                        onDownload: () =>
+                            provider.downloadMushaf(mushaf.identifier!),
                       );
                     }).toList(),
                   );
                 },
-              )
+              ),
             ],
           ),
-          
+
           const SizedBox(height: 8),
 
           // Tafsir
@@ -187,53 +252,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.library_books,
             color: Colors.green,
             children: [
-               // 1. التفسير الميسر (محلي) - Special handling
-               Consumer<LocalTafsirService>(
-                 builder: (context, LocalTafsirService local, _) {
-                   final isSelected = settings.defaultTafsir == 'muyassar';
-                   final bool isDownloaded = local.isLoaded && local.totalEntries > 0;
-                   
-                    String subtitle = isDownloaded ? AppLocalizations.of(context)!.settingsOffline : AppLocalizations.of(context)!.initWait;
-                    if (local.lastError != null && !local.isDownloading && !isDownloaded) {
-                      subtitle = '${AppLocalizations.of(context)!.error}: ${local.lastError}';
-                    }
+              // 1. التفسير الميسر (محلي) - Special handling
+              Consumer<LocalTafsirService>(
+                builder: (context, LocalTafsirService local, _) {
+                  final isSelected = settings.defaultTafsir == 'muyassar';
+                  final bool isDownloaded =
+                      local.isLoaded && local.totalEntries > 0;
 
-                    return _CompactSettingItem(
-                      title: AppLocalizations.of(context)!.tafsirMuyassar,
-                      subtitle: subtitle,
-                      isSelected: isSelected,
-                      isDownloaded: isDownloaded,
-                      isDownloading: local.isDownloading,
-                      progress: local.downloadProgress,
-                      sizeEstimate: '4 MB',
-                      onActivate: () => context.read<SettingsProvider>().updateDefaultTafsir('muyassar'),
-                      onDownload: () => local.downloadAndExtractTafsir().catchError((e) {
-                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${AppLocalizations.of(context)!.error}: $e', style: const TextStyle(fontFamily: 'Tajawal'))));
-                      }),
-                    );
-                 },
-               ),
-               const Divider(height: 1, indent: 16, endIndent: 16),
-               
-               // 2. باقي التفاسير (أونلاين)
-               ...[
-                 {'id': 'tafsir-katheer', 'name': 'تفسير ابن كثير'},
-                 {'id': 'tafsir-saadi', 'name': 'تفسير السعدي'},
-                 {'id': 'tafsir-baghawy', 'name': 'تفسير البغوي'},
-                 {'id': 'tafsir-tabary', 'name': 'تفسير الطبري'},
-                 {'id': 'eerab-aya', 'name': 'إعراب القرآن'},
-               ].map((tafsir) {
-                 final isSelected = settings.defaultTafsir == tafsir['id'];
+                  String subtitle = isDownloaded
+                      ? AppLocalizations.of(context)!.settingsOffline
+                      : AppLocalizations.of(context)!.initWait;
+                  if (local.lastError != null &&
+                      !local.isDownloading &&
+                      !isDownloaded) {
+                    subtitle =
+                        '${AppLocalizations.of(context)!.error}: ${local.lastError}';
+                  }
+
                   return _CompactSettingItem(
-                    title: tafsir['name']!,
-                    subtitle: AppLocalizations.of(context)!.settingsOnline,
+                    title: AppLocalizations.of(context)!.tafsirMuyassar,
+                    subtitle: subtitle,
                     isSelected: isSelected,
-                    isDownloaded: false, // Online tafsirs are NOT downloaded
-                    isOnline: true, // Mark as online
-                    onActivate: () => context.read<SettingsProvider>().updateDefaultTafsir(tafsir['id']!),
-                    onDownload: () {},
+                    isDownloaded: isDownloaded,
+                    isDownloading: local.isDownloading,
+                    progress: local.downloadProgress,
+                    sizeEstimate: '4 MB',
+                    onActivate: () => context
+                        .read<SettingsProvider>()
+                        .updateDefaultTafsir('muyassar'),
+                    onDownload: () =>
+                        local.downloadAndExtractTafsir().catchError((e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${AppLocalizations.of(context)!.error}: $e',
+                                style: const TextStyle(fontFamily: 'Tajawal'),
+                              ),
+                            ),
+                          );
+                        }),
                   );
-               }).toList(),
+                },
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+
+              // 2. باقي التفاسير (أونلاين)
+              ...[
+                {'id': 'tafsir-katheer', 'name': 'تفسير ابن كثير'},
+                {'id': 'tafsir-saadi', 'name': 'تفسير السعدي'},
+                {'id': 'tafsir-baghawy', 'name': 'تفسير البغوي'},
+                {'id': 'tafsir-tabary', 'name': 'تفسير الطبري'},
+                {'id': 'eerab-aya', 'name': 'إعراب القرآن'},
+              ].map((tafsir) {
+                final isSelected = settings.defaultTafsir == tafsir['id'];
+                return _CompactSettingItem(
+                  title: tafsir['name']!,
+                  subtitle: AppLocalizations.of(context)!.settingsOnline,
+                  isSelected: isSelected,
+                  isDownloaded: false, // Online tafsirs are NOT downloaded
+                  isOnline: true, // Mark as online
+                  onActivate: () => context
+                      .read<SettingsProvider>()
+                      .updateDefaultTafsir(tafsir['id']!),
+                  onDownload: () {},
+                );
+              }),
             ],
           ),
 
@@ -242,31 +326,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Audio
           _CompactExpandableCard(
             title: AppLocalizations.of(context)!.settingsReader,
-            subtitle: context.read<AudioProvider>().reciters.firstWhere((r) => r.id == settings.defaultReciter, orElse: () => Reciter(id: '', name: 'اختر القارئ', style: '', bitrate: '')).name,
+            subtitle: context
+                .read<AudioProvider>()
+                .reciters
+                .firstWhere(
+                  (r) => r.id == settings.defaultReciter,
+                  orElse: () => Reciter(
+                    id: '',
+                    name: 'اختر القارئ',
+                    style: '',
+                    bitrate: '',
+                  ),
+                )
+                .name,
             icon: Icons.record_voice_over,
             color: Colors.purple,
             children: [
-               Consumer<AudioProvider>(
-                 builder: (context, audio, _) {
-                   return Column(
-                     children: audio.reciters.map((reciter) {
-                       final isSelected = settings.defaultReciter == reciter.id;
-                       return _CompactSettingItem(
-                         title: reciter.name,
-                         subtitle: AppLocalizations.of(context)!.settingsStreaming,
-                         isSelected: isSelected,
-                         isDownloaded: false,
-                         isOnline: true,
-                         onActivate: () {
-                           context.read<SettingsProvider>().updateDefaultReciter(reciter.id);
-                           context.read<AudioProvider>().setReciter(reciter);
-                         },
-                         onDownload: () {},
-                       );
-                     }).toList(),
-                   );
-                 },
-               )
+              Consumer<AudioProvider>(
+                builder: (context, audio, _) {
+                  return Column(
+                    children: audio.reciters.map((reciter) {
+                      final isSelected = settings.defaultReciter == reciter.id;
+                      return _CompactSettingItem(
+                        title: reciter.name,
+                        subtitle: AppLocalizations.of(context)!
+                            .settingsStreaming,
+                        isSelected: isSelected,
+                        isDownloaded: false,
+                        isOnline: true,
+                        onActivate: () {
+                          context.read<SettingsProvider>().updateDefaultReciter(
+                            reciter.id,
+                          );
+                          context.read<AudioProvider>().setReciter(reciter);
+                        },
+                        onDownload: () {},
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
             ],
           ),
 
@@ -274,14 +373,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // 3. Footer (Very Compact)
           Center(
-            child: Text('${AppLocalizations.of(context)!.appName} v$_version', style: TextStyle(fontFamily: 'Tajawal', fontSize: 10, color: Colors.grey[600])),
+            child: Text(
+              '${AppLocalizations.of(context)!.appName} v$_version',
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 10,
+                color: Colors.grey[600],
+              ),
+            ),
           ),
           const SizedBox(height: 20),
         ],
       ),
     );
   }
-  
+
   Widget _buildDownloadCenterLink(BuildContext context, bool isDark) {
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, '/download_center'),
@@ -289,37 +395,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppColors.brandGold, AppColors.brandGold.withOpacity(0.8)],
+            colors: [
+              AppColors.brandGold,
+              AppColors.brandGold.withValues(alpha: 0.8),
+            ],
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.brandGold.withOpacity(0.2),
+              color: AppColors.brandGold.withValues(alpha: 0.2),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Row(
+        child: const Row(
           children: [
-            const Icon(Icons.cloud_download_rounded, color: Colors.white, size: 30),
-            const SizedBox(width: 16),
-            const Expanded(
+            Icon(Icons.cloud_download_rounded, color: Colors.white, size: 30),
+            SizedBox(width: 16),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'مركز التحميل',
-                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.white,
+                    ),
                   ),
                   Text(
                     'إدارة المصاحف والتفاسير المحملة',
-                    style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: Colors.white70),
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 18),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
           ],
         ),
       ),
@@ -337,14 +459,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1A1A2E) : const Color(0xFFEEF2FF),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.indigo.withOpacity(0.3)),
+          border: Border.all(color: Colors.indigo.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.indigo.withOpacity(0.15),
+                color: Colors.indigo.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: const Text('🔬', style: TextStyle(fontSize: 20)),
@@ -356,16 +478,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Text(
                     'تشخيص نظام التسميع',
-                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 14),
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                   Text(
                     'فحص شامل: ميكروفون، نماذج، محرك ASR، التجويد',
-                    style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey),
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 11,
+                      color: Colors.grey,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: Colors.grey),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 15,
+              color: Colors.grey,
+            ),
           ],
         ),
       ),
@@ -377,26 +511,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => const _RecitationSetupPage(),
-        ),
+        MaterialPageRoute(builder: (_) => const _RecitationSetupPage()),
       ),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1A1A) : const Color(0xFFFFF4E5),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.brandGold.withOpacity(0.3)),
+          border: Border.all(color: AppColors.brandGold.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.brandGold.withOpacity(0.15),
+                color: AppColors.brandGold.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.tune_rounded, color: AppColors.brandGold, size: 20),
+              child: const Icon(
+                Icons.tune_rounded,
+                color: AppColors.brandGold,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 14),
             const Expanded(
@@ -405,16 +541,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Text(
                     'إعدادات التسميع',
-                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 14),
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                   Text(
                     'اختيار السورة، وضع التسميع، تحميل النماذج',
-                    style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey),
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 11,
+                      color: Colors.grey,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: Colors.grey),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 15,
+              color: Colors.grey,
+            ),
           ],
         ),
       ),
@@ -424,17 +572,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _getTafsirName(BuildContext context, String id) {
     final localizations = AppLocalizations.of(context)!;
     switch (id) {
-      case 'muyassar': return localizations.tafsirMuyassar;
-      case 'tafsir-katheer': return 'تفسير ابن كثير';
-      case 'tafsir-saadi': return 'تفسير السعدي';
-      case 'tafsir-baghawy': return 'تفسير البغوي';
-      case 'tafsir-tabary': return 'تفسير الطبري';
-      case 'eerab-aya': return 'إعراب القرآن';
-      default: return id;
+      case 'muyassar':
+        return localizations.tafsirMuyassar;
+      case 'tafsir-katheer':
+        return 'تفسير ابن كثير';
+      case 'tafsir-saadi':
+        return 'تفسير السعدي';
+      case 'tafsir-baghawy':
+        return 'تفسير البغوي';
+      case 'tafsir-tabary':
+        return 'تفسير الطبري';
+      case 'eerab-aya':
+        return 'إعراب القرآن';
+      default:
+        return id;
     }
   }
 
-  Widget _buildInlineSettingRow(BuildContext context, String title, Widget controlWidget) {
+  Widget _buildInlineSettingRow(
+    BuildContext context,
+    String title,
+    Widget controlWidget,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
@@ -503,7 +662,12 @@ class _CompactThemeButton extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _CompactThemeButton({required this.title, this.icon, required this.isSelected, required this.onTap});
+  const _CompactThemeButton({
+    required this.title,
+    this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -514,25 +678,36 @@ class _CompactThemeButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
-          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 2)] : [],
+          boxShadow: isSelected
+              ? [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 2)]
+              : [],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (icon != null) ...[
-              Icon(icon, color: isSelected ? Colors.black : Colors.grey, size: 16), // Reduced size
+              Icon(
+                icon,
+                color: isSelected ? Colors.black : Colors.grey,
+                size: 16,
+              ), // Reduced size
               const SizedBox(width: 6),
             ],
-            Text(title, style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.black : Colors.grey)),
+            Text(
+              title,
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.black : Colors.grey,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-
-
-
 
 class _CompactExpandableCard extends StatelessWidget {
   final String title;
@@ -541,12 +716,18 @@ class _CompactExpandableCard extends StatelessWidget {
   final Color color;
   final List<Widget> children;
 
-  const _CompactExpandableCard({required this.title, required this.subtitle, required this.icon, required this.color, required this.children});
+  const _CompactExpandableCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.children,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Material(
       color: isDark ? const Color(0xFF2C2416) : Colors.white,
       borderRadius: BorderRadius.circular(12),
@@ -564,8 +745,24 @@ class _CompactExpandableCard extends StatelessWidget {
             ),
             child: Icon(icon, color: color, size: 18), // Reduced
           ),
-          title: Text(title, style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13, fontWeight: FontWeight.bold)),
-          subtitle: Text(subtitle, style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey[600]), maxLines: 1, overflow: TextOverflow.ellipsis),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontFamily: 'Tajawal',
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: TextStyle(
+              fontFamily: 'Tajawal',
+              fontSize: 11,
+              color: Colors.grey[600],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           children: children,
         ),
       ),
@@ -604,7 +801,9 @@ class _CompactSettingItem extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: isSelected ? AppColors.primary.withAlpha(12) : Colors.transparent,
+        color: isSelected
+            ? AppColors.primary.withAlpha(12)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -619,7 +818,9 @@ class _CompactSettingItem extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Tajawal',
                     fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     color: isSelected ? AppColors.primary : null,
                   ),
                 ),
@@ -629,13 +830,15 @@ class _CompactSettingItem extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'Tajawal',
                       fontSize: 9,
-                      color: isSelected ? AppColors.primary.withAlpha(178) : Colors.grey[600],
+                      color: isSelected
+                          ? AppColors.primary.withAlpha(178)
+                          : Colors.grey[600],
                     ),
                   ),
               ],
             ),
           ),
-          
+
           // Action Buttons
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -650,13 +853,19 @@ class _CompactSettingItem extends StatelessWidget {
                       child: CircularProgressIndicator(
                         value: progress,
                         strokeWidth: 2,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.orange),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.orange,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '${((progress ?? 0) * 100).toInt()}%',
-                      style: const TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 )
@@ -670,7 +879,11 @@ class _CompactSettingItem extends StatelessWidget {
                     if (sizeEstimate != null && sizeEstimate!.isNotEmpty)
                       Text(
                         sizeEstimate!,
-                        style: TextStyle(fontSize: 9, color: Colors.grey[600], fontFamily: 'Tajawal'),
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.grey[600],
+                          fontFamily: 'Tajawal',
+                        ),
                       ),
                     const SizedBox(width: 4),
                     InkWell(
@@ -682,28 +895,41 @@ class _CompactSettingItem extends StatelessWidget {
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Icon(Icons.download_rounded, size: 16, color: Colors.black54),
+                        child: const Icon(
+                          Icons.download_rounded,
+                          size: 16,
+                          color: Colors.black54,
+                        ),
                       ),
                     ),
                   ],
                 )
-              else 
-                 const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
-              
+              else
+                const Icon(
+                  Icons.check_circle_outline,
+                  size: 16,
+                  color: Colors.green,
+                ),
+
               const SizedBox(width: 8),
-              
+
               // Activate Button
               InkWell(
                 onTap: onActivate,
                 borderRadius: BorderRadius.circular(4),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: isSelected ? AppColors.primary : Colors.grey[300],
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    isSelected ? AppLocalizations.of(context)!.active : AppLocalizations.of(context)!.activate,
+                    isSelected
+                        ? AppLocalizations.of(context)!.active
+                        : AppLocalizations.of(context)!.activate,
                     style: TextStyle(
                       fontFamily: 'Tajawal',
                       fontSize: 10,

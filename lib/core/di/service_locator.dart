@@ -14,12 +14,14 @@ final sl = GetIt.instance;
 Future<void> initServiceLocator() async {
   // Data Sources
   sl.registerLazySingleton(() => QuranLocalDataSource.instance);
-  
+
   // UseCases
   sl.registerLazySingleton(() => GetAllSurahsUseCase(sl()));
 
   // Repositories
   sl.registerLazySingleton<SettingsRepository>(() => SettingsRepositoryImpl());
-  sl.registerLazySingleton<QuranRepository>(() => QuranRepositoryImpl(localDataSource: sl()));
+  sl.registerLazySingleton<QuranRepository>(
+    () => QuranRepositoryImpl(localDataSource: sl()),
+  );
   sl.registerLazySingleton<ReciterRepository>(() => ReciterRepositoryImpl());
 }

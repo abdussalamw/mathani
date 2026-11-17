@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
+
+import '../../widgets/review_summary_card.dart';
 
 /// شاشة لوحة تحليلات وإحصاءات التسميع المتقدمة (لوحة تحكم الحافظ)
 class RecitationAnalyticsView extends StatelessWidget {
@@ -11,6 +13,7 @@ class RecitationAnalyticsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<RecitationProvider>();
+    final summary = provider.reviewSummary;
 
     return Container(
       color: isDark ? const Color(0xFF131315) : AppColors.brandBackground,
@@ -23,7 +26,10 @@ class RecitationAnalyticsView extends StatelessWidget {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded, color: AppColors.slateText),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppColors.slateText,
+                    ),
                     onPressed: () => provider.goToSetup(),
                   ),
                   const Expanded(
@@ -52,12 +58,42 @@ class RecitationAnalyticsView extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          ReviewSummaryCard(
+                            summary: summary,
+                            onReview: summary.suggestedReview == null
+                                ? null
+                                : () async {
+                                    final prepared = await provider
+                                        .prepareSuggestedReview(
+                                          summary.suggestedReview!,
+                                        );
+                                    if (!context.mounted || prepared) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'تعذّر إعداد المراجعة، يرجى إعادة المحاولة',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                          ),
+                          const SizedBox(height: 16),
                           // 1. شعلة الاستمرارية (Streak) + نسبة الحفظ الكلية
                           Row(
                             children: [
-                              Expanded(child: _buildStreakCard(provider.currentStreak, isDark)),
+                              Expanded(
+                                child: _buildStreakCard(
+                                  provider.currentStreak,
+                                  isDark,
+                                ),
+                              ),
                               const SizedBox(width: 12),
-                              Expanded(child: _buildProgressCard(provider.memorizationProgress, isDark)),
+                              Expanded(
+                                child: _buildProgressCard(
+                                  provider.memorizationProgress,
+                                  isDark,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 16),
@@ -89,7 +125,7 @@ class RecitationAnalyticsView extends StatelessWidget {
             Icon(
               Icons.analytics_outlined,
               size: 72,
-              color: Colors.grey.withOpacity(0.4),
+              color: Colors.grey.withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -124,12 +160,12 @@ class RecitationAnalyticsView extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E22) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.brandGold.withOpacity(0.1)),
+        border: Border.all(color: AppColors.brandGold.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
-          )
+          ),
         ],
       ),
       child: Column(
@@ -179,12 +215,12 @@ class RecitationAnalyticsView extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E22) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.brandGold.withOpacity(0.1)),
+        border: Border.all(color: AppColors.brandGold.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
-          )
+          ),
         ],
       ),
       child: Column(
@@ -198,7 +234,7 @@ class RecitationAnalyticsView extends StatelessWidget {
                 CircularProgressIndicator(
                   value: progress,
                   strokeWidth: 4,
-                  backgroundColor: AppColors.brandGold.withOpacity(0.1),
+                  backgroundColor: AppColors.brandGold.withValues(alpha: 0.1),
                   valueColor: const AlwaysStoppedAnimation(AppColors.brandGold),
                 ),
                 Text(
@@ -247,7 +283,7 @@ class RecitationAnalyticsView extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E22) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withOpacity(0.08)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,9 +301,24 @@ class RecitationAnalyticsView extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatDetailItem('متوسط الدقة', '$avgAccuracy%', Icons.check_circle_outline_rounded, AppColors.success),
-              _buildStatDetailItem('إجمالي الكلمات', '$totalWords', Icons.menu_book_rounded, Colors.blue),
-              _buildStatDetailItem('وقت التسميع', '${totalDurationMin} دقيقة', Icons.timer_outlined, Colors.amber),
+              _buildStatDetailItem(
+                'متوسط الدقة',
+                '$avgAccuracy%',
+                Icons.check_circle_outline_rounded,
+                AppColors.success,
+              ),
+              _buildStatDetailItem(
+                'إجمالي الكلمات',
+                '$totalWords',
+                Icons.menu_book_rounded,
+                Colors.blue,
+              ),
+              _buildStatDetailItem(
+                'وقت التسميع',
+                '$totalDurationMin دقيقة',
+                Icons.timer_outlined,
+                Colors.amber,
+              ),
             ],
           ),
         ],
@@ -275,13 +326,18 @@ class RecitationAnalyticsView extends StatelessWidget {
     );
   }
 
-  Widget _buildStatDetailItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatDetailItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: color, size: 20),
@@ -315,7 +371,7 @@ class RecitationAnalyticsView extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E22) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withOpacity(0.08)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,7 +398,11 @@ class RecitationAnalyticsView extends StatelessWidget {
           if (hotspots.isEmpty)
             const Text(
               'لا توجد بيانات كافية.',
-              style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: AppColors.mutedText),
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 12,
+                color: AppColors.mutedText,
+              ),
             )
           else
             ListView.separated(
@@ -354,21 +414,32 @@ class RecitationAnalyticsView extends StatelessWidget {
                 final item = hotspots[index];
                 final acc = item['accuracy'] as int;
                 Color statusColor = Colors.red;
-                if (acc >= 80) statusColor = AppColors.success;
-                else if (acc >= 60) statusColor = AppColors.warning;
+                if (acc >= 80) {
+                  statusColor = AppColors.success;
+                } else if (acc >= 60) {
+                  statusColor = AppColors.warning;
+                }
 
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF151412) : AppColors.brandBackground,
+                    color: isDark
+                        ? const Color(0xFF151412)
+                        : AppColors.brandBackground,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
+                          color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -392,7 +463,11 @@ class RecitationAnalyticsView extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.mutedText),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 12,
+                        color: AppColors.mutedText,
+                      ),
                     ],
                   ),
                 );

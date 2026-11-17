@@ -1,6 +1,7 @@
-
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import '../models/surah_app/aya_content.dart';
 import '../models/surah_app/word_content.dart';
 
@@ -10,16 +11,16 @@ class SurahAppApiService {
   // Available Slugs from Docs
   static const List<String> tafsirSlugs = [
     'tafsir-katheer', // Ibn Kathir
-    'tafsir-saadi',   // Saadi
+    'tafsir-saadi', // Saadi
     'tafsir-baghawy', // Baghawy
-    'tafsir-tabary',  // Tabary
-    'eerab-aya',      // Eerab (Syntax)
-    'ayat-nozool',    // Asbab Nozool
+    'tafsir-tabary', // Tabary
+    'eerab-aya', // Eerab (Syntax)
+    'ayat-nozool', // Asbab Nozool
   ];
 
   static const List<String> wordSlugs = [
-    'meaning-word',   // Word Meaning
-    'eerab-word',     // Word Syntax
+    'meaning-word', // Word Meaning
+    'eerab-word', // Word Syntax
   ];
 
   /// Fetch Content for a specific Ayah
@@ -51,7 +52,9 @@ class SurahAppApiService {
     required int wordNumber,
     String slug = 'meaning-word',
   }) async {
-    final url = Uri.parse('$_baseUrl/word/$slug/$suraNumber/$ayaNumber/$wordNumber');
+    final url = Uri.parse(
+      '$_baseUrl/word/$slug/$suraNumber/$ayaNumber/$wordNumber',
+    );
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -69,7 +72,7 @@ class SurahAppApiService {
   /// Note: The API supports ranges, but words in an ayah are usually 1..N
   /// We might need to know how many words are there first, or just try fetching until 404?
   /// Better approach: The API supports ranges! /word/{slug}/{sura}/{aya}/{from}/{to}
-  /// But we don't know 'to'. 
+  /// But we don't know 'to'.
   /// However, we can use the 'Page' or 'Aya' endpoint if it returns words? No.
   /// Text-based Mushaf knows token count. We can pass it from the UI.
   Future<List<WordContent>> getAyahWordsContent({
@@ -80,8 +83,10 @@ class SurahAppApiService {
   }) async {
     // Determine range: 1 to wordCount
     // Endpoint: /word/{slug}/{sura}/{aya}/{from}/{to}
-    final url = Uri.parse('$_baseUrl/word/$slug/$suraNumber/$ayaNumber/1/$wordCount');
-    
+    final url = Uri.parse(
+      '$_baseUrl/word/$slug/$suraNumber/$ayaNumber/1/$wordCount',
+    );
+
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {

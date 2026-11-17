@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
@@ -40,7 +40,7 @@ class AsrService {
 
   bool _isModelLoaded = false;
   bool _isLoading = false;
-  
+
   sherpa.OfflineRecognizer? _recognizer;
 
   bool get isModelLoaded => _isModelLoaded;
@@ -55,7 +55,7 @@ class AsrService {
     try {
       final directory = await getApplicationSupportDirectory();
       final modelDir = Directory('${directory.path}/ai_models/asr');
-      
+
       if (!await modelDir.exists()) {
         throw Exception('مجلد النموذج غير موجود. يرجى تحميله أولاً.');
       }
@@ -65,7 +65,9 @@ class AsrService {
       String decoderPath = '${modelDir.path}/decoder.int8.onnx';
       String tokensPath = '${modelDir.path}/tokens.txt';
 
-      if (!await File(encoderPath).exists() || !await File(decoderPath).exists() || !await File(tokensPath).exists()) {
+      if (!await File(encoderPath).exists() ||
+          !await File(decoderPath).exists() ||
+          !await File(tokensPath).exists()) {
         debugPrint('⚠️ المسار المباشر غير موجود، بحث متقدم...');
         encoderPath = _findFile(modelDir, 'encoder') ?? '';
         decoderPath = _findFile(modelDir, 'decoder') ?? '';
@@ -81,9 +83,15 @@ class AsrService {
       }
 
       // تسجيل أحجام الملفات
-      debugPrint('📂 Encoder: $encoderPath (${(await File(encoderPath).length() / 1024 / 1024).toStringAsFixed(1)} MB)');
-      debugPrint('📂 Decoder: $decoderPath (${(await File(decoderPath).length() / 1024 / 1024).toStringAsFixed(1)} MB)');
-      debugPrint('📂 Tokens : $tokensPath (${await File(tokensPath).length()} bytes)');
+      debugPrint(
+        '📂 Encoder: $encoderPath (${(await File(encoderPath).length() / 1024 / 1024).toStringAsFixed(1)} MB)',
+      );
+      debugPrint(
+        '📂 Decoder: $decoderPath (${(await File(decoderPath).length() / 1024 / 1024).toStringAsFixed(1)} MB)',
+      );
+      debugPrint(
+        '📂 Tokens : $tokensPath (${await File(tokensPath).length()} bytes)',
+      );
 
       // تحديد مزود التسريع (مع دعم التراجع التلقائي لـ CPU)
       String primaryProvider = 'cpu';
@@ -123,7 +131,9 @@ class AsrService {
             break;
           }
         } catch (initErr) {
-          debugPrint('⚠️ فشل مزود ($provider): $initErr - جاري تجربة البديل...');
+          debugPrint(
+            '⚠️ فشل مزود ($provider): $initErr - جاري تجربة البديل...',
+          );
           _recognizer?.free();
           _recognizer = null;
           if (provider == 'cpu') rethrow;
@@ -152,7 +162,10 @@ class AsrService {
     try {
       for (var entity in dir.listSync(recursive: true)) {
         if (entity is File) {
-          final name = entity.path.split(Platform.pathSeparator).last.toLowerCase();
+          final name = entity.path
+              .split(Platform.pathSeparator)
+              .last
+              .toLowerCase();
           if (name.endsWith('.backup')) continue;
           if (name.contains(pattern.toLowerCase())) {
             return entity.path;
@@ -206,7 +219,9 @@ class AsrService {
     // Whisper small: حجم الإدخال يجب أن يكون 30 ثانية = 480000 عينة @ 16kHz
     const int minSamples = 16000; // 1 ثانية حد أدنى
     if (waveData.samples.length < minSamples) {
-      throw Exception('التسجيل قصير جداً (${(waveData.samples.length / sampleRate * 1000).round()} مللي ثانية). اقرأ لمدة أطول.');
+      throw Exception(
+        'التسجيل قصير جداً (${(waveData.samples.length / sampleRate * 1000).round()} مللي ثانية). اقرأ لمدة أطول.',
+      );
     }
 
     // Padding ديناميكي إلى 30 ثانية (480000 عينة) لمنع ONNX shape mismatch
@@ -215,32 +230,33 @@ class AsrService {
     if (waveData.samples.length < samplesPer30Sec) {
       processedSamples = Float32List(samplesPer30Sec);
       processedSamples.setRange(0, waveData.samples.length, waveData.samples);
-      debugPrint('🎵 ASR: Pad from ${waveData.samples.length} → $samplesPer30Sec عينة');
+      debugPrint(
+        '🎵 ASR: Pad from ${waveData.samples.length} → $samplesPer30Sec عينة',
+      );
     } else {
       processedSamples = waveData.samples;
     }
 
     final stream = _recognizer!.createStream();
     stream.acceptWaveform(sampleRate: sampleRate, samples: processedSamples);
-    
+
     _recognizer!.decode(stream);
-    
+
     final result = _recognizer!.getResult(stream);
     final text = result.text;
-    final words = text.split(' ')
+    final words = text
+        .split(' ')
         .where((w) => w.trim().isNotEmpty)
         .map((w) => AsrWord(text: w, startMs: 0, endMs: 0))
         .toList();
 
     stream.free();
 
-    final duration = sampleRate > 0 ? (waveData.samples.length / sampleRate * 1000).toInt() : 0;
+    final duration = sampleRate > 0
+        ? (waveData.samples.length / sampleRate * 1000).toInt()
+        : 0;
 
-    return AsrResult(
-      fullText: text,
-      words: words,
-      durationMs: duration,
-    );
+    return AsrResult(fullText: text, words: words, durationMs: duration);
   }
 
   /// التحقق من إمكانية تشغيل محرك التعرف الصوتي على هذا الجهاز.
@@ -268,4 +284,3 @@ class AsrService {
     _isModelLoaded = false;
   }
 }
-

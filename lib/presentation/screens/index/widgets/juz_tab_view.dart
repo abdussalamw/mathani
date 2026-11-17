@@ -1,5 +1,6 @@
 import 'dart:math';
-import 'package:flutter/material.dart';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:mathani/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
@@ -9,7 +10,7 @@ import 'package:mathani/data/providers/mushaf_navigation_provider.dart';
 
 /// تبويب الأجزاء مع كعكة دائرية للأحزاب
 class JuzTabView extends StatefulWidget {
-  const JuzTabView({Key? key}) : super(key: key);
+  const JuzTabView({super.key});
 
   @override
   State<JuzTabView> createState() => _JuzTabViewState();
@@ -33,7 +34,7 @@ class _JuzTabViewState extends State<JuzTabView> {
     return juzList.where((juz) {
       final query = _searchQuery.toLowerCase();
       return juz.number.toString().contains(query) ||
-             juz.surahName.contains(_searchQuery);
+          juz.surahName.contains(_searchQuery);
     }).toList();
   }
 
@@ -44,13 +45,17 @@ class _JuzTabViewState extends State<JuzTabView> {
     return Consumer<MushafNavigationProvider>(
       builder: (context, navProvider, child) {
         // تحويل JuzInfo إلى JuzData
-        final juzList = navProvider.juzList.map((juzInfo) => JuzData(
-          number: juzInfo.number,
-          pageNumber: juzInfo.startPage,
-          surahName: juzInfo.surahName,
-          surahNumber: juzInfo.startSurah,
-          ayahNumber: juzInfo.startAyah,
-        )).toList();
+        final juzList = navProvider.juzList
+            .map(
+              (juzInfo) => JuzData(
+                number: juzInfo.number,
+                pageNumber: juzInfo.startPage,
+                surahName: juzInfo.surahName,
+                surahNumber: juzInfo.startSurah,
+                ayahNumber: juzInfo.startAyah,
+              ),
+            )
+            .toList();
 
         final filteredJuz = _getFilteredJuz(juzList);
 
@@ -70,7 +75,10 @@ class _JuzTabViewState extends State<JuzTabView> {
                     color: Colors.grey[500],
                     fontSize: 14,
                   ),
-                  prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: AppColors.primary,
+                  ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
@@ -88,7 +96,10 @@ class _JuzTabViewState extends State<JuzTabView> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ),
@@ -100,7 +111,11 @@ class _JuzTabViewState extends State<JuzTabView> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                          Icon(
+                            Icons.search_off,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
                           const SizedBox(height: 16),
                           Text(
                             AppLocalizations.of(context)!.noSearchResults,
@@ -147,7 +162,7 @@ class _JuzTabViewState extends State<JuzTabView> {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -165,10 +180,7 @@ class _JuzTabViewState extends State<JuzTabView> {
                   // 8 أقسام (4 أحزاب × 2 نصف)
                   CustomPaint(
                     size: const Size(44, 44),
-                    painter: HizbCirclePainter(
-                      segments: 8,
-                      isDark: isDark,
-                    ),
+                    painter: HizbCirclePainter(segments: 8, isDark: isDark),
                   ),
                   // رقم الجزء
                   Text(
@@ -195,13 +207,14 @@ class _JuzTabViewState extends State<JuzTabView> {
                 height: 1.2,
               ),
             ),
-            
+
             const SizedBox(width: 12),
-            
+
             // معلومات البداية - على اليمين
             Expanded(
               child: Text(
-                AppLocalizations.of(context)!.juzFromSurah(juz.surahName, juz.ayahNumber),
+                AppLocalizations.of(context)!
+                    .juzFromSurah(juz.surahName, juz.ayahNumber),
                 style: TextStyle(
                   fontFamily: 'Tajawal',
                   fontSize: 11,
@@ -210,10 +223,14 @@ class _JuzTabViewState extends State<JuzTabView> {
                 textAlign: TextAlign.right,
               ),
             ),
-            
+
             const SizedBox(width: 8),
 
-            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: Colors.grey,
+            ),
           ],
         ),
       ),
@@ -226,10 +243,7 @@ class HizbCirclePainter extends CustomPainter {
   final int segments;
   final bool isDark;
 
-  HizbCirclePainter({
-    required this.segments,
-    required this.isDark,
-  });
+  HizbCirclePainter({required this.segments, required this.isDark});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -241,7 +255,7 @@ class HizbCirclePainter extends CustomPainter {
       // ألوان متدرجة من الذهبي إلى البرتقالي
       final color = Color.lerp(
         AppColors.golden,
-        AppColors.primary.withOpacity(0.7),
+        AppColors.primary.withValues(alpha: 0.7),
         i / segments,
       )!;
 

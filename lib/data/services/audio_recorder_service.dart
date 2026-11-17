@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -7,7 +7,8 @@ import 'package:record/record.dart';
 /// خدمة تسجيل الصوت — تسجل تلاوة المستخدم بصيغة WAV 16kHz mono
 /// مُحسَّنة لتغذية نموذج Whisper ASR
 class AudioRecorderService {
-  static final AudioRecorderService _instance = AudioRecorderService._internal();
+  static final AudioRecorderService _instance =
+      AudioRecorderService._internal();
   factory AudioRecorderService() => _instance;
   AudioRecorderService._internal();
 
@@ -51,10 +52,10 @@ class AudioRecorderService {
     try {
       // إعدادات التسجيل المُحسَّنة لـ Whisper
       const config = RecordConfig(
-        encoder: AudioEncoder.wav,        // WAV بدون ضغط
-        sampleRate: 16000,                // 16kHz — معيار Whisper
-        numChannels: 1,                   // Mono
-        bitRate: 256000,                  // 256kbps
+        encoder: AudioEncoder.wav, // WAV بدون ضغط
+        sampleRate: 16000, // 16kHz — معيار Whisper
+        numChannels: 1, // Mono
+        bitRate: 256000, // 256kbps
       );
 
       await _recorder!.start(config, path: _currentFilePath!);
@@ -103,8 +104,9 @@ class AudioRecorderService {
         if (await file.exists()) {
           final size = await file.length();
           debugPrint('📁 حجم الملف: ${(size / 1024).toStringAsFixed(1)} KB');
-          
-          if (size < 1024) { // أقل من 1KB — تسجيل فارغ
+
+          if (size < 1024) {
+            // أقل من 1KB — تسجيل فارغ
             debugPrint('⚠️ التسجيل قصير جداً');
           }
         }
@@ -148,7 +150,7 @@ class AudioRecorderService {
       // سنركز النطاق ليكون أكثر تفاعلاً
       double current = amp.current;
       if (current < -60) current = -60; // ضجيج الخلفية
-      
+
       final normalized = (current + 60) / 60;
       return normalized.clamp(0.0, 1.0);
     } catch (e) {
@@ -201,7 +203,9 @@ class AudioRecorderService {
       final tempPath = '${dir.path}/partial_recitation.wav';
       final tempFile = File(tempPath);
       await tempFile.writeAsBytes(fixedBytes, flush: true);
-      debugPrint('🎙 نسخة مؤقتة: ${(bytes.length / 1024).toStringAsFixed(1)} KB | عينات: ${dataSize ~/ 2}');
+      debugPrint(
+        '🎙 نسخة مؤقتة: ${(bytes.length / 1024).toStringAsFixed(1)} KB | عينات: ${dataSize ~/ 2}',
+      );
       return tempFile.path;
     } catch (e) {
       debugPrint('⚠️ فشل getPartiallyRecordedFile: $e');

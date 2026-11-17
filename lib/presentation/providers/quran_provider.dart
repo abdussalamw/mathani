@@ -1,4 +1,7 @@
 import 'package:flutter/foundation.dart';
+
+import '../../core/utils/async_work_pool.dart';
+
 import 'package:mathani/data/models/surah.dart';
 import 'package:mathani/data/models/ayah.dart';
 import 'package:mathani/domain/repositories/quran_repository.dart';
@@ -7,16 +10,17 @@ import 'package:fpdart/fpdart.dart'; // Added for Either
 import 'package:mathani/core/errors/failures.dart'; // Added for Failure
 
 class QuranProvider with ChangeNotifier {
+  final _pageWork = AsyncWorkPool<int, List<Ayah>>();
   final QuranRepository _repository;
-  
+
   // الحالة
   List<Surah> _surahs = [];
   List<Ayah> _currentAyahs = [];
   Surah? _currentSurah;
-  
+
   bool _isLoading = false;
   String? _errorMessage;
-  
+
   // Getters
   List<Surah> get surahs => _surahs;
   List<Ayah> get currentAyahs => _currentAyahs;
@@ -41,7 +45,7 @@ class QuranProvider with ChangeNotifier {
     notifyListeners();
 
     final result = await _repository.searchAyahs(query);
-    
+
     result.fold(
       (failure) {
         _searchResults = []; // Quietly fail or showing empty results
@@ -59,7 +63,7 @@ class QuranProvider with ChangeNotifier {
     _searchResults = [];
     notifyListeners();
   }
-  
+
   // Reading State (Synced with Mushaf View)
   int _readingSurah = 1;
   int _readingAyah = 1;
@@ -69,16 +73,16 @@ class QuranProvider with ChangeNotifier {
   int get readingPage => _readingPage;
 
   QuranProvider({QuranRepository? repository})
-      : _repository = repository ?? sl<QuranRepository>(); 
-  
+    : _repository = repository ?? sl<QuranRepository>();
+
   // تحميل جميع السور
   Future<void> loadSurahs() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
-    
+
     final result = await _repository.getAllSurahs();
-    
+
     result.fold(
       (failure) {
         _errorMessage = 'خطأ في تحميل السور: ${failure.message}';
@@ -89,53 +93,55 @@ class QuranProvider with ChangeNotifier {
         _surahs = surahs;
         _isLoading = false;
         notifyListeners();
-      }
+      },
     );
   }
-  
+
   // تحميل سورة وآياتها
   Future<void> loadSurah(int surahNumber) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
-    
+
     // Parallel fetching for efficiency
     final surahResultFuture = _repository.getSurahByNumber(surahNumber);
-    final ayahsResultFuture = _repository.getAyahsForSurah(surahNumber); // Corrected method name
-    
+    final ayahsResultFuture = _repository.getAyahsForSurah(
+      surahNumber,
+    ); // Corrected method name
+
     final results = await Future.wait([surahResultFuture, ayahsResultFuture]);
-    
-    final surahResult = results[0] as dynamic; // casting needed due to dynamic list
+
+    final surahResult =
+        results[0] as dynamic; // casting needed due to dynamic list
     final ayahsResult = results[1] as dynamic;
-    
+
     // Check Surah Result
     surahResult.fold(
       (failure) {
-         _errorMessage = 'خطأ في تحميل السورة: ${failure.message}';
-         _isLoading = false;
-         notifyListeners();
-         return;
+        _errorMessage = 'خطأ في تحميل السورة: ${failure.message}';
+        _isLoading = false;
+        notifyListeners();
+        return;
       },
       (surah) {
-         _currentSurah = surah;
-      }
+        _currentSurah = surah;
+      },
     );
-    
+
     if (_errorMessage != null) return;
-    
 
     // Check Ayahs Result
     ayahsResult.fold(
       (failure) {
-         _errorMessage = 'خطأ في تحميل الآيات: ${failure.message}';
-         _isLoading = false;
-         notifyListeners();
+        _errorMessage = 'خطأ في تحميل الآيات: ${failure.message}';
+        _isLoading = false;
+        notifyListeners();
       },
       (ayahs) {
-         _currentAyahs = ayahs;
-         _isLoading = false;
-         notifyListeners();
-      }
+        _currentAyahs = ayahs;
+        _isLoading = false;
+        notifyListeners();
+      },
     );
   }
 
@@ -144,25 +150,26 @@ class QuranProvider with ChangeNotifier {
     final result = await _repository.getAyah(surahNumber, ayahNumber);
     return result.fold(
       (failure) => null,
-      (ayah) => ayah?.textUthmani ?? ayah?.text // Prefer Uthmani, fallback to simple
+      (ayah) =>
+          ayah?.textUthmani ?? ayah?.text, // Prefer Uthmani, fallback to simple
     );
   }
-  
+
   // تحديث آخر قراءة
   Future<void> updateLastRead(int surahNumber, int ayahNumber) async {
     final result = await _repository.updateLastRead(surahNumber, ayahNumber);
     result.fold(
       (l) => debugPrint('Error updating last read: ${l.message}'),
-      (r) => notifyListeners()
+      (r) => notifyListeners(),
     );
   }
-  
+
   // إضافة/إزالة من المفضلة
   Future<void> toggleFavorite(int surahNumber) async {
     final result = await _repository.toggleFavorite(surahNumber);
     result.fold(
       (l) => debugPrint('Error toggling favorite: ${l.message}'),
-      (r) => loadSurahs() // إعادة تحميل للتحديث
+      (r) => loadSurahs(), // إعادة تحميل للتحديث
     );
   }
 
@@ -188,31 +195,41 @@ class QuranProvider with ChangeNotifier {
   }
 
   // لجلب آيات صفحة كاملة (للمصحف الرقمي)
-  Future<List<Ayah>> getAyahsForPage(int pageNumber) async {
+  Future<List<Ayah>> getAyahsForPage(int pageNumber) =>
+      _pageWork.run(pageNumber, () => _loadAyahsForPage(pageNumber));
+
+  Future<List<Ayah>> _loadAyahsForPage(int pageNumber) async {
     final result = await _repository.getAyahsForPage(pageNumber);
-    return result.fold(
-      (l) {
-        debugPrint('Error loading page ayahs: ${l.message}');
-        return [];
-      },
-      (r) => r
-    );
+    return result.fold((l) {
+      debugPrint('Error loading page ayahs: ${l.message}');
+      return [];
+    }, (r) => r);
   }
 
   // Wrapper for Repository getAyah (needed for sync logic)
-  Future<Either<Failure, Ayah?>> getAyah(int surahNumber, int ayahNumber) async {
+  Future<Either<Failure, Ayah?>> getAyah(
+    int surahNumber,
+    int ayahNumber,
+  ) async {
     return _repository.getAyah(surahNumber, ayahNumber);
   }
 
   // Dynamic Ayah Range Loading
-  Future<List<Ayah>> getAyahsByRange(int startSurah, int startAyah, int endSurah, int endAyah) async {
-    final result = await _repository.getAyahsCountRange(startSurah, startAyah, endSurah, endAyah);
-    return result.fold(
-      (l) {
-        debugPrint('Error loading range ayahs: ${l.message}');
-        return [];
-      },
-      (r) => r
+  Future<List<Ayah>> getAyahsByRange(
+    int startSurah,
+    int startAyah,
+    int endSurah,
+    int endAyah,
+  ) async {
+    final result = await _repository.getAyahsCountRange(
+      startSurah,
+      startAyah,
+      endSurah,
+      endAyah,
     );
+    return result.fold((l) {
+      debugPrint('Error loading range ayahs: ${l.message}');
+      return [];
+    }, (r) => r);
   }
 }

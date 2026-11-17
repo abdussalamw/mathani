@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
@@ -28,13 +28,17 @@ class RecitationExpandedPanel extends StatelessWidget {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           border: Border(
             top: BorderSide(
-              color: isDark ? AppColors.primary.withOpacity(0.15) : Colors.grey.shade200,
+              color: isDark
+                  ? AppColors.primary.withValues(alpha: 0.15)
+                  : Colors.grey.shade200,
               width: 1.5,
             ),
           ),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.08),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.4)
+                  : Colors.black.withValues(alpha: 0.08),
               blurRadius: 20,
               offset: const Offset(0, -4),
             ),
@@ -51,7 +55,9 @@ class RecitationExpandedPanel extends StatelessWidget {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -63,10 +69,14 @@ class RecitationExpandedPanel extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.analytics_rounded, color: AppColors.primary, size: 18),
+                    child: const Icon(
+                      Icons.analytics_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   const Text(
@@ -81,7 +91,9 @@ class RecitationExpandedPanel extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.expand_more_rounded, size: 24),
                     color: AppColors.mutedText,
-                    onPressed: () => context.read<UiProvider>().setShowRecitationResults(false),
+                    onPressed: () => context
+                        .read<UiProvider>()
+                        .setShowRecitationResults(false),
                   ),
                   const SizedBox(width: 8),
                 ],
@@ -99,7 +111,8 @@ class RecitationExpandedPanel extends StatelessWidget {
                       iconColor: AppColors.success,
                       label: 'الدقة الكلية',
                       value: '${result.accuracyPercent}%',
-                      sub: '${result.correctWords} كلمات صحيحة من ${result.totalWords}',
+                      sub:
+                          '${result.correctWords} كلمات صحيحة من ${result.totalWords}',
                       isDark: isDark,
                     ),
                     const SizedBox(height: 8),
@@ -148,13 +161,26 @@ class RecitationExpandedPanel extends StatelessWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => context.read<RecitationProvider>().goToHistory(),
+                        onPressed: () =>
+                            context.read<RecitationProvider>().goToHistory(),
                         icon: const Icon(Icons.history_rounded, size: 16),
-                        label: const Text('سجل التسميعات', style: TextStyle(fontFamily: 'Tajawal', fontSize: 13, fontWeight: FontWeight.bold)),
+                        label: const Text(
+                          'سجل التسميعات',
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
-                          side: BorderSide(color: AppColors.primary.withOpacity(0.3), width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
@@ -163,13 +189,17 @@ class RecitationExpandedPanel extends StatelessWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          context.read<UiProvider>().setShowRecitationResults(false);
+                          context.read<UiProvider>().setShowRecitationResults(
+                            false,
+                          );
                           context.read<RecitationProvider>().reset();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                           padding: EdgeInsets.zero,
                         ),
                         child: Ink(
@@ -182,7 +212,7 @@ class RecitationExpandedPanel extends StatelessWidget {
                             borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withOpacity(0.3),
+                                color: AppColors.primary.withValues(alpha: 0.3),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -191,10 +221,14 @@ class RecitationExpandedPanel extends StatelessWidget {
                           child: Container(
                             alignment: Alignment.center,
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
+                            child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                Icon(Icons.replay_rounded, size: 16, color: Colors.white),
+                              children: [
+                                Icon(
+                                  Icons.replay_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
                                 SizedBox(width: 6),
                                 Text(
                                   'إعادة التسميع',
@@ -233,19 +267,24 @@ class RecitationExpandedPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey.shade50,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade100,
           width: 1,
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 36, height: 36,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
+              color: iconColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: iconColor, size: 18),

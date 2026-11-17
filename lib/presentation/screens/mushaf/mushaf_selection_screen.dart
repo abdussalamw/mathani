@@ -1,12 +1,12 @@
-
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_colors.dart';
-import '../../../core/database/collections.dart'; // Import required for MushafMetadata model
+// Import required for MushafMetadata model
 import '../../providers/mushaf_metadata_provider.dart';
 
 class MushafSelectionScreen extends StatefulWidget {
-  const MushafSelectionScreen({Key? key}) : super(key: key);
+  const MushafSelectionScreen({super.key});
 
   @override
   State<MushafSelectionScreen> createState() => _MushafSelectionScreenState();
@@ -32,10 +32,7 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
       appBar: AppBar(
         title: const Text(
           'مكتبة المصاحف',
-          style: TextStyle(
-            fontFamily: 'Tajawal',
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         elevation: 0,
@@ -43,7 +40,9 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
       body: Consumer<MushafMetadataProvider>(
         builder: (context, MushafMetadataProvider provider, child) {
           if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            );
           }
 
           if (provider.availableMushafs.isEmpty) {
@@ -72,20 +71,21 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
           return ListView.separated(
             padding: const EdgeInsets.all(20),
             itemCount: provider.availableMushafs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 16),
+            separatorBuilder: (_, _) => const SizedBox(height: 16),
             itemBuilder: (context, index) {
               final mushaf = provider.availableMushafs[index];
               final isSelected = mushaf.identifier == provider.currentMushafId;
-              final isDownloadingThis = provider.isDownloading && provider.currentDownloadingId == mushaf.identifier;
+              final isDownloadingThis =
+                  provider.isDownloading &&
+                  provider.currentDownloadingId == mushaf.identifier;
               // تحقق خاص لـ qcf2 - إذا لم يكن محملاً يحتاج تحميل
               final isQcf2 = mushaf.identifier == 'qcf2_v4_woff2';
-              final isImage = (mushaf.type ?? '') == 'image';
-              
+
               // Needs download if:
               // 1. Not isDownloaded AND has a remote URL (Zip, Tar, or specific QCF2 logic)
               final hasUrl = mushaf.baseUrl != null;
               final needsDownload = !mushaf.isDownloaded && (hasUrl || isQcf2);
-              
+
               return Container(
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
@@ -94,11 +94,11 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                     color: isSelected ? AppColors.primary : AppColors.grey10,
                     width: isSelected ? 2 : 1,
                   ),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: AppColors.black05,
                       blurRadius: 10,
-                      offset: const Offset(0, 4),
+                      offset: Offset(0, 4),
                     ),
                   ],
                 ),
@@ -109,11 +109,17 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                       leading: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary10 : AppColors.grey10,
+                          color: isSelected
+                              ? AppColors.primary10
+                              : AppColors.grey10,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          isSelected ? Icons.check : ((mushaf.type ?? '').contains('font') ? Icons.text_fields : Icons.menu_book_rounded),
+                          isSelected
+                              ? Icons.check
+                              : ((mushaf.type ?? '').contains('font')
+                                    ? Icons.text_fields
+                                    : Icons.menu_book_rounded),
                           color: isSelected ? AppColors.primary : Colors.grey,
                           size: 28,
                         ),
@@ -128,89 +134,129 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                       ),
                       subtitle: Padding(
                         padding: const EdgeInsets.only(top: 8.0),
-                        child: isDownloadingThis 
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: isDownloadingThis
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('جاري التحميل...', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: AppColors.primary)),
-                                  Text('${(provider.downloadProgress * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              LinearProgressIndicator(
-                                value: provider.downloadProgress, 
-                                backgroundColor: AppColors.grey10, 
-                                color: AppColors.primary,
-                                minHeight: 6,
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ],
-                          )
-                        : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                             Text(
-                                (mushaf.type ?? '').contains('font') 
-                                    ? (mushaf.identifier != null && mushaf.identifier!.contains('qcf') ? 'خطوط الرسم العثماني (QCF2) الماركة' : 'نسخة رقمية خفيفة وسريعة')
-                                    : 'نسخة طباعة عالية الدقة (تحتاج إنترنت للتحميل)', // Changed from "Picture version" to "High Quality Print"
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                ),
-                              ),
-                              if (needsDownload) ...[
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.download_rounded, size: 14, color: Colors.orange),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      mushaf.identifier == 'shamarly_15lines' 
-                                          ? 'حجم التنزيل: 74 ميجابايت تقريباً' 
-                                          : (mushaf.identifier == 'madani_old_v1' 
-                                              ? 'حجم التنزيل: 50 ميجابايت تقريباً' 
-                                              : (mushaf.identifier == 'qcf2_v4_woff2'
-                                                  ? 'حجم التنزيل: 58 ميجابايت تقريباً'
-                                                  : 'تنزيل ملفات المصحف')),
-                                      style: TextStyle(
-                                        color: Colors.orange[800],
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'جاري التحميل...',
+                                        style: TextStyle(
+                                          fontFamily: 'Tajawal',
+                                          fontSize: 12,
+                                          color: AppColors.primary,
+                                        ),
                                       ),
+                                      Text(
+                                        '${(provider.downloadProgress * 100).toInt()}%',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  LinearProgressIndicator(
+                                    value: provider.downloadProgress,
+                                    backgroundColor: AppColors.grey10,
+                                    color: AppColors.primary,
+                                    minHeight: 6,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    (mushaf.type ?? '').contains('font')
+                                        ? (mushaf.identifier != null &&
+                                                  mushaf.identifier!.contains(
+                                                    'qcf',
+                                                  )
+                                              ? 'خطوط الرسم العثماني (QCF2) الماركة'
+                                              : 'نسخة رقمية خفيفة وسريعة')
+                                        : 'نسخة طباعة عالية الدقة (تحتاج إنترنت للتحميل)', // Changed from "Picture version" to "High Quality Print"
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  if (needsDownload) ...[
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.download_rounded,
+                                          size: 14,
+                                          color: Colors.orange,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          mushaf.identifier ==
+                                                  'shamarly_15lines'
+                                              ? 'حجم التنزيل: 74 ميجابايت تقريباً'
+                                              : (mushaf.identifier ==
+                                                        'madani_old_v1'
+                                                    ? 'حجم التنزيل: 50 ميجابايت تقريباً'
+                                                    : (mushaf.identifier ==
+                                                              'qcf2_v4_woff2'
+                                                          ? 'حجم التنزيل: 58 ميجابايت تقريباً'
+                                                          : 'تنزيل ملفات المصحف')),
+                                          style: TextStyle(
+                                            color: Colors.orange[800],
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
-                                ),
-                              ],
-                          ],
-                        ),
+                                ],
+                              ),
                       ),
                     ),
                     Container(
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         color: AppColors.grey05,
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                        borderRadius: BorderRadius.vertical(
+                          bottom: Radius.circular(16),
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           if (isSelected)
                             const Text(
                               'مستخدم حالياً ✅',
-                              style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
                             )
                           else if (needsDownload && !isDownloadingThis)
                             ElevatedButton.icon(
-                              icon: const Icon(Icons.download_rounded, size: 18),
+                              icon: const Icon(
+                                Icons.download_rounded,
+                                size: 18,
+                              ),
                               label: const Text('تنزيل المصحف'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
                               onPressed: () {
                                 if (mushaf.identifier != null) {
@@ -220,11 +266,14 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                             )
                           else if (!needsDownload)
                             OutlinedButton(
-                              child: const Text('تفعيل هذه النسخة'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: AppColors.primary,
-                                side: const BorderSide(color: AppColors.primary),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                side: const BorderSide(
+                                  color: AppColors.primary,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
                               onPressed: () {
                                 if (mushaf.identifier != null) {
@@ -232,6 +281,7 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                                   Navigator.pop(context);
                                 }
                               },
+                              child: const Text('تفعيل هذه النسخة'),
                             ),
                         ],
                       ),

@@ -1,23 +1,24 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+
 import '../../data/providers/mushaf_navigation_provider.dart';
 
 class UiProvider with ChangeNotifier {
   int _currentTabIndex = 1; // Default to Mushaf
   int? _pageToJump;
   bool _showingTafsir = false;
-  bool _isImmersiveMode = true;
+  bool _isImmersiveMode = false;
   int _indexScreenTabIndex = 0; // 0=Surahs, 1=Juz, 2=Bookmarks
-  bool _showAudioMinibar = false; 
+  bool _showAudioMinibar = false;
   bool _showFullAudioPlayer = false;
   bool _hasNpu = true;
 
   // ✅ تم إزالة surahToPage المشفر - يتم استخدام MushafNavigationProvider الآن
-  
+
   int _currentMushafPage = 1;
 
   // ─── حالة التسميع الذكي ───
   bool _showRecitationMinibar = false;
-  bool _isRecitationActive = false;   // قيد التسجيل حالياً
+  bool _isRecitationActive = false; // قيد التسجيل حالياً
   bool _showRecitationResults = false; // بعد إيقاف التسجيل، النتائج التفصيلية
 
   int get currentTabIndex => _currentTabIndex;
@@ -41,11 +42,13 @@ class UiProvider with ChangeNotifier {
 
   void toggleFullAudioPlayer() {
     _showFullAudioPlayer = !_showFullAudioPlayer;
+    if (_showFullAudioPlayer) _isImmersiveMode = false;
     notifyListeners();
   }
 
   void setShowFullAudioPlayer(bool show) {
     _showFullAudioPlayer = show;
+    if (show) _isImmersiveMode = false;
     notifyListeners();
   }
 
@@ -69,21 +72,24 @@ class UiProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   void setTabIndex(int index, {int? indexScreenTab}) {
     _currentTabIndex = index;
     if (indexScreenTab != null) {
       _indexScreenTabIndex = indexScreenTab.clamp(0, 2);
     }
-    if (index != 1) { // Mushaf is index 1
-       _showingTafsir = false;
-       _isImmersiveMode = false;
+    if (index != 1) {
+      // Mushaf is index 1
+      _showingTafsir = false;
+      _isImmersiveMode = false;
     }
     notifyListeners();
   }
-  
+
   void toggleTafsir() {
-    if (_currentTabIndex == 1) { // Mushaf is index 1
+    _isImmersiveMode = false;
+    if (_currentTabIndex == 1) {
+      // Mushaf is index 1
       _showingTafsir = !_showingTafsir;
       notifyListeners();
     } else {
@@ -93,21 +99,32 @@ class UiProvider with ChangeNotifier {
   }
 
   void jumpToPage(int page) {
-    _pageToJump = page;
+    _isImmersiveMode = false;
+    _pageToJump = page < 1 ? 1 : page;
     _currentTabIndex = 1; // Switch to Mushaf tab (index 1)
     _showingTafsir = false;
     notifyListeners();
   }
 
-  void jumpToSurah(int surahNumber, MushafNavigationProvider navigationProvider) {
+  void jumpToSurah(
+    int surahNumber,
+    MushafNavigationProvider navigationProvider,
+  ) {
     final page = navigationProvider.getPageForSurah(surahNumber);
     if (page != null) {
       jumpToPage(page);
     }
   }
-  
+
   void toggleImmersiveMode() {
-    _isImmersiveMode = !_isImmersiveMode;
+    setImmersiveMode(!_isImmersiveMode);
+  }
+
+  void setImmersiveMode(bool immersive) {
+    final next = immersive && _currentTabIndex == 1 && !_showingTafsir;
+    if (next == _isImmersiveMode) return;
+    _isImmersiveMode = next;
+    if (next) _showFullAudioPlayer = false;
     notifyListeners();
   }
 

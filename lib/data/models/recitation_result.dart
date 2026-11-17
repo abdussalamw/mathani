@@ -1,9 +1,9 @@
 /// تقييم كلمة من التلاوة
 enum WordVerdict {
-  correct,    // صحيحة
+  correct, // صحيحة
   acceptable, // مقبولة (صحيحة بملاحظات)
-  incorrect,  // خطأ
-  skipped,    // لم تُقرأ
+  incorrect, // خطأ
+  skipped, // لم تُقرأ
 }
 
 /// نتيجة تحليل كلمة واحدة من التلاوة
@@ -56,16 +56,16 @@ class WordResult {
       verdict == WordVerdict.correct || verdict == WordVerdict.acceptable;
 
   Map<String, dynamic> toJson() => {
-        'spoken': spokenWord,
-        'expected': expectedWord,
-        'surah': surahNumber,
-        'ayah': ayahNumber,
-        'wordIndex': wordIndex,
-        'verdict': verdict.name,
-        'confidence': confidence,
-        'startMs': startTimeMs,
-        'endMs': endTimeMs,
-      };
+    'spoken': spokenWord,
+    'expected': expectedWord,
+    'surah': surahNumber,
+    'ayah': ayahNumber,
+    'wordIndex': wordIndex,
+    'verdict': verdict.name,
+    'confidence': confidence,
+    'startMs': startTimeMs,
+    'endMs': endTimeMs,
+  };
 }
 
 /// نتيجة تحليل جلسة تسميع كاملة
@@ -156,17 +156,17 @@ class RecitationResult {
   }
 
   Map<String, dynamic> toJson() => {
-        'surah': surahNumber,
-        'surahName': surahName,
-        'startAyah': startAyah,
-        'endAyah': endAyah,
-        'durationMs': durationMs,
-        'rawTranscript': rawTranscript,
-        'accuracy': accuracy,
-        'totalWords': totalWords,
-        'correctWords': correctWords,
-        'words': words.map((w) => w.toJson()).toList(),
-        'analyzedAt': analyzedAt.toIso8601String(),
-        'audioPath': audioPath,
-      };
+    'surah': surahNumber,
+    'surahName': surahName,
+    'startAyah': startAyah,
+    'endAyah': endAyah,
+    'durationMs': durationMs,
+    'rawTranscript': rawTranscript,
+    'accuracy': accuracy,
+    'totalWords': totalWords,
+    'correctWords': correctWords,
+    'words': words.map((w) => w.toJson()).toList(),
+    'analyzedAt': analyzedAt.toIso8601String(),
+    'audioPath': audioPath,
+  };
 }

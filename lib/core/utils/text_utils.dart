@@ -10,12 +10,17 @@ class TextUtils {
 
     // 1. إزالة التشكيل وعلامات الضبط المصحفي والرموز الخاصة
     normalized = normalized.replaceAll(
-      RegExp(r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u08D3-\u08E1\u08E3-\u08FF\uFD3E\uFD3F]'),
+      RegExp(
+        r'[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u08D3-\u08E1\u08E3-\u08FF\uFD3E\uFD3F]',
+      ),
       '',
     );
 
     // 2. إزالة الأرقام وأقواس الآيات وعلامات الترقيم
-    normalized = normalized.replaceAll(RegExp(r'[0-9٠-٩()\[\]{}<>«»".,؛:!?؟ـ\-_/\\|]'), '');
+    normalized = normalized.replaceAll(
+      RegExp(r'[0-9٠-٩()\[\]{}<>«»".,؛:!?؟ـ\-_/\\|]'),
+      '',
+    );
 
     // 3. توحيد الألف بكافة أشكالها (وصل، قطع، مد)
     normalized = normalized.replaceAll(RegExp(r'[أإآٱٲٳء]'), 'ا');

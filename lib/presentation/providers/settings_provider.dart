@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsProvider with ChangeNotifier {
@@ -12,10 +11,12 @@ class SettingsProvider with ChangeNotifier {
   String _backgroundColorMode = 'white'; // white, cream, old
   int _navigationMode = 0; // 0: Horizontal, 1: Vertical Paged, 2: Vertical Continuous, 3: Hybrid (Horizontal + Inner Vertical)
   String _locale = 'ar'; // Default Language
-  
+
   // إعدادات حساسية اللمس
-  double _pageDragSensitivity = 10.0; // Higher = less sensitive (was 2.0 / 25.0) — تقليب أسهل بسحبة أصغر
-  double _minFlingVelocity = 90.0;    // Higher = requires more force (was 80.0 / 150.0)
+  double _pageDragSensitivity =
+      10.0; // Higher = less sensitive (was 2.0 / 25.0) — تقليب أسهل بسحبة أصغر
+  double _minFlingVelocity =
+      90.0; // Higher = requires more force (was 80.0 / 150.0)
   int _lastPage = 1;
 
   // Getters
@@ -30,11 +31,11 @@ class SettingsProvider with ChangeNotifier {
   int get lastPage => _lastPage;
   Locale get locale => Locale(_locale);
   String get localeCode => _locale;
-  
+
   // Getters for navigation settings
   double get pageDragSensitivity => _pageDragSensitivity;
   double get minFlingVelocity => _minFlingVelocity;
-  
+
   // Helper getters
   bool get isHybridMode => _navigationMode == 3;
   bool get isHorizontalMode => _navigationMode == 0;
@@ -44,10 +45,13 @@ class SettingsProvider with ChangeNotifier {
   Color get backgroundColor {
     if (_isDarkMode) return const Color(0xFF121212); // Modern Deep Slate
     switch (_backgroundColorMode) {
-      case 'cream': return const Color(0xFFFBF9F1); // Modern Warm White
-      case 'old': return const Color(0xFFF3E5AB); // Legacy Parchment
-      case 'white': 
-      default: return const Color(0xFFF8F9FA); // Brand Background (Modern White)
+      case 'cream':
+        return const Color(0xFFFBF9F1); // Modern Warm White
+      case 'old':
+        return const Color(0xFFF3E5AB); // Legacy Parchment
+      case 'white':
+      default:
+        return const Color(0xFFF8F9FA); // Brand Background (Modern White)
     }
   }
 
@@ -56,7 +60,7 @@ class SettingsProvider with ChangeNotifier {
   SettingsProvider() {
     // We now depend on explicit init() call from main.dart
   }
-  
+
   // تحميل الإعدادات
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -64,7 +68,8 @@ class SettingsProvider with ChangeNotifier {
     _backgroundColorMode = prefs.getString('backgroundColorMode') ?? 'white';
     _fontSize = prefs.getDouble('fontSize') ?? 24.0;
     _fontFamily = prefs.getString('fontFamily') ?? 'Tajawal';
-    _defaultReciter = prefs.getString('defaultReciter') ?? 'Minshawi_Murattal_128kbps';
+    _defaultReciter =
+        prefs.getString('defaultReciter') ?? 'Minshawi_Murattal_128kbps';
     _defaultTafsir = prefs.getString('defaultTafsir') ?? 'muyassar';
     if (_defaultTafsir == 'w-moyassar') _defaultTafsir = 'muyassar';
     _downloadWhilePlaying = prefs.getBool('downloadWhilePlaying') ?? true;
@@ -75,7 +80,7 @@ class SettingsProvider with ChangeNotifier {
     _locale = prefs.getString('languageCode') ?? 'ar';
     notifyListeners();
   }
-  
+
   // تغيير اللغة
   Future<void> setLanguage(String langCode) async {
     if (_locale == langCode) return;
@@ -84,7 +89,7 @@ class SettingsProvider with ChangeNotifier {
     await prefs.setString('languageCode', langCode);
     notifyListeners();
   }
-  
+
   // تبديل الوضع الليلي (Explicit Set)
   Future<void> setDarkMode(bool value) async {
     _isDarkMode = value;
@@ -112,21 +117,21 @@ class SettingsProvider with ChangeNotifier {
     await prefs.setInt('navigationMode', mode);
     notifyListeners();
   }
-  
+
   Future<void> setPageDragSensitivity(double value) async {
     _pageDragSensitivity = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('pageDragSensitivity', value);
     notifyListeners();
   }
-  
+
   Future<void> setMinFlingVelocity(double value) async {
     _minFlingVelocity = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('minFlingVelocity', value);
     notifyListeners();
   }
-  
+
   // تغيير حجم الخط
   Future<void> setFontSize(double size) async {
     _fontSize = size;
@@ -134,7 +139,7 @@ class SettingsProvider with ChangeNotifier {
     await prefs.setDouble('fontSize', size);
     notifyListeners();
   }
-  
+
   // تغيير نوع الخط
   Future<void> setFontFamily(String family) async {
     _fontFamily = family;
@@ -143,37 +148,37 @@ class SettingsProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  
   // Aliases for UI compatibility
   void toggleTheme() => toggleDarkMode();
   void updateFontSize(double val) => setFontSize(val);
-  
+
   Future<void> updateDefaultReciter(String val) async {
     _defaultReciter = val;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('defaultReciter', val);
     notifyListeners();
   }
-  
+
   Future<void> updateDefaultTafsir(String val) async {
     _defaultTafsir = val;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('defaultTafsir', val);
     notifyListeners();
   }
-  
+
   Future<void> toggleDownloadWhilePlaying() async {
     _downloadWhilePlaying = !_downloadWhilePlaying;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('downloadWhilePlaying', _downloadWhilePlaying);
     notifyListeners();
   }
+
   Future<void> setLastPage(int page) async {
     if (page == _lastPage) return;
     _lastPage = page;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('lastPage', page);
-    // Don't notify here to avoid constant rebuilds on every flip, 
+    // Don't notify here to avoid constant rebuilds on every flip,
     // or notify if you want other screens (like Index) to update.
   }
 }
