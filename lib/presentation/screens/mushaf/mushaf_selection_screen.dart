@@ -80,11 +80,13 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                   provider.currentDownloadingId == mushaf.identifier;
               // تحقق خاص لـ qcf2 - إذا لم يكن محملاً يحتاج تحميل
               final isQcf2 = mushaf.identifier == 'qcf2_v4_woff2';
+              final isOnDemandSvg = mushaf.type == 'svg';
 
               // Needs download if:
               // 1. Not isDownloaded AND has a remote URL (Zip, Tar, or specific QCF2 logic)
               final hasUrl = mushaf.baseUrl != null;
-              final needsDownload = !mushaf.isDownloaded && (hasUrl || isQcf2);
+              final needsDownload =
+                  !mushaf.isDownloaded && !isOnDemandSvg && (hasUrl || isQcf2);
 
               return Container(
                 decoration: BoxDecoration(
@@ -174,7 +176,9 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    (mushaf.type ?? '').contains('font')
+                                    isOnDemandSvg
+                                        ? 'عرض متجهي تجريبي عبر الإنترنت — تُحمّل الصفحة عند فتحها'
+                                        : (mushaf.type ?? '').contains('font')
                                         ? (mushaf.identifier != null &&
                                                   mushaf.identifier!.contains(
                                                     'qcf',

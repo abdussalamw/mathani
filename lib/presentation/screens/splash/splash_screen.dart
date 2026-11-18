@@ -80,7 +80,7 @@ class _SplashScreenState extends State<SplashScreen>
           (m) => m.identifier == currentId,
           orElse: () => mushafList.first,
         );
-        mushafReady = mushaf.isDownloaded;
+        mushafReady = mushaf.isDownloaded || mushaf.type == 'svg';
       }
     }
 

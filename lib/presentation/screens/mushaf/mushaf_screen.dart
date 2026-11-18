@@ -4,6 +4,7 @@ import 'package:mathani/data/models/page_glyph.dart';
 import 'package:mathani/data/services/glyph_data_loader.dart';
 import 'package:mathani/presentation/widgets/mushaf_page_widget.dart';
 import 'package:mathani/presentation/widgets/mushaf_image_widget.dart';
+import 'package:mathani/presentation/widgets/digital_khatt_mushaf_page_widget.dart';
 import 'package:mathani/presentation/widgets/reader_page_frame.dart';
 import 'package:mathani/presentation/widgets/reader_loading_indicator.dart';
 import 'package:mathani/core/constants/app_colors.dart';
@@ -1078,7 +1079,11 @@ class _MushafScreenState extends State<MushafScreen>
 
     Widget pageContent;
 
-    if (currentType == 'image') {
+    if (currentType == 'svg') {
+      pageContent = DigitalKhattMushafPageWidget(
+        pageNumber: _pages![index].page,
+      );
+    } else if (currentType == 'image') {
       final mushafProvider = context.read<MushafMetadataProvider>();
       final mushaf = mushafProvider.availableMushafs.firstWhere(
         (m) => m.identifier == currentId,

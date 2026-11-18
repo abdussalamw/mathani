@@ -191,6 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ) {
                       final isSelected =
                           provider.currentMushafId == mushaf.identifier;
+                      final isOnline = mushaf.type == 'svg';
                       final isDownloaded =
                           mushaf.isDownloaded || mushaf.type == 'digital';
                       final isDownloading =
@@ -213,6 +214,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (isDownloading) {
                         statusText =
                             '${(provider.downloadProgress * 100).toInt()}%';
+                      } else if (isOnline) {
+                        statusText = AppLocalizations.of(context)!
+                            .settingsOnline;
                       } else if (mushaf.type == 'digital') {
                         statusText = AppLocalizations.of(context)!
                             .settingsReady;
@@ -228,13 +232,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         subtitle: statusText,
                         isSelected: isSelected,
                         isDownloaded: isDownloaded,
+                        isOnline: isOnline,
                         isDownloading: isDownloading,
                         progress: provider.downloadProgress,
                         sizeEstimate: sizeEstimate,
                         onActivate: () =>
                             provider.setMushaf(mushaf.identifier!),
-                        onDownload: () =>
-                            provider.downloadMushaf(mushaf.identifier!),
+                        onDownload: isOnline
+                            ? () {}
+                            : () =>
+                                provider.downloadMushaf(mushaf.identifier!),
                       );
                     }).toList(),
                   );

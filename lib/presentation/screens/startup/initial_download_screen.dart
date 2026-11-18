@@ -36,12 +36,15 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final provider = context.read<MushafMetadataProvider>();
-      if (provider.availableMushafs.isNotEmpty) {
+      final downloadableMushafs = provider.availableMushafs
+          .where((m) => m.type != 'svg')
+          .toList();
+      if (downloadableMushafs.isNotEmpty) {
         setState(() {
-          _selectedMushafId = provider.availableMushafs
+          _selectedMushafId = downloadableMushafs
               .firstWhere(
                 (m) => m.identifier == 'qcf2_v4_woff2',
-                orElse: () => provider.availableMushafs.first,
+                orElse: () => downloadableMushafs.first,
               )
               .identifier;
         });
@@ -189,7 +192,10 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Consumer<MushafMetadataProvider>(
             builder: (context, provider, child) {
-              if (provider.availableMushafs.isEmpty) {
+              final downloadableMushafs = provider.availableMushafs
+                  .where((m) => m.type != 'svg')
+                  .toList();
+              if (downloadableMushafs.isEmpty) {
                 return const Center(child: CircularProgressIndicator());
               }
 
@@ -267,11 +273,11 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
                     if (!_isDownloading) ...[
                       Expanded(
                         child: ListView.separated(
-                          itemCount: provider.availableMushafs.length,
+                          itemCount: downloadableMushafs.length,
                           separatorBuilder: (_, _) =>
                               const SizedBox(height: 12),
                           itemBuilder: (context, index) {
-                            final mushaf = provider.availableMushafs[index];
+                            final mushaf = downloadableMushafs[index];
                             final isSelected =
                                 _selectedMushafId == mushaf.identifier;
 

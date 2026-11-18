@@ -61,7 +61,18 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..pageCount = 521
       ..isDownloaded = false,
 
-    // 4. Digital (Hidden/Fallback)
+    // 4. Medina 1441 segmented artwork (on-demand SVG pages)
+    db_models.MushafMetadata()
+      ..id = db_models.fastHash('digital_khatt_1441')
+      ..identifier = 'digital_khatt_1441'
+      ..nameArabic = 'مصحف المدينة 1441 (تجريبي)'
+      ..nameEnglish = 'Medina Mushaf 1441 (DigitalKhatt)'
+      ..type = 'svg'
+      ..pageCount = 604
+      ..totalPages = 604
+      ..isDownloaded = false,
+
+    // 5. Digital (Hidden/Fallback)
     db_models.MushafMetadata()
       ..id = db_models.fastHash('madani_font_v1')
       ..identifier = 'madani_font_v1'
@@ -77,7 +88,8 @@ class MushafMetadataProvider extends ChangeNotifier {
       'qcf2_v4_woff2': 1,
       'madani_old_v1': 2,
       'shamarly_15lines': 3,
-      'madani_font_v1': 4,
+      'digital_khatt_1441': 4,
+      'madani_font_v1': 5,
     };
     list.sort((a, b) {
       final orderA = order[a.identifier] ?? 99;
@@ -92,7 +104,11 @@ class MushafMetadataProvider extends ChangeNotifier {
     final list = _availableMushafs.isNotEmpty
         ? _availableMushafs
         : _fallbackMushafs;
-    return list.where((m) => m.type != 'digital').toList();
+    return list
+        .where(
+          (m) => m.type != 'digital' && (!kIsWeb || m.type != 'svg'),
+        )
+        .toList();
   }
 
   String? _currentMushafId;

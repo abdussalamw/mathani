@@ -216,8 +216,13 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                 (m) => _buildDownloadCard(
                   context,
                   title: m.nameArabic ?? m.identifier!,
-                  subtitle: m.type == 'digital' ? 'مصحف رقمي' : 'مصحف مصور',
+                  subtitle: m.type == 'svg'
+                      ? 'عرض متصل حسب الطلب — تُحمّل الصفحة عند فتحها'
+                      : m.type == 'digital'
+                      ? 'مصحف رقمي'
+                      : 'مصحف مصور',
                   isDownloaded: m.isDownloaded || m.type == 'digital',
+                  isOnline: m.type == 'svg',
                   isDownloading:
                       provider.isDownloading &&
                       provider.currentDownloadingId == m.identifier,
@@ -226,7 +231,11 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                           provider.currentDownloadingId == m.identifier
                       ? provider.downloadProgress
                       : 0,
-                  size: m.identifier == 'shamarly_15lines' ? '74 MB' : '50 MB',
+                  size: m.type == 'svg'
+                      ? 'حسب الطلب'
+                      : m.identifier == 'shamarly_15lines'
+                      ? '74 MB'
+                      : '50 MB',
                   onDownload: () => provider.downloadMushaf(m.identifier!),
                   onActivate: () => provider.setMushaf(m.identifier!),
                   isSelected: provider.currentMushafId == m.identifier,
@@ -296,6 +305,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
     required bool isDownloading,
     required double progress,
     required String size,
+    bool isOnline = false,
     required VoidCallback onDownload,
     required VoidCallback onActivate,
     required bool isSelected,
@@ -388,7 +398,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              if (isDownloaded)
+              if (isDownloaded || isOnline)
                 ElevatedButton(
                   onPressed: isSelected ? null : onActivate,
                   style: ElevatedButton.styleFrom(

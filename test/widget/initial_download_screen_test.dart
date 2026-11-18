@@ -19,6 +19,7 @@ class _DownloadProvider extends ChangeNotifier
   bool selectionStarted = false;
   bool throwOnDownload = true;
   bool multipleMushafs = false;
+  bool includeStreamingMushaf = false;
   String? selectedId;
   int downloads = 0;
   bool get hasActiveListeners => hasListeners;
@@ -33,6 +34,12 @@ class _DownloadProvider extends ChangeNotifier
       MushafMetadata()
         ..identifier = 'madani_old_v1'
         ..nameArabic = 'مصحف آخر'
+        ..isDownloaded = false,
+    if (includeStreamingMushaf)
+      MushafMetadata()
+        ..identifier = 'digital_khatt_1441'
+        ..nameArabic = 'مصحف المدينة 1441 (تجريبي)'
+        ..type = 'svg'
         ..isDownloaded = false,
   ];
 
@@ -121,6 +128,15 @@ void main() {
     expect(provider.selectedId, 'madani_old_v1');
     expect(provider.downloads, 1);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('streamed SVG mushaf is not offered as a bulk download', (
+    tester,
+  ) async {
+    provider.includeStreamingMushaf = true;
+    await showScreen(tester);
+
+    expect(find.text('مصحف المدينة 1441 (تجريبي)'), findsNothing);
   });
 
   testWidgets('allows retry when enabling wakelock fails', (tester) async {
