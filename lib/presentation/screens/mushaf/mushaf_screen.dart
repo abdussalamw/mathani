@@ -4,6 +4,8 @@ import 'package:mathani/data/models/page_glyph.dart';
 import 'package:mathani/data/services/glyph_data_loader.dart';
 import 'package:mathani/presentation/widgets/mushaf_page_widget.dart';
 import 'package:mathani/presentation/widgets/mushaf_image_widget.dart';
+import 'package:mathani/presentation/widgets/reader_page_frame.dart';
+import 'package:mathani/presentation/widgets/reader_loading_indicator.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/widgets/dialogs/ayah_content_sheet.dart';
 import 'package:mathani/presentation/providers/audio_provider.dart';
@@ -18,9 +20,9 @@ import '../../providers/settings_provider.dart';
 
 import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:mathani/core/constants/responsive_constants.dart';
 
 import '../../../core/utils/reader_swipe_policy.dart';
+import '../../../core/services/reader_system_ui.dart';
 
 import 'dart:async';
 
@@ -70,6 +72,8 @@ class _MushafScreenState extends State<MushafScreen>
   late PageController _pageController;
   int _currentPage = 1;
   String? _loadedMushafId;
+  String? _displayMushafId;
+  String? _displayMushafType;
   int _pageLoadGeneration = 0;
   int? _lastNavigationMode;
 
@@ -98,9 +102,12 @@ class _MushafScreenState extends State<MushafScreen>
   bool _secondarySettling = false;
   int _secondaryGestureId = 0;
   Size _readerSize = Size.zero;
+  bool? _appliedImmersiveMode;
+  bool? _appliedDarkMode;
   int? _secondaryTargetPage;
   // Cache pages for smooth dragging without rebuilds
   Widget? _cachedTargetPageWidget;
+  final Map<String, GlobalKey> _verticalPageKeys = {};
   late AnimationController _secondaryAnimController;
 
   @override
@@ -121,7 +128,6 @@ class _MushafScreenState extends State<MushafScreen>
       }
     });
 
-    _loadPages();
     WakelockPlus.enable();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -240,9 +246,7 @@ class _MushafScreenState extends State<MushafScreen>
     if (settings.isVerticalContinuousMode && _pageController.hasClients) {
       final viewportHeight = _pageController.position.viewportDimension;
       if (viewportHeight > 0) {
-        final topOffset =
-            _pageController.offset +
-            ResponsiveConstants.getTopBarHeight(context);
+        final topOffset = _pageController.offset;
         final topPage = (topOffset / viewportHeight).floor() + 1;
         if (topPage != _currentPage &&
             topPage >= 1 &&
@@ -296,6 +300,8 @@ class _MushafScreenState extends State<MushafScreen>
       if (mounted && generation == _pageLoadGeneration) {
         setState(() {
           _pages = pages;
+          _displayMushafId = currentId;
+          _displayMushafType = currentType;
           _currentPage = _currentPage.clamp(1, pages.length);
           _isLoading = false;
         });
@@ -347,14 +353,24 @@ class _MushafScreenState extends State<MushafScreen>
     final settingsProvider = context.read<SettingsProvider>();
     final isDark = settingsProvider.isDarkMode;
 
-    if (uiProvider.isImmersiveMode) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (_appliedImmersiveMode != uiProvider.isImmersiveMode) {
+      _appliedImmersiveMode = uiProvider.isImmersiveMode;
+      ReaderSystemUi.setImmersiveMode(uiProvider.isImmersiveMode)
+          .catchError((Object error) {
+            _appliedImmersiveMode = null;
+            debugPrint('Unable to update reader system bars: $error');
+            return false;
+          });
+    }
+    if (_appliedDarkMode != isDark) {
+      _appliedDarkMode = isDark;
       SystemChrome.setSystemUIOverlayStyle(
         SystemUiOverlayStyle(
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          systemNavigationBarIconBrightness: isDark
+              ? Brightness.light
+              : Brightness.dark,
         ),
       );
     }
@@ -706,12 +722,6 @@ class _MushafScreenState extends State<MushafScreen>
 
         return Stack(
           children: [
-            // خلفية لإخفاء PageView أثناء الحركة
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 600),
-              color: settings.backgroundColor,
-            ),
-
             // الصفحة المستهدفة (تأتي من الخلف أو أمام)
             if (targetPageWidget != null)
               Transform.translate(
@@ -759,9 +769,9 @@ class _MushafScreenState extends State<MushafScreen>
       });
     }
 
-    final mushafMetadata = context.watch<MushafMetadataProvider>();
+    context.watch<MushafMetadataProvider>();
 
-    if (_isLoading) {
+    if (_isLoading && _pages == null) {
       return _buildLoadingScreen(isDark, settings);
     }
 
@@ -773,247 +783,269 @@ class _MushafScreenState extends State<MushafScreen>
       return _buildEmptyScreen(isDark, settings);
     }
 
-    int totalPages = 604;
-    try {
-      final currentId = mushafMetadata.currentMushafId;
-      final mushaf = mushafMetadata.availableMushafs.firstWhere(
-        (m) => m.identifier == currentId,
-      );
-      totalPages = mushaf.pageCount;
-    } catch (_) {
-      totalPages = _pages?.length ?? 604;
-    }
+    final totalPages = _pages!.length;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        _readerSize = constraints.biggest;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 600),
-          color: settings.backgroundColor,
-          child: Stack(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 600),
+      decoration: _pageDecoration(settings),
+      child: IgnorePointer(
+        ignoring: _isLoading,
+        child: ReaderPageFrame(
+          immersive: uiProvider.isImmersiveMode,
+          child: Column(
             children: [
-              if (!settings.isVerticalContinuousMode)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: _buildSecondaryOverlay(settings, uiProvider),
-                  ),
+              SizedBox(
+                height: 45,
+                child: MushafPageWidget(
+                  key: const ValueKey('reader-page-header'),
+                  page: _pages![_currentPage - 1],
+                  mushafId: _displayMushafId,
+                  showInfo: true,
+                  hideContent: true,
+                  paintBackground: false,
+                  headerHeight: 45,
                 ),
-              Column(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: () {
-                        if (_isAutoScrolling || _isAutoScrollPaused) {
-                          // في الوضع المتحرك: ضغطة واحدة = إيقاف مؤقت أو استئناف
-                          _pauseOrResumeAutoScroll();
-                        } else {
-                          // في الأوضاع الأخرى: إخفاء/إظهار الأشرطة
-                          Provider.of<UiProvider>(
-                            context,
-                            listen: false,
-                          ).toggleImmersiveMode();
-                          _updateSystemUI();
-                        }
-                      },
-                      onDoubleTap: () {
-                        final settings = context.read<SettingsProvider>();
-                        if (_isAutoScrolling || _isAutoScrollPaused) {
-                          // ضغطتان في الوضع المتحرك: خروج كامل مع توقف سلس
-                          _exitAutoScrollMode();
-                        } else {
-                          // ضغطتان خارج الوضع المتحرك: تفعيله
-                          if (!settings.isVerticalContinuousMode) {
-                            settings.setNavigationMode(2);
-                          }
-                          _isAutoScrollPaused = false;
-                          _startAutoScroll();
-                        }
-                      },
-                      onVerticalDragUpdate: settings.isHorizontalMode
-                          ? (details) =>
-                                _handleSecondaryDragUpdate(details, settings)
-                          : null,
-                      onVerticalDragEnd: settings.isHorizontalMode
-                          ? (details) =>
-                                _handleSecondaryDragEnd(details, settings)
-                          : null,
-                      onVerticalDragCancel: settings.isHorizontalMode
-                          ? _resetSecondaryDrag
-                          : null,
-                      onHorizontalDragUpdate: settings.isVerticalPagedMode
-                          ? (details) =>
-                                _handleSecondaryDragUpdate(details, settings)
-                          : null,
-                      onHorizontalDragEnd: settings.isVerticalPagedMode
-                          ? (details) =>
-                                _handleSecondaryDragEnd(details, settings)
-                          : null,
-                      onHorizontalDragCancel: settings.isVerticalPagedMode
-                          ? _resetSecondaryDrag
-                          : null,
-                      child: ValueListenableBuilder<double>(
-                        valueListenable: _secondaryOffsetNotifier,
-                        builder: (context, offset, child) =>
-                            Transform.translate(
-                              offset: settings.isHorizontalMode
-                                  ? Offset(0, offset)
-                                  : Offset(offset, 0),
-                              child: child,
-                            ),
-                        child: Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: Consumer<SettingsProvider>(
-                            builder: (context, settings, child) {
-                              return PageView.builder(
-                                key: ValueKey(
-                                  'reader-pages-${mushafMetadata.currentMushafId}',
-                                ),
-                                physics:
-                                    _isSecondaryDragging || _secondarySettling
-                                    ? const NeverScrollableScrollPhysics()
-                                    : _getScrollPhysics(settings),
-                                scrollDirection:
-                                    settings.isHorizontalMode ||
-                                        settings.isHybridMode
-                                    ? Axis.horizontal
-                                    : Axis.vertical,
-                                pageSnapping:
-                                    !settings.isVerticalContinuousMode,
-                                controller: _pageController,
-                                itemCount: totalPages,
-                                reverse: false,
-                                onPageChanged: (index) {
-                                  final page = index + 1;
-                                  setState(() {
-                                    _currentPage = page;
-                                  });
-                                  _syncPageWithProvider(page);
-                                  // ط­ظپط¸ ط¢ط®ط± طµظپط­ط© ظ‚ط±ط§ط،ط©
-                                  context.read<SettingsProvider>().setLastPage(
-                                    page,
-                                  );
-                                },
-                                itemBuilder: (context, index) {
-                                  return _buildPageItem(
-                                    context,
-                                    index,
-                                    settings,
-                                    uiProvider,
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    _readerSize = constraints.biggest;
+                    return Stack(
+                      key: const ValueKey('reader-page-viewport'),
+                      children: [
+                        if (!settings.isVerticalContinuousMode)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: _buildSecondaryOverlay(
+                                settings,
+                                uiProvider,
+                              ),
+                            ),
+                          ),
+                        Column(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                onTap: () {
+                                  if (_isAutoScrolling || _isAutoScrollPaused) {
+                                    // في الوضع المتحرك: ضغطة واحدة = إيقاف مؤقت أو استئناف
+                                    _pauseOrResumeAutoScroll();
+                                  } else {
+                                    // في الأوضاع الأخرى: إخفاء/إظهار الأشرطة
+                                    Provider.of<UiProvider>(
+                                      context,
+                                      listen: false,
+                                    ).toggleImmersiveMode();
+                                    _updateSystemUI();
+                                  }
+                                },
+                                onDoubleTap: () {
+                                  final settings = context
+                                      .read<SettingsProvider>();
+                                  if (_isAutoScrolling || _isAutoScrollPaused) {
+                                    // ضغطتان في الوضع المتحرك: خروج كامل مع توقف سلس
+                                    _exitAutoScrollMode();
+                                  } else {
+                                    // ضغطتان خارج الوضع المتحرك: تفعيله
+                                    if (!settings.isVerticalContinuousMode) {
+                                      settings.setNavigationMode(2);
+                                    }
+                                    _isAutoScrollPaused = false;
+                                    _startAutoScroll();
+                                  }
+                                },
+                                onVerticalDragUpdate: settings.isHorizontalMode
+                                    ? (details) => _handleSecondaryDragUpdate(
+                                        details,
+                                        settings,
+                                      )
+                                    : null,
+                                onVerticalDragEnd: settings.isHorizontalMode
+                                    ? (details) => _handleSecondaryDragEnd(
+                                        details,
+                                        settings,
+                                      )
+                                    : null,
+                                onVerticalDragCancel: settings.isHorizontalMode
+                                    ? _resetSecondaryDrag
+                                    : null,
+                                onHorizontalDragUpdate:
+                                    settings.isVerticalPagedMode
+                                    ? (details) => _handleSecondaryDragUpdate(
+                                        details,
+                                        settings,
+                                      )
+                                    : null,
+                                onHorizontalDragEnd:
+                                    settings.isVerticalPagedMode
+                                    ? (details) => _handleSecondaryDragEnd(
+                                        details,
+                                        settings,
+                                      )
+                                    : null,
+                                onHorizontalDragCancel:
+                                    settings.isVerticalPagedMode
+                                    ? _resetSecondaryDrag
+                                    : null,
+                                child: ValueListenableBuilder<double>(
+                                  valueListenable: _secondaryOffsetNotifier,
+                                  builder: (context, offset, child) =>
+                                      Transform.translate(
+                                        offset: settings.isHorizontalMode
+                                            ? Offset(0, offset)
+                                            : Offset(offset, 0),
+                                        child: child,
+                                      ),
+                                  child: Directionality(
+                                    textDirection: TextDirection.rtl,
+                                    child: Consumer<SettingsProvider>(
+                                      builder: (context, settings, child) {
+                                        return PageView.builder(
+                                          key: ValueKey(
+                                            'reader-pages-$_displayMushafId',
+                                          ),
+                                          physics:
+                                              _isSecondaryDragging ||
+                                                  _secondarySettling
+                                              ? const NeverScrollableScrollPhysics()
+                                              : _getScrollPhysics(settings),
+                                          scrollDirection:
+                                              settings.isHorizontalMode ||
+                                                  settings.isHybridMode
+                                              ? Axis.horizontal
+                                              : Axis.vertical,
+                                          pageSnapping: !settings
+                                              .isVerticalContinuousMode,
+                                          controller: _pageController,
+                                          itemCount: totalPages,
+                                          reverse: false,
+                                          onPageChanged: (index) {
+                                            final page = index + 1;
+                                            setState(() {
+                                              _currentPage = page;
+                                            });
+                                            _syncPageWithProvider(page);
+                                            // ط­ظپط¸ ط¢ط®ط± طµظپط­ط© ظ‚ط±ط§ط،ط©
+                                            context
+                                                .read<SettingsProvider>()
+                                                .setLastPage(page);
+                                          },
+                                          itemBuilder: (context, index) {
+                                            // The incoming page is owned by the vertical
+                                            // overlay until the transition completes.
+                                            if (settings.isHorizontalMode &&
+                                                _isSecondaryDragging &&
+                                                index + 1 ==
+                                                    _secondaryTargetPage) {
+                                              return const SizedBox.expand();
+                                            }
+                                            return _buildPageItem(
+                                              context,
+                                              index,
+                                              settings,
+                                              uiProvider,
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
 
-              // AudioMinibar removed â€” it's already in main_shell_screen
+                        // AudioMinibar removed â€” it's already in main_shell_screen
 
-              // Auto Scroll Indicator
-              if (_isAutoScrolling || _isAutoScrollPaused)
-                Positioned(
-                  top: 100,
-                  right: 16,
-                  left: 16,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _isAutoScrollPaused
-                            ? Colors.orange.shade800.withAlpha(220)
-                            : Colors.black.withAlpha(160),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // زر الإيقاف المؤقت / الاستئناف
-                          InkWell(
-                            onTap: _pauseOrResumeAutoScroll,
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(30),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _isAutoScrollPaused
-                                    ? Icons.play_arrow_rounded
-                                    : Icons.pause_rounded,
-                                color: Colors.white,
-                                size: 22,
+                        // Auto Scroll Indicator
+                        if (_isAutoScrolling || _isAutoScrollPaused)
+                          Positioned(
+                            top: 100,
+                            right: 16,
+                            left: 16,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _isAutoScrollPaused
+                                      ? Colors.orange.shade800.withAlpha(220)
+                                      : Colors.black.withAlpha(160),
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // زر الإيقاف المؤقت / الاستئناف
+                                    InkWell(
+                                      onTap: _pauseOrResumeAutoScroll,
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withAlpha(30),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          _isAutoScrollPaused
+                                              ? Icons.play_arrow_rounded
+                                              : Icons.pause_rounded,
+                                          color: Colors.white,
+                                          size: 22,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // النص
+                                    Text(
+                                      _isAutoScrollPaused
+                                          ? AppLocalizations.of(context)!
+                                                .autoScrollPaused
+                                          : AppLocalizations.of(context)!
+                                                .autoScrollActive,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontFamily: 'Tajawal',
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // زر الإيقاف النهائي
+                                    InkWell(
+                                      onTap: _exitAutoScrollMode,
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withAlpha(80),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.stop_rounded,
+                                          color: Colors.white,
+                                          size: 22,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          // النص
-                          Text(
-                            _isAutoScrollPaused
-                                ? AppLocalizations.of(context)!.autoScrollPaused
-                                : AppLocalizations.of(context)!
-                                      .autoScrollActive,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontFamily: 'Tajawal',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // زر الإيقاف النهائي
-                          InkWell(
-                            onTap: _exitAutoScrollMode,
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withAlpha(80),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.stop_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                      ],
+                    );
+                  },
                 ),
-
-              // ط§ظ„ط´ط±ظٹط· ط§ظ„ط¹ظ„ظˆظٹ ط§ظ„ط«ط§ط¨طھ (ظٹط¸ظ‡ط± ظپظ‚ط· ظپظٹ ط§ظ„ظˆط¶ط¹ ط§ظ„ظ…طھط­ط±ظƒ)
-              if (!uiProvider.isImmersiveMode)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: ResponsiveConstants.getTopBarHeight(context),
-                  child: Material(
-                    color: settings.backgroundColor,
-                    elevation: 1,
-                    child: MushafPageWidget(
-                      page: _pages![_currentPage - 1],
-                      mushafId: mushafMetadata.currentMushafId,
-                      showInfo: true,
-                      hideContent: true,
-                    ),
-                  ),
-                ),
+              ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -1034,10 +1066,8 @@ class _MushafScreenState extends State<MushafScreen>
     SettingsProvider settings,
     UiProvider uiProvider,
   ) {
-    final currentType = context
-        .read<MushafMetadataProvider>()
-        .currentMushafType;
-    final currentId = context.read<MushafMetadataProvider>().currentMushafId;
+    final currentType = _displayMushafType!;
+    final currentId = _displayMushafId!;
     final isDigital = currentType == 'digital';
 
     // ط¥ظ†ط´ط§ط، ScrollController ظ„ظ„طµظپط­ط© ط¥ط°ط§ ظ„ظ… ظٹظƒظ† ظ…ظˆط¬ظˆط¯ط§ظ‹ (ظ„ظ„ظˆط¶ط¹ ط§ظ„ظ‡ط¬ظٹظ†)
@@ -1069,69 +1099,55 @@ class _MushafScreenState extends State<MushafScreen>
         selectedSurah: _selectedSurah,
         selectedAyah: _selectedAyah,
         // إيقاف الضغط على الآيات في الوضع المتحرك لمنع التعارض مع ضغطة الإيقاف
-        onAyahSelected: (_isAutoScrolling || _isAutoScrollPaused)
-            ? null
-            : _onAyahInteraction,
         onAyahLongPress: (_isAutoScrolling || _isAutoScrollPaused)
             ? null
             : _onAyahInteraction,
         showInfo: false,
+        paintBackground: false,
         isDigital: isDigital,
       );
     }
 
-    if (!settings.isVerticalContinuousMode) {
-      pageContent = Padding(
-        padding: EdgeInsets.only(
-          top: ResponsiveConstants.getTopBarHeight(context),
-          bottom: currentType == 'image'
-              ? 0
-              : ResponsiveConstants.getBottomBarHeight(context),
-        ),
-        child: pageContent,
-      );
-    }
+    pageContent = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: pageContent,
+    );
 
-    // ظپظٹ ط§ظ„ظˆط¶ط¹ ط§ظ„ظ‡ط¬ظٹظ†طŒ ظ†ط¶ظٹظپ SingleChildScrollView ط¯ط§ط®ظ„ظٹ
+    // Keep the line layout bounded inside the hybrid scrolling viewport.
     if (settings.isHybridMode) {
       pageContent = SingleChildScrollView(
         controller: _innerScrollControllers[index + 1],
         physics: const ClampingScrollPhysics(),
-        child: pageContent,
+        child: SizedBox(height: _readerSize.height, child: pageContent),
       );
     }
 
     // لا نلف بـ GestureDetector هنا — كل النقرات تُعالج من الخارج (سطر 718)
+    if (settings.isHorizontalMode) {
+      final identity = '$currentId-${_pages![index].page}';
+      return KeyedSubtree(
+        key: _verticalPageKeys.putIfAbsent(identity, () => GlobalKey()),
+        child: pageContent,
+      );
+    }
     return pageContent;
   }
 
+  BoxDecoration _pageDecoration(SettingsProvider settings) => BoxDecoration(
+    color: settings.backgroundColor,
+    image: !settings.isDarkMode && settings.backgroundColorMode == 'old'
+        ? const DecorationImage(
+            image: AssetImage('assets/images/mushaf_texture.png'),
+            fit: BoxFit.cover,
+            opacity: 0.1,
+          )
+        : null,
+  );
+
   Widget _buildLoadingScreen(bool isDark, SettingsProvider settings) {
-    return Scaffold(
-      backgroundColor: settings.backgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'ط§ظ„ظ…طµط­ظپ ط§ظ„ط´ط±ظٹظپ',
-          style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'ط¬ط§ط±ظٹ طھط­ظ…ظٹظ„ ط§ظ„ظ…طµط­ظپ...',
-              style: TextStyle(fontFamily: 'Tajawal', fontSize: 16),
-            ),
-          ],
-        ),
-      ),
+    return DecoratedBox(
+      decoration: _pageDecoration(settings),
+      child: ReaderLoadingIndicator(key: ValueKey(_pageLoadGeneration)),
     );
   }
 
@@ -1139,8 +1155,8 @@ class _MushafScreenState extends State<MushafScreen>
     return Scaffold(
       backgroundColor: settings.backgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'ط§ظ„ظ…طµط­ظپ ط§ظ„ط´ط±ظٹظپ',
+        title: Text(
+          AppLocalizations.of(context)!.mushafTitle,
           style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -1206,8 +1222,8 @@ class _MushafScreenState extends State<MushafScreen>
     return Scaffold(
       backgroundColor: settings.backgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'ط§ظ„ظ…طµط­ظپ ط§ظ„ط´ط±ظٹظپ',
+        title: Text(
+          AppLocalizations.of(context)!.mushafTitle,
           style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
         ),
         centerTitle: true,

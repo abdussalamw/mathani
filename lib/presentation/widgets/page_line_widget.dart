@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'ayah_press_target.dart';
+
 import '../../data/models/page_glyph.dart';
 import '../../core/constants/app_colors.dart';
 
@@ -175,13 +177,14 @@ class PageLineWidget extends StatelessWidget {
 
                 // Intearaction
                 if (glyph.surah != null && glyph.ayah != null) {
-                  return GestureDetector(
-                    onTap: () =>
-                        onAyahSelected?.call(glyph.surah!, glyph.ayah!),
-                    onLongPress: () => onAyahLongPress?.call(
-                      glyph.surah!,
-                      glyph.ayah!,
-                    ), // Added
+                  return AyahPressTarget(
+                    onSelected:
+                        onAyahLongPress == null && onAyahSelected == null
+                        ? null
+                        : () => (onAyahLongPress ?? onAyahSelected)?.call(
+                            glyph.surah!,
+                            glyph.ayah!,
+                          ),
                     child: child,
                   );
                 }
@@ -330,14 +333,14 @@ class PageLineWidget extends StatelessWidget {
                 if ((glyph.isWord || glyph.isAyahEnd) &&
                     glyph.surah != null &&
                     glyph.ayah != null) {
-                  return GestureDetector(
-                    onTap: () =>
-                        onAyahSelected?.call(glyph.surah!, glyph.ayah!),
-                    onLongPress: () => onAyahLongPress?.call(
-                      glyph.surah!,
-                      glyph.ayah!,
-                    ), // Added
-                    behavior: HitTestBehavior.translucent,
+                  return AyahPressTarget(
+                    onSelected:
+                        onAyahLongPress == null && onAyahSelected == null
+                        ? null
+                        : () => (onAyahLongPress ?? onAyahSelected)?.call(
+                            glyph.surah!,
+                            glyph.ayah!,
+                          ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 1.0),
                       child: child,

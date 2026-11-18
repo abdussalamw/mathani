@@ -12,7 +12,6 @@ import '../../providers/ui_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../widgets/audio_minibar.dart';
 import '../../widgets/audio_player_sheet.dart';
-import '../../widgets/reader_controls_toggle.dart';
 import '../../widgets/recitation_minibar.dart';
 import '../../widgets/recitation_expanded_panel.dart';
 
@@ -83,7 +82,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
             await SystemNavigator.pop();
           },
           child: Scaffold(
-            extendBody: true, // Allow body to extend behind BottomNavigationBar
+            extendBody: false,
             extendBodyBehindAppBar: uiProvider.currentTabIndex == 1,
             appBar: (uiProvider.currentTabIndex == 1)
                 ? null
@@ -140,16 +139,6 @@ class _MainShellScreenState extends State<MainShellScreen> {
                       },
                       child: const AudioPlayerSheet(),
                     ),
-                  ),
-                if (uiProvider.currentTabIndex == 1 &&
-                    !uiProvider.showingTafsir &&
-                    !uiProvider.showFullAudioPlayer)
-                  PositionedDirectional(
-                    end: 12,
-                    bottom:
-                        MediaQuery.of(context).viewPadding.bottom +
-                        (uiProvider.isImmersiveMode ? 12 : 110),
-                    child: const ReaderControlsToggle(),
                   ),
               ],
             ),
@@ -233,14 +222,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final showingTafsir = uiProvider.showingTafsir;
 
     return Container(
-      margin: currentIndex == 1
-          ? const EdgeInsets.fromLTRB(8, 0, 8, 8)
-          : EdgeInsets.zero,
+      key: const ValueKey('app-bottom-navigation'),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF131315) : Colors.white,
-        borderRadius: currentIndex == 1 ? BorderRadius.circular(20) : null,
-        border: Border.all(
-          color: isDark ? Colors.white10 : Colors.grey.shade200,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? Colors.white10 : Colors.grey.shade200,
+            width: 1,
+          ),
         ),
         boxShadow: [
           BoxShadow(
@@ -251,7 +240,6 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ],
       ),
       child: SafeArea(
-        top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: 4,

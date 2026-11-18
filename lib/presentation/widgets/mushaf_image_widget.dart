@@ -332,21 +332,12 @@ class _MushafImageWidgetState extends State<MushafImageWidget> {
       );
     }
 
-    // Padding Logic
-    // Bottom: 140 (Standard Nav Bar clearance)
-    // Top: 0 (Header is separate now) OR extra tablet padding?
-    // If we separated the Header, we don't need huge top padding inside expected,
-    // unless user wants MORE distance.
-    // User said: "Between top and bottom bar".
-    // We already have the Top Bar above.
-    // We apply bottom padding.
-    // We apply Tablet padding if needed.
-
+    // The reader supplies its own vertical clearance when the header is outside.
     final contentPadding = EdgeInsets.only(
-      bottom: 140,
+      bottom: widget.showInfo ? 140 : 0,
       left: 16,
       right: 16,
-      top: isTablet ? 20.0 : 0.0, // Extra breather for iPad below header
+      top: widget.showInfo && isTablet ? 20.0 : 0.0,
     );
 
     return Consumer<SettingsProvider>(

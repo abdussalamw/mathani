@@ -1,0 +1,4 @@
+interface:
+  display_name: "صيانة مشروع مثاني"
+  short_description: "صيانة Flutter والتحقق ضمن نطاق الطلب والموافقات"
+  default_prompt: "استخدم $mathani-maintenance لتنفيذ المهمة المطلوبة في مثاني والتحقق منها ضمن قواعد المشروع."

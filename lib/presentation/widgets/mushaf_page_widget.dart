@@ -32,6 +32,8 @@ class MushafPageWidget extends StatefulWidget {
   final Function(int surah, int ayah)? onAyahLongPress;
   final bool showInfo;
   final bool isDigital;
+  final bool paintBackground;
+  final double? headerHeight;
   final bool
   hideContent; // إضافة خاصية لإخفاء المحتوى عند الحاجة (للشريط الثابت)
 
@@ -47,6 +49,8 @@ class MushafPageWidget extends StatefulWidget {
     this.onAyahLongPress,
     this.showInfo = true,
     this.isDigital = false,
+    this.paintBackground = true,
+    this.headerHeight,
     this.hideContent = false, // القيمة الافتراضية هي إظهار المحتوى
   });
 
@@ -230,20 +234,23 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     final isDark = settings.isDarkMode;
-    final topBarHeight = ResponsiveConstants.getTopBarHeight(context);
+    final topBarHeight =
+        widget.headerHeight ?? ResponsiveConstants.getTopBarHeight(context);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 600),
-      decoration: BoxDecoration(
-        color: settings.backgroundColor,
-        image: (!isDark && settings.backgroundColorMode == 'old')
-            ? const DecorationImage(
-                image: AssetImage('assets/images/mushaf_texture.png'),
-                fit: BoxFit.cover,
-                opacity: 0.1,
-              )
-            : null,
-      ),
+      decoration: widget.paintBackground
+          ? BoxDecoration(
+              color: settings.backgroundColor,
+              image: (!isDark && settings.backgroundColorMode == 'old')
+                  ? const DecorationImage(
+                      image: AssetImage('assets/images/mushaf_texture.png'),
+                      fit: BoxFit.cover,
+                      opacity: 0.1,
+                    )
+                  : null,
+            )
+          : null,
       child: Column(
         children: [
           if (widget.showInfo)
