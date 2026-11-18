@@ -79,6 +79,7 @@ scripts/*.csv
 /onnx_output/
 /tadabur/
 /ai_lab/
+/model_zipformer/
 analyze_log.txt
 _chk.ps1
 fix_tadabbur_model.py
