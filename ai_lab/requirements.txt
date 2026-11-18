@@ -1,0 +1,12 @@
+torch
+transformers
+optimum[onnxruntime]
+onnx
+onnxruntime
+librosa
+sounddevice
+pyaudio
+numpy
+sherpa-onnx
+sentencepiece
+
