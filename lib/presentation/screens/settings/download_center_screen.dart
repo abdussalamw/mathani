@@ -275,25 +275,107 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
   Widget _buildAiModelsList(BuildContext context) {
     return Consumer<RecitationProvider>(
       builder: (context, provider, _) {
+        final npuStatus = switch ((
+          provider.isNpuSupported,
+          provider.isZipformerDownloading,
+          provider.isZipformerDownloaded,
+        )) {
+          (false, _, _) =>
+            provider.npuUnavailableReason ?? 'مسار NPU غير متاح للجهاز حاليًا.',
+          (true, true, _) => provider.zipformerStatusText,
+          (true, false, false) =>
+            provider.zipformerStatusText.isEmpty
+                ? 'حزمة Hexagon ومرجع الفونيمات للتنزيل.'
+                : provider.zipformerStatusText,
+          (true, false, true) => 'الملفات موجودة. يُختبر NPU عند بدء التسميع.',
+        };
         return Column(
           children: [
             _buildDownloadCard(
               context,
-              title: 'نموذج التعرف الصوتي (Whisper)',
-              subtitle: 'لتحليل التلاوة ومطابقتها مع النص القرآني',
-              isDownloaded: provider.isAsrModelDownloaded,
-              isDownloading: provider.isAsrDownloading,
-              progress: provider.asrDownloadProgress,
-              size: '142 MB',
-              onDownload: () => provider.downloadAsrModel(),
-              onActivate: () {},
-              isSelected: provider.isAsrModelDownloaded,
+              title: 'محرك التسميع الذكي (Zipformer V3)',
+              icon: Icons.mic_rounded,
+              subtitle: npuStatus,
+              isDownloaded: provider.isZipformerDownloaded,
+              isDownloading: provider.isZipformerDownloading,
+              progress: provider.zipformerDownloadProgress,
+              size: '164 MB',
+              badge: 'المعتمد',
+              badgeColor: Colors.green,
+              onDownload: provider.isNpuSupported
+                  ? provider.downloadZipformerModel
+                  : null,
+              onActivate: provider.isNpuSupported
+                  ? () =>
+                        provider.setRecitationEngine(RecitationEngine.zipformer)
+                  : null,
+              onDelete:
+                  provider.isZipformerDownloaded &&
+                      provider.activeSessionConfig == null
+                  ? () => _confirmDeleteModel(
+                      context,
+                      'محرك Zipformer V3',
+                      provider.deleteZipformerModel,
+                    )
+                  : null,
+              isSelected: provider.engine == RecitationEngine.zipformer,
             ),
-            // ملاحظة: بطاقة "مصنف التجويد" أزيلت — لا يوجد نموذج حقيقي بعد،
-            // والنتائج السابقة كانت محاكاة زائفة (لا نعرض ميزات وهمية للمستخدم).
+            _buildDownloadCard(
+              context,
+              title: 'محرك التسميع الكلاسيكي (Whisper)',
+              icon: Icons.mic_rounded,
+              subtitle: 'قيد التطوير إلى حين إصلاح تحويل النموذج.',
+              isDownloaded: provider.isWhisperDownloaded,
+              isDownloading: false,
+              progress: 0,
+              size: '142 MB',
+              badge: 'قيد التطوير',
+              badgeColor: Colors.amber[800],
+              isSelected: false,
+            ),
           ],
         );
       },
+    );
+  }
+
+  void _confirmDeleteModel(
+    BuildContext context,
+    String modelTitle,
+    VoidCallback onConfirm,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'حذف $modelTitle',
+          style: const TextStyle(
+            fontFamily: 'Tajawal',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'هل ترغب في حذف ملفات $modelTitle لتوفير المساحة؟ يمكنك إعادة تنزيلها لاحقاً في أي وقت.',
+          style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onConfirm();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('حذف', style: TextStyle(fontFamily: 'Tajawal')),
+          ),
+        ],
+      ),
     );
   }
 
@@ -306,9 +388,13 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
     required double progress,
     required String size,
     bool isOnline = false,
-    required VoidCallback onDownload,
-    required VoidCallback onActivate,
+    IconData icon = Icons.menu_book_rounded,
+    VoidCallback? onDownload,
+    VoidCallback? onActivate,
     required bool isSelected,
+    String? badge,
+    Color? badgeColor,
+    VoidCallback? onDelete,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -339,11 +425,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
               color: AppColors.brandGold.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
-              Icons.menu_book_rounded,
-              color: AppColors.brandGold,
-              size: 24,
-            ),
+            child: Icon(icon, color: AppColors.brandGold, size: 24),
           ),
           const SizedBox(width: 12),
           // Content
@@ -351,15 +433,53 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.slateText,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.slateText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (badge != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: (badgeColor ?? AppColors.brandGold).withValues(
+                            alpha: 0.12,
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: (badgeColor ?? AppColors.brandGold)
+                                .withValues(alpha: 0.3),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          badge,
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: badgeColor ?? AppColors.brandGold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+                const SizedBox(height: 3),
                 Text(
                   subtitle,
                   style: const TextStyle(
@@ -373,7 +493,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      value: progress,
+                      value: progress > 0 ? progress : null,
                       backgroundColor: Colors.grey.withValues(alpha: 0.1),
                       valueColor: const AlwaysStoppedAnimation<Color>(
                         AppColors.brandGold,
@@ -397,33 +517,55 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                   color: AppColors.mutedText,
                 ),
               ),
-              const SizedBox(height: 8),
-              if (isDownloaded || isOnline)
-                ElevatedButton(
-                  onPressed: isSelected ? null : onActivate,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isSelected
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : AppColors.brandGold,
-                    foregroundColor: isSelected ? Colors.green : Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 0,
+              if (onDownload != null || onActivate != null || onDelete != null)
+                const SizedBox(height: 8),
+              if ((isDownloaded || isOnline) &&
+                  (onActivate != null || onDelete != null))
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onDelete != null)
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Colors.grey,
+                        ),
+                        tooltip: 'حذف لتوفير المساحة',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: onDelete,
+                      ),
+                    if (onDelete != null) const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: isSelected ? null : onActivate,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isSelected
+                            ? Colors.green.withValues(alpha: 0.1)
+                            : AppColors.brandGold,
+                        foregroundColor: isSelected
+                            ? Colors.green
+                            : Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 0,
+                        ),
+                        minimumSize: const Size(60, 28),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        isSelected ? 'مفعل' : 'تفعيل',
+                        style: const TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    minimumSize: const Size(60, 28),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    isSelected ? 'مفعل' : 'تفعيل',
-                    style: const TextStyle(
-                      fontFamily: 'Tajawal',
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  ],
                 )
               else if (isDownloading)
                 Text(
@@ -434,7 +576,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                     fontSize: 12,
                   ),
                 )
-              else
+              else if (!isDownloaded && onDownload != null)
                 IconButton(
                   onPressed: onDownload,
                   icon: const Icon(

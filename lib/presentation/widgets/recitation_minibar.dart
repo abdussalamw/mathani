@@ -7,11 +7,10 @@ import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
 import 'package:mathani/presentation/providers/ui_provider.dart';
-import 'package:mathani/data/services/audio_recorder_service.dart';
 
 /// شريط التسميع الذكي الصغير — يظهر فوق BottomNavigationBar
 class RecitationMiniBar extends StatefulWidget {
-  const RecitationMiniBar({Key? key}) : super(key: key);
+  const RecitationMiniBar({super.key});
 
   @override
   State<RecitationMiniBar> createState() => _RecitationMiniBarState();
@@ -19,9 +18,8 @@ class RecitationMiniBar extends StatefulWidget {
 
 class _RecitationMiniBarState extends State<RecitationMiniBar>
     with SingleTickerProviderStateMixin {
-  Timer? _timer;
   Timer? _waveTimer;
-  int _elapsedMs = 0;
+  bool _readingAmplitude = false;
   late AnimationController _pulseController;
   final List<double> _waveformData = List.generate(20, (_) => 0.1);
   final _random = Random();
@@ -37,7 +35,6 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
 
   @override
   void dispose() {
-    _timer?.cancel();
     _waveTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
@@ -51,34 +48,35 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
   }
 
   void _startTimers() {
-    _timer?.cancel();
     _waveTimer?.cancel();
-    _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (!mounted) return;
-      setState(() => _elapsedMs += 100);
-    });
+    final provider = context.read<RecitationProvider>();
+    final sessionId = provider.activeSessionConfig?.sessionId;
     _waveTimer = Timer.periodic(const Duration(milliseconds: 100), (_) async {
-      if (!mounted) return;
-      final provider = context.read<RecitationProvider>();
-      if (provider.isPaused) {
-        setState(() {
-          _waveformData.removeAt(0);
-          _waveformData.add(0.05);
-        });
+      if (!mounted ||
+          _readingAmplitude ||
+          provider.state != RecitationState.recording ||
+          provider.activeSessionConfig?.sessionId != sessionId) {
         return;
       }
-      final amp = await AudioRecorderService().getAmplitude();
-      if (mounted) {
+      _readingAmplitude = true;
+      try {
+        final amplitude = await provider.getRecordingAmplitude();
+        if (!mounted ||
+            provider.state != RecitationState.recording ||
+            provider.activeSessionConfig?.sessionId != sessionId) {
+          return;
+        }
         setState(() {
           _waveformData.removeAt(0);
-          _waveformData.add(max(0.1, amp + (_random.nextDouble() * 0.05)));
+          _waveformData.add(max(0.1, amplitude + _random.nextDouble() * 0.05));
         });
+      } finally {
+        _readingAmplitude = false;
       }
     });
   }
 
   void _stopTimers() {
-    _timer?.cancel();
     _waveTimer?.cancel();
   }
 
@@ -87,10 +85,12 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final recProvider = context.watch<RecitationProvider>();
     final uiProvider = context.watch<UiProvider>();
-    final isRecording = uiProvider.isRecitationActive;
+    final isRecording =
+        recProvider.state == RecitationState.recording ||
+        recProvider.state == RecitationState.paused;
 
     // تحميل النموذج جارٍ
-    if (recProvider.isModelLoading) {
+    if (recProvider.state == RecitationState.preparing) {
       return Container(
         padding: EdgeInsets.fromLTRB(
           16,
@@ -145,10 +145,8 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                 size: 20,
                 color: AppColors.mutedText,
               ),
-              onPressed: () {
-                uiProvider.hideRecitationMinibar();
-                recProvider.reset();
-              },
+              tooltip: 'إلغاء بدء التسميع',
+              onPressed: _cancelRecording,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
@@ -209,14 +207,19 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                 ),
               ),
             ),
+            if (recProvider.activeSessionConfig != null)
+              IconButton(
+                tooltip: 'إلغاء التحليل',
+                icon: const Icon(Icons.close_rounded),
+                onPressed: _cancelRecording,
+              ),
           ],
         ),
       );
     }
 
-    // حالة الخطأ
-    if (recProvider.state == RecitationState.error ||
-        recProvider.errorMessage != null) {
+    // حالة التحميل الجاري للنماذج في المينيبار
+    if (recProvider.isZipformerDownloading) {
       return Container(
         padding: EdgeInsets.fromLTRB(
           16,
@@ -228,13 +231,96 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
           color: isDark ? const Color(0xFF151412) : Colors.white,
           border: Border(
             top: BorderSide(
-              color: Colors.red.withValues(alpha: 0.3),
+              color: AppColors.brandGold.withValues(alpha: 0.3),
               width: 1.5,
             ),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.red.withValues(alpha: 0.05),
+              color: AppColors.brandGold.withValues(alpha: 0.05),
+              blurRadius: 15,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.brandGold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'جارِ تنزيل ${recProvider.currentEngineName}... ${(recProvider.currentEngineProgress * 100).toInt()}%',
+                    style: const TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 13,
+                      color: AppColors.brandGold,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: recProvider.currentEngineProgress > 0
+                    ? recProvider.currentEngineProgress
+                    : null,
+                backgroundColor: Colors.grey.withValues(alpha: 0.1),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.brandGold,
+                ),
+                minHeight: 4,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // حالة الخطأ أو المحرك غير محمل
+    if (recProvider.state == RecitationState.error ||
+        recProvider.errorMessage != null) {
+      final isWhisper = recProvider.engine == RecitationEngine.whisper;
+      final isModelMissing =
+          !isWhisper &&
+          recProvider.isNpuSupported &&
+          !recProvider.isZipformerDownloaded;
+      return Container(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          12 + MediaQuery.of(context).padding.bottom,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF151412) : Colors.white,
+          border: Border(
+            top: BorderSide(
+              color: isModelMissing
+                  ? AppColors.brandGold.withValues(alpha: 0.4)
+                  : Colors.red.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isModelMissing
+                  ? AppColors.brandGold.withValues(alpha: 0.05)
+                  : Colors.red.withValues(alpha: 0.05),
               blurRadius: 15,
               offset: const Offset(0, -4),
             ),
@@ -242,25 +328,66 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
         ),
         child: Row(
           children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              color: Colors.red,
+            Icon(
+              isModelMissing
+                  ? Icons.cloud_download_rounded
+                  : Icons.error_outline_rounded,
+              color: isModelMissing ? AppColors.brandGold : Colors.red,
               size: 20,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 recProvider.errorMessage ?? 'حدث خطأ غير متوقع',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Tajawal',
-                  fontSize: 13,
-                  color: Colors.red,
+                  fontSize: 12,
+                  color: isModelMissing
+                      ? (isDark ? Colors.white : AppColors.slateText)
+                      : Colors.red,
                   fontWeight: FontWeight.w600,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (isModelMissing) ...[
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: recProvider.downloadZipformerModel,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandGold,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 0,
+                  ),
+                  minimumSize: const Size(60, 28),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'تحميل (${recProvider.currentEngineSize})',
+                  style: const TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+            if (isWhisper)
+              TextButton(
+                onPressed: () async {
+                  await recProvider.setRecitationEngine(
+                    RecitationEngine.zipformer,
+                  );
+                  if (mounted) recProvider.reset();
+                },
+                child: const Text('اختيار Zipformer'),
+              ),
+            const SizedBox(width: 4),
             IconButton(
               icon: const Icon(
                 Icons.close_rounded,
@@ -532,14 +659,12 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                 // وقت التسجيل والتوقيف المؤقت
                 if (isRecording) ...[
                   GestureDetector(
-                    onTap: () {
+                    onTap: () async {
                       final p = context.read<RecitationProvider>();
                       if (p.isPaused) {
-                        p.resumeRecording();
-                        _startTimers();
+                        await p.resumeRecording();
                       } else {
-                        p.pauseRecording();
-                        _stopTimers();
+                        await p.pauseRecording();
                       }
                     },
                     child: Container(
@@ -582,7 +707,7 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    _formatDuration(_elapsedMs),
+                    _formatDuration(recProvider.recordingDurationMs),
                     style: const TextStyle(
                       fontFamily: 'Tajawal',
                       fontSize: 14,
@@ -597,11 +722,7 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                       size: 20,
                       color: Colors.red,
                     ),
-                    onPressed: () {
-                      _stopTimers();
-                      recProvider.cancelRecording();
-                      uiProvider.hideRecitationMinibar();
-                    },
+                    onPressed: _cancelRecording,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -1024,22 +1145,159 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     );
   }
 
-  void _startRecitation() async {
+  Future<void> _startRecitation() async {
     final uiProvider = context.read<UiProvider>();
     final recProvider = context.read<RecitationProvider>();
+
     uiProvider.openRecitationMinibar();
-    uiProvider.setRecitationActive(true);
-    await recProvider.startRecitationFromMinibar();
-    if (recProvider.isRecording) {
-      _startTimers();
+    if (recProvider.engine == RecitationEngine.zipformer &&
+        recProvider.isNpuSupported &&
+        !recProvider.isZipformerDownloaded) {
+      _showDownloadPrompt(context, recProvider);
+      return;
     }
+
+    final path = await recProvider.startRecitationFromMinibar();
+    if (!mounted || path == null || !recProvider.isRecording) return;
+    uiProvider.setRecitationActive(true);
+    _startTimers();
   }
 
-  void _stopRecitation() {
+  void _showDownloadPrompt(
+    BuildContext context,
+    RecitationProvider recProvider,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E22) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: AppColors.brandGold.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.cloud_download_rounded,
+                  color: AppColors.brandGold,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'تحميل محرك التسميع (${recProvider.currentEngineName})',
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'يعمل التسميع محلياً 100% دون إنترنت. يلزم تنزيل ملفات المحرك لمرة واحدة بحجم (${recProvider.currentEngineSize}).',
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 13,
+                  color: AppColors.mutedText,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    recProvider.downloadZipformerModel();
+                  },
+                  icon: const Icon(Icons.download_rounded),
+                  label: Text(
+                    'تنزيل الآن (${recProvider.currentEngineSize})',
+                    style: const TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.brandGold,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.pushNamed(context, '/download_center');
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.brandGold,
+                        side: const BorderSide(color: AppColors.brandGold),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'مركز التحميلات والتبديل',
+                        style: TextStyle(fontFamily: 'Tajawal', fontSize: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text(
+                      'إلغاء',
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        color: AppColors.mutedText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _cancelRecording() async {
     _stopTimers();
     final recProvider = context.read<RecitationProvider>();
-    recProvider.stopRecording();
-    context.read<UiProvider>().setRecitationActive(false);
-    context.read<UiProvider>().setShowRecitationResults(false);
+    final uiProvider = context.read<UiProvider>();
+    await recProvider.cancelRecording();
+    if (mounted) uiProvider.hideRecitationMinibar();
+  }
+
+  Future<void> _stopRecitation() async {
+    _stopTimers();
+    final recProvider = context.read<RecitationProvider>();
+    final uiProvider = context.read<UiProvider>();
+    final stopping = recProvider.stopRecording();
+    uiProvider.setRecitationActive(false);
+    uiProvider.setShowRecitationResults(false);
+    await stopping;
   }
 }

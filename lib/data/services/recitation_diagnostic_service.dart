@@ -1,503 +1,411 @@
 import 'dart:io';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-/// نتيجة فحص واحد
-class DiagnosticCheckResult {
-  final String name;
-  final bool passed;
-  final String detail;
-  final String? errorMessage;
-  final Duration? duration;
+import '../../core/services/recitation/recitation_model_downloader.dart';
+import '../../core/services/recitation/zipformer_npu_package.dart';
 
-  const DiagnosticCheckResult({
-    required this.name,
-    required this.passed,
-    required this.detail,
-    this.errorMessage,
-    this.duration,
-  });
+enum DiagnosticStatus {
+  passed('اجتاز'),
+  blocked('يحتاج إجراء'),
+  unverified('لم يُختبر'),
+  info('معلومة');
 
-  String get icon => passed ? '✅' : '❌';
+  const DiagnosticStatus(this.label);
+  final String label;
 }
 
-/// تقرير التشخيص الكامل
+enum RecitationDiagnosticStage {
+  engine('اختيار المحرك'),
+  npu('تهيئة NPU'),
+  download('تنزيل ملفات Zipformer'),
+  reference('قراءة مرجع الفونيمات'),
+  permission('إذن الميكروفون'),
+  recording('فتح الميكروفون'),
+  streaming('بث الصوت'),
+  matching('مطابقة التلاوة'),
+  finalization('إنهاء التحليل'),
+  cleanup('إغلاق الجلسة');
+
+  const RecitationDiagnosticStage(this.label);
+  final String label;
+}
+
+typedef RecitationDiagnosticIssue = ({
+  RecitationDiagnosticStage stage,
+  String message,
+  DateTime occurredAt,
+});
+
+class DiagnosticCheckResult {
+  const DiagnosticCheckResult({
+    required this.name,
+    required this.status,
+    required this.detail,
+    this.action,
+  });
+
+  final String name;
+  final DiagnosticStatus status;
+  final String detail;
+  final String? action;
+}
+
 class DiagnosticReport {
+  const DiagnosticReport({required this.checks, required this.timestamp});
+
   final List<DiagnosticCheckResult> checks;
   final DateTime timestamp;
 
-  const DiagnosticReport({required this.checks, required this.timestamp});
+  DiagnosticCheckResult? get firstBlocker {
+    for (final check in checks) {
+      if (check.status == DiagnosticStatus.blocked) return check;
+    }
+    return null;
+  }
 
-  bool get allPassed => checks.every((c) => c.passed);
-  int get passedCount => checks.where((c) => c.passed).length;
+  String get summary => firstBlocker?.name ?? 'الفحص الأولي مكتمل';
+  String get guidance =>
+      firstBlocker?.action ??
+      'ابدأ جلسة تسميع للتحقق من سرعة التنبيه وثباته أثناء التلاوة.';
 
   String toText() {
-    final sb = StringBuffer();
-    sb.writeln('═══════════════════════════════');
-    sb.writeln('تقرير تشخيص نظام التسميع');
-    sb.writeln(timestamp.toIso8601String());
-    sb.writeln('═══════════════════════════════');
-    for (final c in checks) {
-      sb.writeln('${c.icon} ${c.name}');
-      sb.writeln('   ${c.detail}');
-      if (c.errorMessage != null) sb.writeln('   ⚠️ ${c.errorMessage}');
-      if (c.duration != null) {
-        sb.writeln('   ⏱ ${c.duration!.inMilliseconds}ms');
-      }
-      sb.writeln();
+    final text = StringBuffer()
+      ..writeln('تقرير تشخيص التسميع في مثاني')
+      ..writeln(timestamp.toIso8601String())
+      ..writeln(summary)
+      ..writeln(guidance);
+    for (final check in checks) {
+      text
+        ..writeln()
+        ..writeln('[${check.status.label}] ${check.name}')
+        ..writeln(check.detail);
+      if (check.action != null) text.writeln(check.action);
     }
-    sb.writeln('النتيجة: $passedCount/${checks.length} اجتازت');
-    return sb.toString();
+    return text.toString().trimRight();
   }
 }
 
-/// خدمة التشخيص الشامل لنظام التسميع
 class RecitationDiagnosticService {
-  static final RecitationDiagnosticService _instance =
-      RecitationDiagnosticService._internal();
-  factory RecitationDiagnosticService() => _instance;
-  RecitationDiagnosticService._internal();
+  RecitationDiagnosticService({
+    Future<Directory> Function()? modelDirectory,
+    Future<PermissionStatus> Function()? microphoneStatus,
+    AssetBundle? assets,
+  }) : _modelDirectory =
+           modelDirectory ??
+           (() => RecitationModelDownloader.getModelDirectory(create: false)),
+       _microphoneStatus =
+           microphoneStatus ?? (() => Permission.microphone.status),
+       _assets = assets ?? rootBundle;
 
-  static const String _asrModelZipUrl =
-      'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/tadabur-whisper-mobile.zip';
-  static const String _tajweedModelUrl =
-      'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/tajweed_classifier.tflite';
+  static const _platform = MethodChannel('mathani/recitation_diagnostics');
+  final Future<Directory> Function() _modelDirectory;
+  final Future<PermissionStatus> Function() _microphoneStatus;
+  final AssetBundle _assets;
 
-  /// تشغيل التشخيص الكامل
   Future<DiagnosticReport> runAll({
+    required bool npuBackendConfigured,
+    required bool whisperSelected,
+    required bool downloadingModel,
+    required bool sessionActive,
+    String? npuUnavailableReason,
+    DateTime? lastVerifiedNpuAt,
+    RecitationDiagnosticIssue? lastIssue,
     void Function(String checkName)? onCheckStarted,
   }) async {
-    final checks = <DiagnosticCheckResult>[];
-
-    // الفحص 1: الميكروفون والصلاحيات
-    onCheckStarted?.call('الميكروفون');
-    checks.add(await _checkMicrophone());
-
-    // الفحص 2: ملفات نموذج تدبر
-    onCheckStarted?.call('ملفات النموذج');
-    checks.add(await _checkModelFiles());
-
-    // الفحص 3: تهيئة Sherpa ONNX
-    onCheckStarted?.call('محرك Sherpa ONNX');
-    checks.add(await _checkSherpaInit());
-
-    // الفحص 4: التسجيل وقراءة WAV
-    onCheckStarted?.call('التسجيل الصوتي');
-    checks.add(await _checkRecording());
-
-    // الفحص 5: URL نموذج تدبر
-    onCheckStarted?.call('رابط نموذج تدبر');
-    checks.add(await _checkModelUrl());
-
-    // الفحص 6: ملف التجويد المحلي والرابط
-    onCheckStarted?.call('نموذج التجويد');
-    checks.add(await _checkTajweedModel());
-
-    // الفحص 7: منصة التشغيل
-    onCheckStarted?.call('منصة التشغيل');
-    checks.add(_checkPlatform());
-
-    return DiagnosticReport(checks: checks, timestamp: DateTime.now());
+    onCheckStarted?.call('معلومات الجهاز');
+    final device = await _deviceInfo();
+    onCheckStarted?.call('ملفات Zipformer');
+    final files = await _checkModelFiles(downloadingModel);
+    onCheckStarted?.call('إذن الميكروفون');
+    final microphone = await _checkMicrophone();
+    return DiagnosticReport(
+      timestamp: DateTime.now(),
+      checks: List.unmodifiable([
+        DiagnosticCheckResult(
+          name: 'المحرك المختار',
+          status: whisperSelected
+              ? DiagnosticStatus.blocked
+              : DiagnosticStatus.passed,
+          detail: whisperSelected
+              ? 'Whisper محدد في التفضيلات وقيد التطوير.'
+              : 'Zipformer V3 هو المحرك المحدد.',
+          action: whisperSelected
+              ? 'اختر Zipformer V3 من إعدادات التسميع.'
+              : null,
+        ),
+        DiagnosticCheckResult(
+          name: 'توافق الجهاز مع مسار NPU',
+          status: npuBackendConfigured
+              ? DiagnosticStatus.passed
+              : DiagnosticStatus.blocked,
+          detail: npuBackendConfigured
+              ? 'الجهاز مؤهل لمسار QNN عبر Hexagon. يُختبر الاستدلال عند البدء.'
+              : npuUnavailableReason ??
+                    'مسار Zipformer على NPU غير متاح للجهاز حاليًا.',
+          action: npuBackendConfigured
+              ? null
+              : 'راجع بيانات الجهاز وإصدار مثاني أدناه.',
+        ),
+        ...files,
+        _npuExecutionCheck(
+          npuBackendConfigured: npuBackendConfigured,
+          lastVerifiedAt: lastVerifiedNpuAt,
+          lastIssue: lastIssue,
+        ),
+        microphone,
+        device,
+        DiagnosticCheckResult(
+          name: 'اختبار التسجيل أثناء التلاوة',
+          status: DiagnosticStatus.unverified,
+          detail: sessionActive
+              ? 'توجد جلسة نشطة. الفحص لم يتدخل فيها.'
+              : 'يعرض الفحص حالة الإذن. قياس التنبيه يتطلب جلسة تلاوة.',
+          action: 'يلزم اختبار فعلي لقياس سرعة التنبيه وثباته أثناء التلاوة.',
+        ),
+        if (lastIssue != null)
+          DiagnosticCheckResult(
+            name: 'آخر تعثر منذ فتح التطبيق',
+            status: DiagnosticStatus.info,
+            detail:
+                '${lastIssue.stage.label} [${lastIssue.stage.name}]\n'
+                '${lastIssue.message}\n${lastIssue.occurredAt.toIso8601String()}',
+          ),
+      ]),
+    );
   }
 
-  // ─────────────────────────────────────────────
-  // الفحص 1: الميكروفون
-  // ─────────────────────────────────────────────
+  DiagnosticCheckResult _npuExecutionCheck({
+    required bool npuBackendConfigured,
+    required DateTime? lastVerifiedAt,
+    required RecitationDiagnosticIssue? lastIssue,
+  }) {
+    const name = 'التحقق من استدلال NPU';
+    if (npuBackendConfigured &&
+        lastIssue != null &&
+        lastIssue.stage == RecitationDiagnosticStage.npu &&
+        (lastVerifiedAt == null ||
+            !lastIssue.occurredAt.isBefore(lastVerifiedAt))) {
+      return DiagnosticCheckResult(
+        name: name,
+        status: DiagnosticStatus.blocked,
+        detail: 'تعذّر تحقق NPU في آخر محاولة. ${lastIssue.message}',
+        action: 'راجع ملفات النموذج ثم أعد محاولة بدء التسميع.',
+      );
+    }
+    if (npuBackendConfigured && lastVerifiedAt != null) {
+      return DiagnosticCheckResult(
+        name: name,
+        status: DiagnosticStatus.passed,
+        detail:
+            'نجح اختبار النموذج على Hexagon عند تهيئة آخر جلسة '
+            'وكان تشغيل عمليات النموذج على CPU معطّلًا.\n'
+            '${lastVerifiedAt.toIso8601String()}',
+      );
+    }
+    return DiagnosticCheckResult(
+      name: name,
+      status: DiagnosticStatus.unverified,
+      detail: 'تُختبر دفعة قبل فتح الميكروفون عند بدء التسميع.',
+      action: npuBackendConfigured
+          ? 'ابدأ جلسة بعد اكتمال ملفات النموذج.'
+          : null,
+    );
+  }
+
+  Future<DiagnosticCheckResult> _deviceInfo() async {
+    Map<String, Object?> info = {};
+    try {
+      info =
+          await _platform.invokeMapMethod<String, Object?>('deviceInfo') ?? {};
+    } on PlatformException {
+      // Fall back to public OS metadata.
+    } on MissingPluginException {
+      // The optional Android channel may be unavailable on this build/platform.
+    }
+    final description = [
+      if (info['model'] case final String model)
+        'الجهاز ${info['manufacturer'] ?? ''} $model',
+      if (info['soc'] case final String soc)
+        'الشريحة ${info['socManufacturer'] ?? ''} $soc',
+      if (info['sdk'] case final int sdk)
+        'Android ${info['release']} (API $sdk)',
+      if (info['abis'] case final List abis)
+        'واجهات ABI المدعومة ${abis.join(', ')}',
+      if (info['appVersion'] case final String appVersion)
+        'مثاني $appVersion (${info['appBuild']})',
+      if (info.isEmpty) 'النظام ${kIsWeb ? 'Web' : Platform.operatingSystem}',
+    ];
+    return DiagnosticCheckResult(
+      name: 'الجهاز ونسخة التطبيق',
+      status: DiagnosticStatus.info,
+      detail: description.join('\n'),
+      action: info.isEmpty
+          ? 'تفاصيل الجهاز والإصدار غير متاحة في هذه البيئة.'
+          : null,
+    );
+  }
+
+  Future<List<DiagnosticCheckResult>> _checkModelFiles(bool downloading) async {
+    DiagnosticCheckResult bundledTokens;
+    try {
+      final data = await _assets.load('assets/data/tokens.txt');
+      final bytes = data.buffer.asUint8List(
+        data.offsetInBytes,
+        data.lengthInBytes,
+      );
+      final tokens = ZipformerNpuPackage.tokens;
+      final matches =
+          bytes.length == tokens.size &&
+          crypto.sha256.convert(bytes).toString() == tokens.sha256;
+      bundledTokens = DiagnosticCheckResult(
+        name: 'جدول الرموز المضمّن',
+        status: matches ? DiagnosticStatus.passed : DiagnosticStatus.blocked,
+        detail: matches
+            ? 'يطابق جدول Zipformer V3 المرجعي المضمّن.'
+            : 'الجدول المضمّن مختلف عن مرجع Zipformer V3.',
+        action: matches ? null : 'تحقّق من سلامة نسخة مثاني.',
+      );
+    } catch (_) {
+      bundledTokens = const DiagnosticCheckResult(
+        name: 'جدول الرموز المضمّن',
+        status: DiagnosticStatus.blocked,
+        detail: 'تعذّرت قراءة جدول الرموز من أصول التطبيق.',
+        action: 'تحقّق من سلامة نسخة مثاني.',
+      );
+    }
+    if (kIsWeb) {
+      return [
+        const DiagnosticCheckResult(
+          name: 'ملفات Zipformer المحلية',
+          status: DiagnosticStatus.unverified,
+          detail: 'فحص مجلد نموذج Android متاح في تطبيق الهاتف.',
+        ),
+        bundledTokens,
+      ];
+    }
+    if (downloading) {
+      return [
+        const DiagnosticCheckResult(
+          name: 'ملفات Zipformer',
+          status: DiagnosticStatus.unverified,
+          detail: 'يجري تنزيل الملفات الآن.',
+          action: 'أعد الفحص بعد اكتمال التنزيل.',
+        ),
+        bundledTokens,
+      ];
+    }
+    try {
+      final dir = await _modelDirectory();
+      final installed = await compute(_inspectInstalledFiles, dir.path);
+      return [...installed, bundledTokens];
+    } catch (_) {
+      return [
+        const DiagnosticCheckResult(
+          name: 'مجلد ملفات Zipformer',
+          status: DiagnosticStatus.blocked,
+          detail: 'تعذّر الوصول إلى مساحة ملفات النموذج.',
+          action: 'تحقّق من مساحة التخزين ثم أعد الفحص.',
+        ),
+        bundledTokens,
+      ];
+    }
+  }
+
   Future<DiagnosticCheckResult> _checkMicrophone() async {
     try {
-      final recorder = AudioRecorder();
-      final hasPermission = await recorder.hasPermission();
-      await recorder.dispose();
-      if (hasPermission) {
-        return const DiagnosticCheckResult(
-          name: 'الميكروفون',
-          passed: true,
-          detail: 'الصلاحية ممنوحة ✓',
-        );
-      } else {
-        return const DiagnosticCheckResult(
-          name: 'الميكروفون',
-          passed: false,
-          detail: 'الصلاحية غير ممنوحة',
-          errorMessage: 'اذهب للإعدادات وامنح صلاحية الميكروفون',
-        );
-      }
-    } catch (e) {
+      final result = await _microphoneStatus();
       return DiagnosticCheckResult(
-        name: 'الميكروفون',
-        passed: false,
-        detail: 'خطأ في الوصول للميكروفون',
-        errorMessage: e.toString(),
-      );
-    }
-  }
-
-  // ─────────────────────────────────────────────
-  // الفحص 2: ملفات نموذج تدبر
-  // ─────────────────────────────────────────────
-  Future<DiagnosticCheckResult> _checkModelFiles() async {
-    try {
-      final directory = await getApplicationSupportDirectory();
-      final asrDir = Directory('${directory.path}/ai_models/asr');
-
-      if (!await asrDir.exists()) {
-        return DiagnosticCheckResult(
-          name: 'ملفات نموذج تدبر',
-          passed: false,
-          detail: 'المجلد غير موجود: ${asrDir.path}',
-          errorMessage: 'يجب تحميل النموذج أولاً',
-        );
-      }
-
-      final files = await asrDir.list(recursive: true).toList();
-      final fileDetails = <String>[];
-      bool hasEncoder = false, hasDecoder = false, hasTokens = false;
-      double totalMB = 0;
-
-      for (final f in files) {
-        if (f is File) {
-          final name = f.path.split(Platform.pathSeparator).last;
-          if (name.endsWith('.backup')) continue; // تجاهل النسخ الاحتياطية
-          final sz = await f.length();
-          final mb = sz / 1024 / 1024;
-          totalMB += mb;
-          fileDetails.add('$name: ${mb.toStringAsFixed(2)} MB');
-          if (name.contains('encoder') && mb > 1) hasEncoder = true;
-          if (name.contains('decoder') && mb > 1) hasDecoder = true;
-          if (name.contains('tokens') && sz > 100) hasTokens = true;
-        }
-      }
-
-      final allPresent = hasEncoder && hasDecoder && hasTokens;
-      final detail = [
-        'المجموع: ${totalMB.toStringAsFixed(1)} MB',
-        'Encoder: ${hasEncoder ? "✓" : "✗"}',
-        'Decoder: ${hasDecoder ? "✓" : "✗"}',
-        'Tokens: ${hasTokens ? "✓" : "✗"}',
-        ...fileDetails,
-      ].join('\n   ');
-
-      return DiagnosticCheckResult(
-        name: 'ملفات نموذج تدبر',
-        passed: allPresent,
-        detail: detail,
-        errorMessage: allPresent ? null : 'ملفات ناقصة — أعد تحميل النموذج',
-      );
-    } catch (e) {
-      return DiagnosticCheckResult(
-        name: 'ملفات نموذج تدبر',
-        passed: false,
-        detail: 'خطأ في قراءة الملفات',
-        errorMessage: e.toString(),
-      );
-    }
-  }
-
-  // ─────────────────────────────────────────────
-  // الفحص 3: تهيئة Sherpa ONNX — تحقق من المسارات فقط (لا ننشئ recognizer حقيقي لتجنب crash)
-  // ─────────────────────────────────────────────
-  Future<DiagnosticCheckResult> _checkSherpaInit() async {
-    final stopwatch = Stopwatch()..start();
-    try {
-      final directory = await getApplicationSupportDirectory();
-      final asrDir = Directory('${directory.path}/ai_models/asr');
-      if (!await asrDir.exists()) {
-        return const DiagnosticCheckResult(
-          name: 'محرك Sherpa ONNX',
-          passed: false,
-          detail: 'تعذر الفحص — ملفات النموذج غير موجودة',
-        );
-      }
-
-      // البحث عن المسارات (تتجاهل النسخ الاحتياطية .backup)
-      String encoderPath = '', decoderPath = '', tokensPath = '';
-      await for (final f in asrDir.list(recursive: true)) {
-        if (f is File) {
-          final name = f.path.split(Platform.pathSeparator).last.toLowerCase();
-          if (name.endsWith('.backup')) continue; // تجاهل النسخ الاحتياطية
-          if (name.contains('encoder') && name.endsWith('.onnx')) {
-            encoderPath = f.path;
-          } else if (name.contains('decoder') && name.endsWith('.onnx')) {
-            decoderPath = f.path;
-          } else if (name.contains('tokens')) {
-            tokensPath = f.path;
-          }
-        }
-      }
-
-      if (encoderPath.isEmpty || decoderPath.isEmpty || tokensPath.isEmpty) {
-        return const DiagnosticCheckResult(
-          name: 'محرك Sherpa ONNX',
-          passed: false,
-          detail: 'مسارات الملفات غير مكتملة',
-          errorMessage: 'Encoder أو Decoder أو Tokens مفقود',
-        );
-      }
-
-      // التحقق من أحجام الملفات (دون إنشاء recognizer فعلي)
-      final encoderSize = await File(encoderPath).length();
-      final decoderSize = await File(decoderPath).length();
-      final tokensSize = await File(tokensPath).length();
-
-      final sizesOk =
-          encoderSize > 1024 * 1024 && // > 1MB
-          decoderSize > 1024 * 1024 && // > 1MB
-          tokensSize > 100; // > 100 bytes
-
-      String provider = 'nnapi';
-      if (Platform.isWindows) provider = 'directml';
-      if (Platform.isIOS || Platform.isMacOS) provider = 'coreml';
-
-      stopwatch.stop();
-
-      return DiagnosticCheckResult(
-        name: 'محرك Sherpa ONNX',
-        passed: sizesOk,
-        detail: [
-          'Encoder: $encoderPath',
-          '  ↳ ${(encoderSize / 1024 / 1024).toStringAsFixed(1)} MB',
-          'Decoder: $decoderPath',
-          '  ↳ ${(decoderSize / 1024 / 1024).toStringAsFixed(1)} MB',
-          'Tokens : $tokensPath',
-          '  ↳ ${(tokensSize / 1024).toStringAsFixed(1)} KB',
-          'المسرّع المستهدف: $provider',
-          '⚠️ تم تخطي إنشاء Recognizer (فحص مسارات فقط لتجنب تعارض الموارد)',
-        ].join('\n   '),
-        errorMessage: sizesOk
+        name: 'إذن الميكروفون',
+        status: result.isGranted
+            ? DiagnosticStatus.passed
+            : DiagnosticStatus.blocked,
+        detail: switch (result) {
+          PermissionStatus.granted => 'الإذن ممنوح.',
+          PermissionStatus.permanentlyDenied =>
+            'الإذن مرفوض ويحتاج تفعيلًا من إعدادات الجهاز.',
+          PermissionStatus.restricted =>
+            'إعدادات النظام تقيّد الوصول إلى الميكروفون.',
+          _ => 'الإذن غير ممنوح.',
+        },
+        action: result.isGranted
             ? null
-            : 'أحد الملفات صغير جداً أو تالف — أعد تحميل النموذج',
-        duration: stopwatch.elapsed,
+            : 'راجع إذن الميكروفون لمثاني في إعدادات الجهاز.',
       );
-    } catch (e) {
-      stopwatch.stop();
-      return DiagnosticCheckResult(
-        name: 'محرك Sherpa ONNX',
-        passed: false,
-        detail: 'استثناء غير متوقع',
-        errorMessage: e.toString(),
-        duration: stopwatch.elapsed,
-      );
-    }
-  }
-
-  // ─────────────────────────────────────────────
-  // الفحص 4: التسجيل وقراءة WAV
-  // ─────────────────────────────────────────────
-  Future<DiagnosticCheckResult> _checkRecording() async {
-    if (kIsWeb) {
+    } catch (_) {
       return const DiagnosticCheckResult(
-        name: 'التسجيل الصوتي',
-        passed: false,
-        detail: 'غير مدعوم على الويب',
-      );
-    }
-    try {
-      final recorder = AudioRecorder();
-      final hasPermission = await recorder.hasPermission();
-      if (!hasPermission) {
-        await recorder.dispose();
-        return const DiagnosticCheckResult(
-          name: 'التسجيل الصوتي',
-          passed: false,
-          detail: 'لا توجد صلاحية للميكروفون',
-        );
-      }
-
-      final dir = await getTemporaryDirectory();
-      final testPath = '${dir.path}/diag_test.wav';
-
-      await recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.wav,
-          sampleRate: 16000,
-          numChannels: 1,
-        ),
-        path: testPath,
-      );
-      await Future.delayed(const Duration(seconds: 2));
-      await recorder.stop();
-      await recorder.dispose();
-
-      final file = File(testPath);
-      if (!await file.exists()) {
-        return const DiagnosticCheckResult(
-          name: 'التسجيل الصوتي',
-          passed: false,
-          detail: 'ملف WAV لم يُنشأ بعد التسجيل',
-        );
-      }
-
-      final bytes = await file.readAsBytes();
-      final fileSizeKB = (bytes.length / 1024).toStringAsFixed(1);
-
-      // التحقق من WAV header
-      if (bytes.length < 44) {
-        return DiagnosticCheckResult(
-          name: 'التسجيل الصوتي',
-          passed: false,
-          detail: 'ملف WAV صغير جداً ($fileSizeKB KB) — header ناقص',
-        );
-      }
-
-      final riff = String.fromCharCodes(bytes.sublist(0, 4));
-      final wave = String.fromCharCodes(bytes.sublist(8, 12));
-      final headerOk = riff == 'RIFF' && wave == 'WAVE';
-
-      // إيجاد data chunk
-      int dataOffset = -1;
-      for (int i = 12; i < bytes.length - 8; i++) {
-        if (bytes[i] == 0x64 &&
-            bytes[i + 1] == 0x61 &&
-            bytes[i + 2] == 0x74 &&
-            bytes[i + 3] == 0x61) {
-          dataOffset = i;
-          break;
-        }
-      }
-
-      await file.delete();
-
-      return DiagnosticCheckResult(
-        name: 'التسجيل الصوتي',
-        passed: headerOk && dataOffset != -1,
-        detail: [
-          'حجم الملف: $fileSizeKB KB',
-          'RIFF header: ${headerOk ? "✓" : "✗"} ($riff/$wave)',
-          'data chunk: ${dataOffset != -1 ? "✓ offset=$dataOffset" : "✗ غير موجود"}',
-        ].join('\n   '),
-      );
-    } catch (e) {
-      return DiagnosticCheckResult(
-        name: 'التسجيل الصوتي',
-        passed: false,
-        detail: 'استثناء أثناء التسجيل',
-        errorMessage: e.toString(),
+        name: 'إذن الميكروفون',
+        status: DiagnosticStatus.unverified,
+        detail: 'تعذّرت قراءة حالة الإذن على هذه المنصة.',
       );
     }
   }
+}
 
-  // ─────────────────────────────────────────────
-  // الفحص 5: إمكانية الوصول لرابط النموذج
-  // ─────────────────────────────────────────────
-  Future<DiagnosticCheckResult> _checkModelUrl() async {
-    try {
-      final response = await http
-          .head(Uri.parse(_asrModelZipUrl))
-          .timeout(const Duration(seconds: 10));
-      final ok = response.statusCode == 200 || response.statusCode == 302;
+const _fingerprints = {
+  'ملف سياق QNN': ZipformerNpuPackage.context,
+  'النموذج المجمّع لـHexagon': ZipformerNpuPackage.binary,
+  'مرجع الفونيمات': ZipformerNpuPackage.phonemes,
+};
+
+Future<List<DiagnosticCheckResult>> _inspectInstalledFiles(
+  String directory,
+) async {
+  return [
+    for (final MapEntry(key: label, value: fingerprint)
+        in _fingerprints.entries)
+      await _inspectInstalledFile(directory, label, fingerprint),
+  ];
+}
+
+Future<DiagnosticCheckResult> _inspectInstalledFile(
+  String directory,
+  String label,
+  ZipformerFile fingerprint,
+) async {
+  final file = File('$directory/${fingerprint.name}');
+  const retry = 'راجع ملفات Zipformer في مركز التحميل ثم أعد الفحص.';
+  try {
+    final stat = await file.stat();
+    final expected = 'المتوقع ${fingerprint.size} بايت';
+    if (stat.type == FileSystemEntityType.notFound) {
+      final partial = await File('${file.path}.tmp').exists();
       return DiagnosticCheckResult(
-        name: 'رابط نموذج تدبر',
-        passed: ok,
+        name: label,
+        status: DiagnosticStatus.blocked,
         detail:
-            'HTTP ${response.statusCode} — ${ok ? "الرابط يعمل" : "الرابط معطوب"}',
-        errorMessage: ok ? null : 'تحقق من روابط GitHub Release',
+            '${fingerprint.name}\n${partial ? 'بقي ملف مؤقت من تنزيل غير مكتمل.' : 'الملف مفقود.'}\n$expected',
+        action: retry,
       );
-    } catch (e) {
+    }
+    if (stat.type != FileSystemEntityType.file ||
+        stat.size != fingerprint.size) {
       return DiagnosticCheckResult(
-        name: 'رابط نموذج تدبر',
-        passed: false,
-        detail: 'تعذر الاتصال بالرابط',
-        errorMessage: e.toString(),
+        name: label,
+        status: DiagnosticStatus.blocked,
+        detail: '${fingerprint.name}\nحجم الملف ${stat.size} بايت. $expected.',
+        action: retry,
       );
     }
-  }
 
-  // ─────────────────────────────────────────────
-  // الفحص 6: نموذج التجويد
-  // ─────────────────────────────────────────────
-  Future<DiagnosticCheckResult> _checkTajweedModel() async {
-    final details = <String>[];
-    bool localFileExists = false;
-
-    // فحص الرابط
-    try {
-      final response = await http
-          .head(Uri.parse(_tajweedModelUrl))
-          .timeout(const Duration(seconds: 8));
-      final urlOk = response.statusCode == 200 || response.statusCode == 302;
-      details.add(
-        'رابط GitHub: HTTP ${response.statusCode} ${urlOk ? "✓" : "✗ (404)"}',
-      );
-    } catch (e) {
-      details.add('رابط GitHub: تعذر الاتصال');
-    }
-
-    // فحص الملف المحلي
-    try {
-      final directory = await getApplicationSupportDirectory();
-      final tajweedDir = Directory('${directory.path}/ai_models/tajweed');
-      if (await tajweedDir.exists()) {
-        final files = await tajweedDir.list(recursive: true).toList();
-        for (final f in files) {
-          if (f is File && f.path.endsWith('.tflite')) {
-            final sz = await f.length();
-            details.add(
-              'ملف محلي: ${f.path.split(Platform.pathSeparator).last} (${(sz / 1024).toStringAsFixed(0)} KB)',
-            );
-            localFileExists = true;
-          }
-        }
-        if (!localFileExists) details.add('ملف محلي: غير موجود');
-      } else {
-        details.add('مجلد التجويد: غير موجود');
-      }
-    } catch (e) {
-      details.add('خطأ في فحص الملف المحلي: $e');
-    }
-
-    details.add(
-      'ملاحظة: نموذج التجويد يعمل بمحاكاة (Mock Data) للتطوير البصري وسيربط بـ TFLite لاحقاً.',
-    );
-
-    if (localFileExists) {
-      return DiagnosticCheckResult(
-        name: 'نموذج التجويد (tflite)',
-        passed: true,
-        detail:
-            '${details.join('\n   ')}\n   [حالة الملف]: متوفر محلياً وجاهز (تم إنشاء ملف placeholder للتوافق)',
-      );
-    } else {
-      return DiagnosticCheckResult(
-        name: 'نموذج التجويد (tflite)',
-        passed: false,
-        detail: details.join('\n   '),
-        errorMessage: 'الملف المحلي مفقود. يرجى الضغط على زر تحميل نموذج التجويد في مركز التحميل ليتم كتابة ملف placeholder متوافق تلقائياً.',
-      );
-    }
-  }
-
-  // ─────────────────────────────────────────────
-  // الفحص 7: منصة التشغيل
-  // ─────────────────────────────────────────────
-  DiagnosticCheckResult _checkPlatform() {
-    final platform = Platform.operatingSystem;
-    final version = Platform.operatingSystemVersion;
-    String provider = 'غير محدد';
-    String npuNote = '';
-
-    if (Platform.isAndroid) {
-      provider = 'nnapi';
-      npuNote = 'يتطلب API 28+ و ARM64';
-    } else if (Platform.isIOS || Platform.isMacOS) {
-      provider = 'coreml';
-      npuNote = 'Apple Neural Engine';
-    } else if (Platform.isWindows) {
-      provider = 'directml';
-      npuNote = 'DirectML GPU/NPU';
-    }
-
+    final matches = await ZipformerNpuPackage.matches(file, fingerprint);
     return DiagnosticCheckResult(
-      name: 'منصة التشغيل',
-      passed: true,
-      detail: [
-        'المنصة: $platform',
-        'الإصدار: $version',
-        'المسرّع المستخدم: $provider',
-        'ملاحظة NPU: $npuNote',
-      ].join('\n   '),
+      name: label,
+      status: matches ? DiagnosticStatus.passed : DiagnosticStatus.blocked,
+      detail:
+          '${fingerprint.name}\n${stat.size} بايت\n'
+          '${matches ? 'تطابق بصمة SHA-256 الملف المعتمد.' : 'تعذّر التحقق من تطابق بصمة SHA-256 مع الملف المعتمد.'}',
+      action: matches ? null : retry,
+    );
+  } on FileSystemException {
+    return DiagnosticCheckResult(
+      name: label,
+      status: DiagnosticStatus.unverified,
+      detail: 'تعذّرت قراءة ${fingerprint.name}.',
+      action: retry,
     );
   }
 }

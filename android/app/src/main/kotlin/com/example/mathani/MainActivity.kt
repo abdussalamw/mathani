@@ -1,5 +1,6 @@
 package com.example.mathani
 
+import android.os.Build
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -9,9 +10,20 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
     private var readerImmersiveMode: Boolean? = null
+    private var zipformerNpuChannel: ZipformerNpuChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        zipformerNpuChannel?.close()
+        zipformerNpuChannel = ZipformerNpuChannel(this, flutterEngine.dartExecutor.binaryMessenger)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mathani/recitation_diagnostics")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "deviceInfo") {
+                    result.success(recitationDeviceInfo())
+                } else {
+                    result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mathani/reader_system_ui")
             .setMethodCallHandler { call, result ->
                 if (call.method != "setImmersiveMode") {
@@ -27,6 +39,34 @@ class MainActivity : AudioServiceActivity() {
                 applyReaderSystemUi()
                 result.success(null)
             }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        zipformerNpuChannel?.close()
+        zipformerNpuChannel = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun recitationDeviceInfo(): Map<String, Any?> {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        val buildNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            info.versionCode.toLong()
+        }
+        return mapOf(
+            "manufacturer" to Build.MANUFACTURER,
+            "model" to Build.MODEL,
+            "soc" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else null,
+            "socManufacturer" to
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MANUFACTURER else null,
+            "release" to Build.VERSION.RELEASE,
+            "sdk" to Build.VERSION.SDK_INT,
+            "abis" to Build.SUPPORTED_ABIS.toList(),
+            "appVersion" to info.versionName,
+            "appBuild" to buildNumber
+        )
     }
 
     override fun onResume() {

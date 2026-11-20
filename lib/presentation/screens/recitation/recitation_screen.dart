@@ -12,7 +12,7 @@ import 'recitation_analytics_view.dart';
 /// الشاشة الرئيسية لقسم التسميع الذكي
 /// تتحكم في التنقل بين الحالات المختلفة
 class RecitationScreen extends StatelessWidget {
-  const RecitationScreen({Key? key}) : super(key: key);
+  const RecitationScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +45,25 @@ class RecitationScreen extends StatelessWidget {
       case RecitationState.idle:
       case RecitationState.setup:
         return const RecitationSetupView(key: ValueKey('setup'));
+      case RecitationState.preparing:
+        return Center(
+          key: const ValueKey('preparing'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(provider.analysisStep),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: provider.cancelRecording,
+                child: const Text('إلغاء'),
+              ),
+            ],
+          ),
+        );
       case RecitationState.recording:
+      case RecitationState.paused:
         return const RecitationRecordingView(key: ValueKey('recording'));
       case RecitationState.analyzing:
         return const RecitationAnalysisView(key: ValueKey('analyzing'));

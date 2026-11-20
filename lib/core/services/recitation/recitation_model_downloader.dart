@@ -1,180 +1,196 @@
-// lib/core/services/recitation/recitation_model_downloader.dart
-// ═══════════════════════════════════════════════════════════════════════════════
-// خدمة تنزيل والتحقق من ملفات محرك التسميع الذكي (Zipformer CTC)
-//
-// تعتمد نمط التحميل المتدفق مع شريط التقدم، وتحفظ الملفات محلياً.
-// بعد اكتمال التحميل يعمل المحرك 100% دون أي اتصال شبكي (Offline).
-// ═══════════════════════════════════════════════════════════════════════════════
-
 import 'dart:io';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import 'zipformer_npu_package.dart';
+
 class RecitationModelDownloader {
   static const String modelBaseUrl =
       'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/';
+  static const String _testBaseUrl = String.fromEnvironment(
+    'MATHANI_ZIPFORMER_NPU_TEST_BASE_URL',
+  );
+  static const String _downloadBaseUrl = _testBaseUrl == ''
+      ? modelBaseUrl
+      : _testBaseUrl;
 
   static const String onnxFileName = 'zipformer_p_arabic_v3.int8.onnx';
   static const String phonemesFileName = 'ordered_quran_phonemes.json';
   static const String tokensFileName = 'tokens.txt';
 
-  static const int minOnnxSizeBytes = 60 * 1024 * 1024; // > 60 MB
-  static const int minPhonemesSizeBytes = 10 * 1024 * 1024; // > 10 MB
+  static const _downloadFiles = [
+    (ZipformerNpuPackage.context, 'ملف تهيئة NPU'),
+    (ZipformerNpuPackage.binary, 'نموذج Zipformer المجهّز لـNPU'),
+    (ZipformerNpuPackage.phonemes, 'مرجع الفونيمات'),
+  ];
+  static const _networkTimeout = Duration(seconds: 30);
 
-  /// المسار المحلي لمجلد ملفات التسميع.
-  static Future<Directory> getModelDirectory() async {
+  static Future<Directory> getModelDirectory({bool create = true}) async {
     final baseDir = await getApplicationSupportDirectory();
     final dir = Directory('${baseDir.path}/recitation_models');
-    if (!await dir.exists()) {
+    if (create && !await dir.exists()) {
       await dir.create(recursive: true);
     }
     return dir;
   }
 
-  /// التحقق من جاهزية ملفات النموذج والبيانات محلياً.
   static Future<bool> isModelReady() async {
     try {
-      final dir = await getModelDirectory();
-      final onnxFile = File('${dir.path}/$onnxFileName');
-      final phonemesFile = File('${dir.path}/$phonemesFileName');
-
-      if (!await onnxFile.exists() || !await phonemesFile.exists()) {
-        return false;
-      }
-
-      final onnxLen = await onnxFile.length();
-      final phonemesLen = await phonemesFile.length();
-
-      return onnxLen >= minOnnxSizeBytes && phonemesLen >= minPhonemesSizeBytes;
+      final dir = await getModelDirectory(create: false);
+      return await compute(_verifyNpuFiles, dir.path);
     } catch (_) {
       return false;
     }
   }
 
-  /// استخراج ملف tokens.txt من أصول التطبيق إلى مجلد النماذج إن لم يكن موجوداً.
-  static Future<File> ensureTokensExtracted() async {
-    final dir = await getModelDirectory();
-    final targetFile = File('${dir.path}/$tokensFileName');
-
-    if (!await targetFile.exists() || await targetFile.length() < 100) {
-      final byteData = await rootBundle.load('assets/data/tokens.txt');
-      final buffer = byteData.buffer;
-      await targetFile.writeAsBytes(
-        buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes),
-        flush: true,
-      );
+  static Future<Uint8List> readBundledTokens() async {
+    final byteData = await rootBundle.load('assets/data/tokens.txt');
+    final bytes = byteData.buffer.asUint8List(
+      byteData.offsetInBytes,
+      byteData.lengthInBytes,
+    );
+    if (sha256.convert(bytes).toString() != ZipformerNpuPackage.tokens.sha256) {
+      throw const FormatException('Invalid bundled Zipformer vocabulary');
     }
-    return targetFile;
+    return bytes;
   }
 
-  /// تنزيل النموذج وبيانات الفونيمات مع متابعة التقدم.
+  static Future<File> ensureTokensExtracted() async {
+    final dir = await getModelDirectory();
+    final target = File('${dir.path}/$tokensFileName');
+    if (!await ZipformerNpuPackage.matches(
+      target,
+      ZipformerNpuPackage.tokens,
+    )) {
+      final temporary = File('${target.path}.tmp');
+      await temporary.writeAsBytes(await readBundledTokens(), flush: true);
+      await temporary.rename(target.path);
+    }
+    return target;
+  }
+
   static Future<void> downloadRequiredFiles({
     required void Function(double progress, String statusText) onProgress,
   }) async {
     final dir = await getModelDirectory();
-
-    // 1. تنزيل نموذج ONNX (حوالي 69.3 MB)
-    final onnxFile = File('${dir.path}/$onnxFileName');
-    if (!await onnxFile.exists() || await onnxFile.length() < minOnnxSizeBytes) {
-      onProgress(0.05, 'بدء تنزيل نموذج التعرف الصوتي...');
-      await _downloadStreamingFile(
-        url: '$modelBaseUrl$onnxFileName',
-        targetFile: onnxFile,
-        onFileProgress: (fileProgress) {
-          // ONNX يمثل 0% إلى 80% من إجمالي العملية
-          onProgress(fileProgress * 0.80, 'جاري تنزيل نموذج التعرف الصوتي (${(fileProgress * 100).toInt()}%)...');
-        },
-      );
-    }
-
-    // 2. تنزيل قاموس الآيات الفونيمي (حوالي 12.2 MB)
-    final phonemesFile = File('${dir.path}/$phonemesFileName');
-    if (!await phonemesFile.exists() || await phonemesFile.length() < minPhonemesSizeBytes) {
-      onProgress(0.82, 'بدء تنزيل القاموس الفونيمي للقرآن الكريم...');
-      await _downloadStreamingFile(
-        url: '$modelBaseUrl$phonemesFileName',
-        targetFile: phonemesFile,
-        onFileProgress: (fileProgress) {
-          // JSON يمثل 80% إلى 98% من إجمالي العملية
-          final totalProgress = 0.80 + (fileProgress * 0.18);
-          onProgress(totalProgress, 'جاري تنزيل قاموس الآيات الصوتي (${(fileProgress * 100).toInt()}%)...');
-        },
-      );
-    }
-
-    // 3. ضمان وجود tokens.txt
-    onProgress(0.99, 'تهيئة الرموز الصوتية...');
-    await ensureTokensExtracted();
-
-    onProgress(1.0, 'اكتمل تجهيز محرك التسميع بنجاح.');
-  }
-
-  /// تنزيل ملف متدفق وتخزينه مباشرة على القرص.
-  static Future<void> _downloadStreamingFile({
-    required String url,
-    required File targetFile,
-    required void Function(double progress) onFileProgress,
-  }) async {
-    final client = http.Client();
-    try {
-      final request = http.Request('GET', Uri.parse(url));
-      final response = await client.send(request);
-
-      if (response.statusCode != 200) {
-        throw HttpException(
-          'فشل التنزيل برمز استجابة: ${response.statusCode}',
-          uri: Uri.parse(url),
+    final total = _downloadFiles.fold(0, (sum, entry) => sum + entry.$1.size);
+    var completed = 0;
+    for (final (spec, label) in _downloadFiles) {
+      final target = File('${dir.path}/${spec.name}');
+      if (!await compute(_matchesFile, (target.path, spec))) {
+        final base = Uri.tryParse(_downloadBaseUrl);
+        // A test APK can use ADB reverse with the pinned artifacts, offline.
+        final isTestLoopback =
+            _testBaseUrl.isNotEmpty &&
+            base?.scheme == 'http' &&
+            base?.host == '127.0.0.1' &&
+            base?.hasPort == true;
+        if (base == null ||
+            !base.hasAuthority ||
+            base.userInfo.isNotEmpty ||
+            !base.path.endsWith('/') ||
+            (base.scheme != 'https' && !isTestLoopback)) {
+          throw const FormatException('Invalid Zipformer download origin');
+        }
+        onProgress(completed / total * 0.98, 'جارٍ تجهيز $label...');
+        await _downloadStreamingFile(
+          url: base.resolve(spec.name),
+          targetFile: target,
+          spec: spec,
+          onFileProgress: (received) {
+            onProgress(
+              (completed + received) / total * 0.98,
+              'جارٍ تنزيل $label...',
+            );
+          },
         );
       }
+      completed += spec.size;
+    }
 
-      final totalBytes = response.contentLength ?? 0;
-      int receivedBytes = 0;
+    onProgress(0.99, 'التحقق من الرموز الصوتية...');
+    await readBundledTokens();
+    onProgress(1.0, 'اكتمل تنزيل ملفات Zipformer.');
+  }
 
-      // كتابة تدفقية لتفادي استهلاك الذاكرة (OOM)
-      final tempFile = File('${targetFile.path}.tmp');
-      final sink = tempFile.openWrite();
-
-      await for (final chunk in response.stream) {
-        sink.add(chunk);
-        receivedBytes += chunk.length;
-        if (totalBytes > 0) {
-          onFileProgress(receivedBytes / totalBytes);
-        }
+  static Future<void> _downloadStreamingFile({
+    required Uri url,
+    required File targetFile,
+    required ZipformerFile spec,
+    required void Function(int bytes) onFileProgress,
+  }) async {
+    final client = http.Client();
+    final tempFile = File('${targetFile.path}.tmp');
+    try {
+      final response = await client
+          .send(http.Request('GET', url))
+          .timeout(_networkTimeout);
+      if (response.statusCode != 200) {
+        throw HttpException('HTTP ${response.statusCode}', uri: url);
       }
-
-      await sink.flush();
-      await sink.close();
-
-      // استبدال الملف المؤقت بالملف النهائي بعد التحقق
-      if (await tempFile.length() > 0) {
-        if (await targetFile.exists()) {
-          await targetFile.delete();
-        }
-        await tempFile.rename(targetFile.path);
-      } else {
-        throw Exception('الملف الذي تم تنزيله فارغ.');
+      if (response.contentLength != null &&
+          response.contentLength != spec.size) {
+        throw const FormatException('Unexpected Zipformer file length');
       }
+      final file = await tempFile.open(mode: FileMode.write);
+      var received = 0;
+      try {
+        await for (final chunk in response.stream.timeout(_networkTimeout)) {
+          received += chunk.length;
+          if (received > spec.size) {
+            throw const FormatException(
+              'Zipformer download exceeds expected size',
+            );
+          }
+          await file.writeFrom(chunk);
+          onFileProgress(received);
+        }
+        await file.flush();
+      } finally {
+        await file.close();
+      }
+      if (!await compute(_matchesFile, (tempFile.path, spec))) {
+        throw const FormatException('Zipformer SHA-256 mismatch');
+      }
+      await tempFile.rename(targetFile.path);
     } finally {
       client.close();
+      if (await tempFile.exists()) await tempFile.delete();
     }
   }
 
-  /// مسار ملف النموذج.
   static Future<String> getOnnxModelPath() async {
     final dir = await getModelDirectory();
     return '${dir.path}/$onnxFileName';
   }
 
-  /// مسار ملف الفونيمات.
   static Future<String> getPhonemesJsonPath() async {
     final dir = await getModelDirectory();
     return '${dir.path}/$phonemesFileName';
   }
 
-  /// مسار ملف tokens.txt.
   static Future<String> getTokensPath() async {
     final file = await ensureTokensExtracted();
     return file.path;
   }
 }
+
+Future<bool> _verifyNpuFiles(String path) async {
+  for (final spec in const [
+    ZipformerNpuPackage.context,
+    ZipformerNpuPackage.binary,
+    ZipformerNpuPackage.phonemes,
+  ]) {
+    if (!await ZipformerNpuPackage.matches(File('$path/${spec.name}'), spec)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+Future<bool> _matchesFile((String, ZipformerFile) file) =>
+    ZipformerNpuPackage.matches(File(file.$1), file.$2);

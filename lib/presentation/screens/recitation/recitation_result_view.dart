@@ -433,20 +433,18 @@ class RecitationResultView extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // تشغيل تسجيل المستخدم
-                  if (result.audioPath != null) ...[
+                  if (result.audioPath != null &&
+                      word.startTimeMs != null &&
+                      word.endTimeMs != null &&
+                      word.endTimeMs! > word.startTimeMs!) ...[
                     _buildComparisonPlayRow(
                       context: context,
-                      label: 'صوتك المسجل (تقديري)',
+                      label: 'صوتك المسجل لهذه الكلمة',
                       icon: Icons.mic_rounded,
                       color: AppColors.primary,
                       isPlaying: false,
                       onPlay: () {
-                        provider.playUserWordAudio(
-                          result.audioPath!,
-                          word.wordIndex,
-                          result.totalWords,
-                          result.durationMs,
-                        );
+                        provider.playUserWordAudio(result.audioPath!, word);
                       },
                       onStop: () {
                         provider.stopUserAudio();

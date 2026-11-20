@@ -1,182 +1,341 @@
-// lib/core/services/recitation/live_recitation_service.dart
-// ═══════════════════════════════════════════════════════════════════════════════
-// خدمة إدارة جلسة التسميع اللحظي الشاملة (Live Recitation Service)
-//
-// تربط بين دفق الميكروفون المباشر (16kHz PCM) ومحرك Zipformer2-CTC ومطابق الكلمات.
-// تعمل بالكامل محلياً (100% Offline) دون أي اتصال خارجي.
-// مستلهم ومطور استناداً إلى حزمة recite_quran (v1.0.5) المرخصة لوجه الله تعالى.
-// ═══════════════════════════════════════════════════════════════════════════════
-
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
-import 'package:record/record.dart';
 
-import 'phoneme_matcher.dart';
-import 'recitation_model_downloader.dart';
-import 'recitation_models.dart';
-import 'recitation_phoneme_repository.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../../../data/services/audio_recorder_service.dart';
 import 'zipformer_engine.dart';
 
+typedef LiveRecitationResult = ({String phonemes, String? audioPath});
+
 class LiveRecitationService {
-  static final LiveRecitationService _instance =
-      LiveRecitationService._internal();
-  factory LiveRecitationService() => _instance;
-  LiveRecitationService._internal();
+  LiveRecitationService({
+    ZipformerEngine? engine,
+    RecitationAudioRecorder? recorder,
+    Future<Directory> Function()? temporaryDirectory,
+  }) : _engine = engine ?? const ZipformerEngine(),
+       _recorder = recorder ?? AudioRecorderService(),
+       _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory;
 
-  final ZipformerEngine _engine = ZipformerEngine();
-  final RecitationPhonemeRepository _repository = RecitationPhonemeRepository();
-  AudioRecorder? _audioRecorder;
-  StreamSubscription<Uint8List>? _recordSubscription;
+  static const _headerSize = 44;
+  static const _maxPendingBytes = recitationSampleRate * 2 * 2;
+  static int _fileSequence = 0;
 
-  PhonemeWordMatcher? _matcher;
-  QuranVersePhonemes? _currentVerse;
-  bool _isReciting = false;
+  final ZipformerEngine _engine;
+  final RecitationAudioRecorder _recorder;
+  final Future<Directory> Function() _temporaryDirectory;
+  Future<void> _operation = Future.value();
+  _Capture? _capture;
+  bool _disposed = false;
 
-  final StreamController<List<WordMatchEvent>> _wordsStreamController =
-      StreamController<List<WordMatchEvent>>.broadcast();
-  final StreamController<String> _livePhonemesController =
-      StreamController<String>.broadcast();
+  bool get isNpuSupported => _engine.isNpuSupported;
 
-  Stream<List<WordMatchEvent>> get wordsStream => _wordsStreamController.stream;
-  Stream<String> get livePhonemesStream => _livePhonemesController.stream;
+  Future<bool> hasPermission({bool request = false}) =>
+      _recorder.hasPermission(request: request);
 
-  bool get isReciting => _isReciting;
-  QuranVersePhonemes? get currentVerse => _currentVerse;
-  List<WordMatchEvent> get currentWordStatuses =>
-      _matcher?.wordStatuses ?? const [];
+  Future<double> getAmplitude() => _recorder.getAmplitude();
 
-  /// التحقق من جاهزية المحرك والبيانات محلياً.
-  Future<bool> isModelReady() async {
-    return await RecitationModelDownloader.isModelReady();
-  }
-
-  /// تهيئة المحرك وقاموس الآيات.
-  Future<bool> initialize() async {
-    final ready = await isModelReady();
-    if (!ready) return false;
-
-    final repoLoaded = await _repository.load();
-    if (!repoLoaded) return false;
-
-    final engineInit = await _engine.initialize();
-    return engineInit;
-  }
-
-  /// بدء تسميع آية محددة مع التتبع اللحظي للكلمات.
-  Future<bool> startAyahRecitation({
-    required int surahNumber,
-    required int ayahNumber,
-  }) async {
-    if (_isReciting) {
-      await stopRecitation();
-    }
-
-    final verse = _repository.getVersePhonemes(surahNumber, ayahNumber);
-    if (verse == null) {
-      debugPrint('❌ لم يتم العثور على فونيمات الآية $surahNumber:$ayahNumber');
-      return false;
-    }
-
-    _currentVerse = verse;
-    _matcher = PhonemeWordMatcher(referenceVerse: verse);
-    _wordsStreamController.add(_matcher!.wordStatuses);
-
-    _audioRecorder ??= AudioRecorder();
-    final hasPerm = await _audioRecorder!.hasPermission();
-    if (!hasPerm) {
-      debugPrint('❌ لا توجد صلاحية للميكروفون');
-      return false;
-    }
-
-    _engine.startStream();
-
-    try {
-      // دفق صوتي خام 16kHz Mono PCM
-      const config = RecordConfig(
-        encoder: AudioEncoder.pcm16bits,
-        sampleRate: 16000,
-        numChannels: 1,
-      );
-
-      final audioStream = await _audioRecorder!.startStream(config);
-      _isReciting = true;
-
-      _recordSubscription = audioStream.listen(
-        _onAudioChunkReceived,
-        onError: (err) {
-          debugPrint('❌ خطأ في دفق التسجيل: $err');
-          stopRecitation();
-        },
-      );
-
-      return true;
-    } catch (e) {
-      debugPrint('❌ فشل بدء دفق الصوت: $e');
-      _isReciting = false;
-      return false;
-    }
-  }
-
-  /// معالجة كل حزمة صوتية قادمة من الميكروفون.
-  void _onAudioChunkReceived(Uint8List bytes) {
-    if (!_isReciting || _matcher == null) return;
-    if (bytes.length < 2) return;
-
-    // تحويل PCM16 إلى Float32List
-    final int16List = Int16List.view(
-      bytes.buffer,
-      bytes.offsetInBytes,
-      bytes.lengthInBytes ~/ 2,
+  Future<T> _serialize<T>(Future<T> Function() action) {
+    final result = _operation.then((_) => action());
+    _operation = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
     );
-
-    final float32List = Float32List(int16List.length);
-    for (int i = 0; i < int16List.length; i++) {
-      float32List[i] = int16List[i] / 32768.0;
-    }
-
-    // تغذية المحرك
-    _engine.acceptWaveform(float32List);
-
-    // قراءة النتيجة اللحظية
-    final res = _engine.getCurrentResult();
-    if (res != null && res.text.isNotEmpty) {
-      _livePhonemesController.add(res.text);
-
-      // مطابقة الكلمات اللحظية وتحديث الواجهة
-      final updatedWords = _matcher!.processLivePhonemes(res.text);
-      _wordsStreamController.add(updatedWords);
-    }
+    return result;
   }
 
-  /// إيقاف جلسة التسميع.
-  Future<List<WordMatchEvent>> stopRecitation() async {
-    _isReciting = false;
-    await _recordSubscription?.cancel();
-    _recordSubscription = null;
+  /// Opens a verified NPU stream before an audio file or microphone is opened.
+  Future<void> prepare() {
+    if (_disposed || _capture != null) {
+      return Future.error(StateError('جلسة التسميع قيد الإعداد أو التشغيل.'));
+    }
+    final capture = _Capture();
+    _capture = capture;
+    return _serialize(() async {
+      try {
+        _ensureActive(capture);
+        capture.decoder = await _engine.openStream();
+        _ensureActive(capture);
+      } catch (_) {
+        await _release(capture);
+        rethrow;
+      }
+    });
+  }
 
+  Future<String> start({
+    required void Function(String) onPartial,
+    required void Function(Object, StackTrace) onError,
+  }) {
+    final capture = _capture;
+    return _serialize(() async {
+      if (capture == null ||
+          capture.decoder == null ||
+          !identical(_capture, capture) ||
+          capture.recorderOpen) {
+        throw StateError('لا توجد جلسة تسميع جاهزة للبدء.');
+      }
+      try {
+        _ensureActive(capture);
+        final directory = await _temporaryDirectory();
+        _ensureActive(capture);
+        final timestamp = DateTime.now().microsecondsSinceEpoch;
+        final file = File(
+          '${directory.path}/recitation_${timestamp}_${++_fileSequence}.wav',
+        );
+        await file.create(exclusive: true);
+        capture.file = file;
+        capture.wave = await file.open(mode: FileMode.write);
+        await capture.wave!.writeFrom(Uint8List(_headerSize));
+        _ensureActive(capture);
+
+        capture.onError = onError;
+        capture.recorderOpen = true;
+        final stream = await _recorder.startPcm();
+        _ensureActive(capture);
+        capture.subscription = stream.listen(
+          (chunk) => _queueChunk(capture, chunk, onPartial),
+          onError: (Object error, StackTrace stack) =>
+              _signalFailure(capture, error, stack),
+          onDone: () {
+            capture.streamDone.complete();
+            if (!capture.stopping && !capture.cancelled) {
+              _signalFailure(
+                capture,
+                StateError('انقطع بث صوت التسميع.'),
+                StackTrace.current,
+              );
+            }
+          },
+        );
+        return file.path;
+      } catch (_) {
+        await _release(capture);
+        rethrow;
+      }
+    });
+  }
+
+  void _queueChunk(
+    _Capture capture,
+    Uint8List chunk,
+    void Function(String) onPartial,
+  ) {
+    if (capture.cancelled || capture.failure != null || chunk.isEmpty) return;
+    if (capture.pendingBytes + chunk.length > _maxPendingBytes) {
+      _signalFailure(
+        capture,
+        StateError('تعذّر تحليل الصوت بالسرعة اللازمة.'),
+        StackTrace.current,
+      );
+      return;
+    }
+    final input = Uint8List.fromList(chunk);
+    capture.pendingBytes += input.length;
+    capture.pending = capture.pending
+        .then((_) async {
+          if (capture.cancelled || capture.failure != null) return;
+
+          final leadingByte = capture.trailingByte;
+          final bytes = leadingByte == null
+              ? input
+              : (Uint8List(input.length + 1)
+                  ..[0] = leadingByte
+                  ..setRange(1, input.length + 1, input));
+          final length = bytes.length & ~1;
+          capture.trailingByte = length < bytes.length ? bytes.last : null;
+          if (length == 0) return;
+          final data = ByteData.sublistView(bytes, 0, length);
+          final samples = Float32List(length ~/ 2);
+          for (var i = 0; i < samples.length; i++) {
+            samples[i] = data.getInt16(i * 2, Endian.little) / 32768.0;
+          }
+
+          await capture.wave!.writeFrom(bytes, 0, length);
+          capture.writtenBytes += length;
+          if (capture.cancelled || capture.failure != null) return;
+
+          final phonemes = await capture.decoder!.acceptPcm(samples);
+          if (!capture.cancelled &&
+              capture.failure == null &&
+              !capture.stopping &&
+              phonemes.isNotEmpty &&
+              phonemes != capture.lastPhonemes) {
+            capture.lastPhonemes = phonemes;
+            onPartial(phonemes);
+          }
+        })
+        .catchError((Object error, StackTrace stack) {
+          _signalFailure(capture, error, stack);
+        })
+        .whenComplete(() {
+          capture.pendingBytes -= input.length;
+        });
+  }
+
+  void _signalFailure(_Capture capture, Object error, StackTrace stack) {
+    if (capture.cancelled || capture.failure != null) return;
+    capture.failure = (error, stack);
+    // Release resources even if the observer does not request cancellation.
+    _serialize(() => _release(capture)).ignore();
+    capture.onError?.call(error, stack);
+  }
+
+  Future<LiveRecitationResult> finish() {
+    final capture = _capture;
+    return _serialize(() async {
+      if (capture == null ||
+          !identical(_capture, capture) ||
+          capture.subscription == null) {
+        throw StateError('لا توجد جلسة تسميع نشطة.');
+      }
+      try {
+        _ensureActive(capture);
+        capture.stopping = true;
+        await _recorder.stop();
+        capture.recorderOpen = false;
+        // The record package closes its stream after the last PCM chunk.
+        await capture.streamDone.future;
+        await capture.pending;
+        _ensureActive(capture);
+        if (capture.trailingByte != null) {
+          throw const FormatException('انتهى البث بعينة صوتية غير مكتملة.');
+        }
+        final phonemes = await capture.decoder!.finish();
+        _ensureActive(capture);
+        final audioPath = capture.writtenBytes == 0 ? null : capture.file!.path;
+        if (audioPath != null) {
+          await capture.wave!.setPosition(0);
+          await capture.wave!.writeFrom(_waveHeader(capture.writtenBytes));
+          await capture.wave!.flush();
+        }
+        _ensureActive(capture);
+        await _release(capture, keepAudio: audioPath != null);
+        _ensureActive(capture);
+        return (phonemes: phonemes, audioPath: audioPath);
+      } catch (_) {
+        await _release(capture);
+        rethrow;
+      }
+    });
+  }
+
+  Future<void> pause() {
+    final capture = _capture;
+    return _serialize(() async {
+      if (capture != null && capture.recorderOpen && !capture.cancelled) {
+        await _recorder.pause();
+      }
+    });
+  }
+
+  Future<void> resume() {
+    final capture = _capture;
+    return _serialize(() async {
+      if (capture != null && capture.recorderOpen && !capture.cancelled) {
+        await _recorder.resume();
+      }
+    });
+  }
+
+  Future<void> cancel() {
+    final capture = _capture;
+    if (capture == null) return _operation;
+    capture.cancelled = true;
+    return _serialize(() => _release(capture));
+  }
+
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
     try {
-      await _audioRecorder?.stop();
-    } catch (_) {}
-
-    _engine.finishInput();
-
-    final finalRes = _engine.getCurrentResult();
-    if (finalRes != null && _matcher != null) {
-      _matcher!.processLivePhonemes(finalRes.text);
-      _wordsStreamController.add(_matcher!.wordStatuses);
+      await cancel();
+    } finally {
+      await _recorder.dispose();
     }
-
-    _engine.resetStream();
-    return _matcher?.wordStatuses ?? const [];
   }
 
-  /// تفريغ الموارد بالكامل.
-  void dispose() {
-    stopRecitation();
-    _audioRecorder?.dispose();
-    _audioRecorder = null;
-    _engine.dispose();
-    _repository.clearCache();
+  void _ensureActive(_Capture capture) {
+    if (capture.cancelled) throw StateError('أُلغيت جلسة التسميع.');
+    if (capture.failure case (final error, final stack)) {
+      Error.throwWithStackTrace(error, stack);
+    }
   }
+
+  Future<void> _release(_Capture capture, {bool keepAudio = false}) async {
+    try {
+      if (capture.recorderOpen) {
+        capture.recorderOpen = false;
+        await _recorder.cancel();
+      }
+    } finally {
+      try {
+        await capture.subscription?.cancel();
+        capture.subscription = null;
+        await capture.pending;
+      } finally {
+        try {
+          final wave = capture.wave;
+          capture.wave = null;
+          await wave?.close();
+        } finally {
+          try {
+            final decoder = capture.decoder;
+            capture.decoder = null;
+            await decoder?.close();
+          } finally {
+            final file = capture.file;
+            try {
+              if (!keepAudio && file != null) {
+                capture.file = null;
+                if (await file.exists()) await file.delete();
+              }
+            } finally {
+              if (identical(_capture, capture)) _capture = null;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  Uint8List _waveHeader(int bytes) {
+    if (bytes > 0xFFFFFFFF - 36) {
+      throw const FormatException('حجم تسجيل WAV يتجاوز الحد المدعوم.');
+    }
+    final header = ByteData(_headerSize);
+    final data = header.buffer.asUint8List();
+    data.setAll(0, 'RIFF'.codeUnits);
+    header.setUint32(4, bytes + 36, Endian.little);
+    data.setAll(8, 'WAVEfmt '.codeUnits);
+    header.setUint32(16, 16, Endian.little);
+    header.setUint16(20, 1, Endian.little);
+    header.setUint16(22, 1, Endian.little);
+    header.setUint32(24, recitationSampleRate, Endian.little);
+    header.setUint32(28, recitationSampleRate * 2, Endian.little);
+    header.setUint16(32, 2, Endian.little);
+    header.setUint16(34, 16, Endian.little);
+    data.setAll(36, 'data'.codeUnits);
+    header.setUint32(40, bytes, Endian.little);
+    return data;
+  }
+}
+
+class _Capture {
+  final streamDone = Completer<void>();
+  Future<void> pending = Future.value();
+  int pendingBytes = 0;
+  int writtenBytes = 0;
+  int? trailingByte;
+  String lastPhonemes = '';
+  bool cancelled = false;
+  bool stopping = false;
+  bool recorderOpen = false;
+  (Object, StackTrace)? failure;
+  ZipformerNpuStream? decoder;
+  StreamSubscription<Uint8List>? subscription;
+  File? file;
+  RandomAccessFile? wave;
+  void Function(Object, StackTrace)? onError;
 }

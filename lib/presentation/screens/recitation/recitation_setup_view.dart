@@ -4,33 +4,16 @@ import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
 import 'package:mathani/presentation/providers/quran_provider.dart';
 
+import '../settings/recitation_diagnostic_screen.dart';
+
 /// شاشة إعداد التسميع — مع نظام حماية المتطلبات (NPU, Models, Mic)
-class RecitationSetupView extends StatefulWidget {
-  const RecitationSetupView({Key? key}) : super(key: key);
-
-  @override
-  State<RecitationSetupView> createState() => _RecitationSetupViewState();
-}
-
-class _RecitationSetupViewState extends State<RecitationSetupView> {
-  @override
-  void initState() {
-    super.initState();
-    // التحقق من الصلاحيات والجاهزية عند الفتح
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RecitationProvider>().checkMicrophonePermission();
-    });
-  }
+class RecitationSetupView extends StatelessWidget {
+  const RecitationSetupView({super.key});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<RecitationProvider>();
-
-    // ─── الحماية 1: التحقق من إمكانية تشغيل محرك التعرف الصوتي (CPU) ───
-    if (!provider.isNpuSupported) {
-      return _buildNotSupportedView(isDark);
-    }
 
     return Container(
       color: isDark ? const Color(0xFF131315) : AppColors.brandBackground,
@@ -44,7 +27,9 @@ class _RecitationSetupViewState extends State<RecitationSetupView> {
 
               // ─── الترويسة ───
               _buildHeader(isDark),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
+              _buildSystemStatusCard(context, provider, isDark),
+              const SizedBox(height: 20),
 
               // ─── اختيار الوضع ───
               _buildModeSelector(context, provider, isDark),
@@ -105,51 +90,8 @@ class _RecitationSetupViewState extends State<RecitationSetupView> {
 
               // ─── زر السجل ───
               _buildHistoryButton(context, provider, isDark),
-              const SizedBox(height: 20),
-
-              // ─── بطاقة حالة النظام ───
-              _buildSystemStatusCard(provider, isDark),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotSupportedView(bool isDark) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.memory_rounded,
-              size: 80,
-              color: Colors.grey.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'المعالج غير مدعوم',
-              style: TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.slateText,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'ميزة التسميع الذكي تتطلب جهازاً يحتوي على معالج ذكاء اصطناعي (NPU) لضمان دقة وسرعة التحليل اللحظي دون إنترنت.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 14,
-                color: AppColors.mutedText,
-                height: 1.5,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -489,27 +431,29 @@ class _RecitationSetupViewState extends State<RecitationSetupView> {
     Color buttonColor = AppColors.primary;
     VoidCallback? action;
 
-    if (!provider.isAsrModelDownloaded) {
-      if (provider.isAsrDownloading) {
+    if (provider.engine == RecitationEngine.whisper) {
+      label = 'اختيار Zipformer V3';
+      icon = Icons.tune_rounded;
+      action = () => provider.setRecitationEngine(RecitationEngine.zipformer);
+    } else if (!provider.isNpuSupported) {
+      label = 'التسميع غير متاح';
+      icon = Icons.memory_rounded;
+      buttonColor = AppColors.mutedText.withValues(alpha: 0.3);
+    } else if (!provider.isZipformerDownloaded) {
+      if (provider.isZipformerDownloading) {
         label =
-            'جارِ التحميل... ${(provider.asrDownloadProgress * 100).toInt()}%';
+            'جارِ التحميل... ${(provider.zipformerDownloadProgress * 100).toInt()}%';
         icon = Icons.downloading_rounded;
         buttonColor = AppColors.brandGold.withValues(alpha: 0.7);
         action = null; // تعطيل الزر أثناء التحميل
       } else {
-        label = 'تحميل النماذج للبدء';
+        label = 'تحميل محرك التسميع (${provider.currentEngineSize})';
         icon = Icons.download_rounded;
         buttonColor = AppColors.brandGold;
         action = () async {
-          await provider.downloadAsrModel();
-          provider.checkModelsState();
+          await provider.downloadZipformerModel();
         };
       }
-    } else if (!provider.hasMicrophonePermission) {
-      label = 'منح صلاحية الميكروفون';
-      icon = Icons.security_rounded;
-      buttonColor = Colors.orange;
-      action = () => provider.checkMicrophonePermission();
     } else {
       final bool canStart =
           provider.mode == RecitationMode.free ||
@@ -664,49 +608,119 @@ class _RecitationSetupViewState extends State<RecitationSetupView> {
     );
   }
 
-  Widget _buildSystemStatusCard(RecitationProvider provider, bool isDark) {
+  Widget _buildSystemStatusCard(
+    BuildContext context,
+    RecitationProvider provider,
+    bool isDark,
+  ) {
+    final isWhisper = provider.engine == RecitationEngine.whisper;
+    final isReady =
+        !isWhisper && provider.isZipformerDownloaded && provider.isNpuSupported;
+    final status = provider.recitationAvailabilityLabel;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: provider.isAsrModelDownloaded
+        color: isReady
             ? AppColors.success.withValues(alpha: 0.08)
-            : Colors.red.withValues(alpha: 0.08),
+            : Colors.amber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: provider.isAsrModelDownloaded
+          color: isReady
               ? AppColors.success.withValues(alpha: 0.2)
-              : Colors.red.withValues(alpha: 0.2),
+              : Colors.amber.withValues(alpha: 0.3),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            provider.isAsrModelDownloaded
-                ? Icons.check_circle_rounded
-                : Icons.error_outline_rounded,
-            color: provider.isAsrModelDownloaded
-                ? AppColors.success
-                : Colors.red,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              provider.isAsrModelDownloaded
-                  ? 'جميع المتطلبات جاهزة (بالـ NPU)'
-                  : 'النماذج الصوتية مفقودة',
-              style: TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: provider.isAsrModelDownloaded
-                    ? AppColors.success
-                    : Colors.red,
+          Row(
+            children: [
+              Icon(
+                isReady
+                    ? Icons.check_circle_rounded
+                    : Icons.info_outline_rounded,
+                color: isReady ? AppColors.success : Colors.amber[800],
+                size: 20,
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isReady ? AppColors.success : Colors.amber[900],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            provider.isZipformerDownloading
+                ? 'الملفات · جارٍ التنزيل'
+                : provider.isZipformerDownloaded
+                ? 'الملفات · موجودة على الجهاز'
+                : 'الملفات · تحتاج تنزيلًا أو تحققًا',
+            style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          // محدد التبديل السريع بين المحركين
+          _buildQuickEngineSwitch(provider, isDark),
+          Wrap(
+            spacing: 6,
+            children: [
+              TextButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RecitationDiagnosticScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.health_and_safety_outlined, size: 18),
+                label: const Text('تشخيص التسميع'),
+              ),
+              TextButton(
+                onPressed: () =>
+                    Navigator.pushNamed(context, '/download_center'),
+                child: const Text('مركز التحميل'),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildQuickEngineSwitch(RecitationProvider provider, bool isDark) {
+    return Row(
+      children: [
+        Expanded(
+          child: _EngineSwitchChip(
+            title: 'Zipformer V3',
+            size: '164 MB',
+            badge: 'المعتمد',
+            isDownloaded: provider.isZipformerDownloaded,
+            isSelected: provider.engine == RecitationEngine.zipformer,
+            isDark: isDark,
+            onTap: () =>
+                provider.setRecitationEngine(RecitationEngine.zipformer),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _EngineSwitchChip(
+            title: 'Whisper',
+            size: '142 MB',
+            badge: 'قيد التطوير',
+            isDownloaded: provider.isWhisperDownloaded,
+            isSelected: false,
+            isDark: isDark,
+            onTap: null,
+          ),
+        ),
+      ],
     );
   }
 
@@ -829,6 +843,123 @@ class _RecitationSetupViewState extends State<RecitationSetupView> {
           ),
         );
       },
+    );
+  }
+}
+
+class _EngineSwitchChip extends StatelessWidget {
+  final String title;
+  final String size;
+  final String badge;
+  final bool isDownloaded;
+  final bool isSelected;
+  final bool isDark;
+  final VoidCallback? onTap;
+
+  const _EngineSwitchChip({
+    required this.title,
+    required this.size,
+    required this.badge,
+    required this.isDownloaded,
+    required this.isSelected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark
+                    ? AppColors.brandGold.withValues(alpha: 0.18)
+                    : AppColors.brandGold.withValues(alpha: 0.12))
+              : (isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.brandGold
+                : (isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.grey.withValues(alpha: 0.2)),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isSelected
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_off_rounded,
+                  size: 14,
+                  color: isSelected ? AppColors.brandGold : AppColors.mutedText,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 12,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
+                      color: isSelected
+                          ? (isDark ? Colors.white : AppColors.slateText)
+                          : AppColors.mutedText,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  size,
+                  style: const TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 10,
+                    color: AppColors.mutedText,
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isDownloaded
+                          ? Icons.check_circle_rounded
+                          : Icons.download_rounded,
+                      size: 11,
+                      color: isDownloaded ? Colors.green : Colors.orange,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      isDownloaded ? 'جاهز' : 'تنزيل',
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: isDownloaded ? Colors.green : Colors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

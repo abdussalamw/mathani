@@ -10,112 +10,167 @@ import '../../utils/phoneme_utils.dart';
 import 'recitation_models.dart';
 
 class PhonemeWordMatcher {
-  final QuranVersePhonemes referenceVerse;
-  final List<String> _wordsText;
-  final List<WordMatchEvent> _wordStatuses = [];
-  int _activeWordIndex = 0;
-
   PhonemeWordMatcher({required this.referenceVerse})
-      : _wordsText = referenceVerse.ayaText.split(' ') {
-    _initStatuses();
+    : _wordsText = referenceVerse.ayaText.trim().split(RegExp(r'\s+')),
+      _references = referenceVerse.ayaPhonemesList
+          .map(PhonemeUtils.cleanPhonemes)
+          .toList() {
+    _reset();
   }
 
-  void _initStatuses() {
+  final QuranVersePhonemes referenceVerse;
+  final List<String> _wordsText;
+  final List<String> _references;
+  final List<WordMatchEvent> _wordStatuses = [];
+  int _activeWordIndex = 0;
+  int _consumedPhonemes = 0;
+
+  void _reset() {
+    _activeWordIndex = 0;
+    _consumedPhonemes = 0;
     _wordStatuses.clear();
-    final count = referenceVerse.ayaPhonemesList.length;
-    for (int i = 0; i < count; i++) {
-      final wordText = i < _wordsText.length ? _wordsText[i] : '';
-      final refPh = referenceVerse.ayaPhonemesList[i];
+    for (int i = 0; i < _references.length; i++) {
       _wordStatuses.add(
-        WordMatchEvent(
-          wordIndex: i,
-          wordText: wordText,
-          referencePhonemes: refPh,
-          recognizedPhonemes: '',
-          similarity: 0.0,
-          status: i == 0 ? WordRecitationStatus.current : WordRecitationStatus.unspoken,
+        _event(
+          i,
+          i == 0 ? WordRecitationStatus.current : WordRecitationStatus.unspoken,
         ),
       );
     }
   }
 
+  WordMatchEvent _event(
+    int index,
+    WordRecitationStatus status, {
+    String recognized = '',
+    double similarity = 0,
+  }) {
+    return WordMatchEvent(
+      wordIndex: index,
+      wordText: index < _wordsText.length ? _wordsText[index] : '',
+      referencePhonemes: referenceVerse.ayaPhonemesList[index],
+      recognizedPhonemes: recognized,
+      similarity: similarity,
+      status: status,
+    );
+  }
+
   List<WordMatchEvent> get wordStatuses => List.unmodifiable(_wordStatuses);
   int get activeWordIndex => _activeWordIndex;
+
+  /// Code units consumed after normalization, relative to the start offset.
+  int get consumedPhonemes => _consumedPhonemes;
   bool get isCompleted => _activeWordIndex >= _wordStatuses.length;
 
-  /// معالجة سيل الرموز الصوتية القادمة من محرك ASR وتحديث حالة الكلمات اللحظية.
+  /// A decoder may revise or shorten its cumulative hypothesis. Re-evaluate
+  /// from the start and clear conclusions no longer supported by its input.
   List<WordMatchEvent> processLivePhonemes(String rawAsrPhonemes) {
-    if (rawAsrPhonemes.isEmpty || _wordStatuses.isEmpty) {
-      return wordStatuses;
-    }
+    return processNormalizedPhonemes(
+      PhonemeUtils.cleanPhonemes(rawAsrPhonemes),
+    );
+  }
 
-    final cleanAsr = PhonemeUtils.cleanPhonemes(rawAsrPhonemes);
-    if (cleanAsr.isEmpty) return wordStatuses;
-
-    int consumedPhonemes = 0;
-
-    for (int i = 0; i < _wordStatuses.length; i++) {
-      final refPh = PhonemeUtils.cleanPhonemes(_wordStatuses[i].referencePhonemes);
-      if (refPh.isEmpty) continue;
-
-      final remainingAsrLen = cleanAsr.length - consumedPhonemes;
-      if (remainingAsrLen <= 0) break;
-
-      // نافذة البحث التقريبية بطول الكلمة المرجعية مع هامش سماح
-      final windowLen = (refPh.length * 1.5).ceil().clamp(refPh.length, remainingAsrLen);
-      final asrSlice = cleanAsr.substring(
-        consumedPhonemes,
-        consumedPhonemes + windowLen,
-      );
-
-      final similarity = PhonemeUtils.similarityScore(asrSlice, refPh);
-
-      if (similarity >= 0.55) {
-        // تم التعرف على الكلمة بنجاح
-        _wordStatuses[i] = WordMatchEvent(
-          wordIndex: i,
-          wordText: _wordStatuses[i].wordText,
-          referencePhonemes: _wordStatuses[i].referencePhonemes,
-          recognizedPhonemes: asrSlice,
-          similarity: similarity,
-          status: WordRecitationStatus.matched,
-        );
-        consumedPhonemes += refPh.length;
-        _activeWordIndex = i + 1;
-      } else {
-        // فحص هل تجاوز القارئ الكلمة وقفز للكلمة التالية (Omission Detection)
-        if (i + 1 < _wordStatuses.length) {
-          final nextRefPh = PhonemeUtils.cleanPhonemes(_wordStatuses[i + 1].referencePhonemes);
-          final nextSimilarity = PhonemeUtils.similarityScore(asrSlice, nextRefPh);
-          if (nextSimilarity >= 0.65) {
-            // الكلمة الحالية سقطت سهواً
-            _wordStatuses[i] = WordMatchEvent(
-              wordIndex: i,
-              wordText: _wordStatuses[i].wordText,
-              referencePhonemes: _wordStatuses[i].referencePhonemes,
-              recognizedPhonemes: '',
-              similarity: 0.0,
-              status: WordRecitationStatus.omitted,
-            );
-            _activeWordIndex = i + 1;
-            continue;
-          }
-        }
-
-        // الكلمة لا تزال قيد القراءة
-        _wordStatuses[i] = WordMatchEvent(
-          wordIndex: i,
-          wordText: _wordStatuses[i].wordText,
-          referencePhonemes: _wordStatuses[i].referencePhonemes,
-          recognizedPhonemes: asrSlice,
-          similarity: similarity,
-          status: WordRecitationStatus.current,
-        );
-        _activeWordIndex = i;
+  List<WordMatchEvent> processNormalizedPhonemes(
+    String phonemes, {
+    int startOffset = 0,
+  }) {
+    RangeError.checkValueInInterval(startOffset, 0, phonemes.length);
+    _reset();
+    var offset = startOffset;
+    for (var i = 0; i < _references.length; i++) {
+      _activeWordIndex = i;
+      final reference = _references[i];
+      if (reference.isEmpty || offset == phonemes.length) {
+        _wordStatuses[i] = _event(i, WordRecitationStatus.current);
         break;
       }
+
+      if (_matchesAt(phonemes, offset, reference)) {
+        _wordStatuses[i] = _event(
+          i,
+          WordRecitationStatus.matched,
+          recognized: phonemes.substring(offset, offset + reference.length),
+          similarity: 1,
+        );
+        offset += reference.length;
+        _activeWordIndex = i + 1;
+        continue;
+      }
+
+      final remaining = phonemes.length - offset;
+      if (remaining < reference.length &&
+          _matchesAt(phonemes, offset, reference.substring(0, remaining))) {
+        _wordStatuses[i] = _event(
+          i,
+          WordRecitationStatus.current,
+          recognized: phonemes.substring(offset),
+        );
+        break;
+      }
+      final next = i + 1 < _references.length ? _references[i + 1] : '';
+      if (next.length >= 4 && _matchesAt(phonemes, offset, next)) {
+        _wordStatuses[i] = _event(i, WordRecitationStatus.omitted);
+        _activeWordIndex = i + 1;
+        continue;
+      }
+
+      // Two complete following words anchor a substitution. A short or
+      // ambiguous span remains pending because it may be a partial word.
+      final replacementEnd = _confirmedReplacementEnd(phonemes, offset, i);
+      if (replacementEnd != null) {
+        final heard = phonemes.substring(offset, replacementEnd);
+        _wordStatuses[i] = _event(
+          i,
+          WordRecitationStatus.incorrect,
+          recognized: heard,
+          similarity: PhonemeUtils.similarityScore(heard, reference),
+        );
+        offset = replacementEnd;
+        _activeWordIndex = i + 1;
+        continue;
+      }
+
+      _wordStatuses[i] = _event(i, WordRecitationStatus.current);
+      break;
     }
 
+    _consumedPhonemes = offset - startOffset;
     return wordStatuses;
+  }
+
+  int? _confirmedReplacementEnd(String phonemes, int offset, int wordIndex) {
+    if (wordIndex + 2 >= _references.length) return null;
+    final next = _references[wordIndex + 1];
+    final following = _references[wordIndex + 2];
+    if (next.length < 3 || following.length < 3) return null;
+    final expectedLength = _references[wordIndex].length;
+    int? confirmedEnd;
+    for (
+      var end = offset + expectedLength;
+      end <= offset + expectedLength + 2;
+      end++
+    ) {
+      if (_matchesAt(phonemes, end, next) &&
+          _matchesAt(phonemes, end + next.length, following)) {
+        if (confirmedEnd != null) return null;
+        confirmedEnd = end;
+      }
+    }
+    return confirmedEnd;
+  }
+
+  static bool _matchesAt(String input, int offset, String reference) {
+    if (reference.isEmpty || offset + reference.length > input.length) {
+      return false;
+    }
+    for (var i = 0; i < reference.length; i++) {
+      if (!PhonemeUtils.isEquivalentGlyph(
+        input.codeUnitAt(offset + i),
+        reference.codeUnitAt(i),
+      )) {
+        return false;
+      }
+    }
+    return true;
   }
 }

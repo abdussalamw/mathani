@@ -70,7 +70,9 @@ class QuranVersePhonemes {
     Map<String, dynamic> ruleNames,
   ) {
     final rulesList = (json['rules'] as List<dynamic>? ?? [])
-        .map((r) => TajweedRuleOccurrence.fromList(r as List<dynamic>, ruleNames))
+        .map(
+          (r) => TajweedRuleOccurrence.fromList(r as List<dynamic>, ruleNames),
+        )
         .toList();
 
     final phonemesList = (json['aya_phonemes_list'] as List<dynamic>? ?? [])
@@ -95,6 +97,7 @@ enum WordRecitationStatus {
   current, // يقرأها الآن
   matched, // قُرئت بنجاح
   omitted, // تم تجاوزها أو نسيانها
+  incorrect, // ثبت الاختلاف بعد محاذاة الكلمات اللاحقة
 }
 
 /// نتيجة مطابقة لحظية لكلمة قرآنية.

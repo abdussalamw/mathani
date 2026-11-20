@@ -1,127 +1,37 @@
-// lib/core/services/recitation/zipformer_engine.dart
-// ═══════════════════════════════════════════════════════════════════════════════
-// محرك التعرف الصوتي اللحظي الفونيمي (Zipformer2 CTC Engine)
-//
-// مستلهم ومطور استناداً إلى حزمة recite_quran (v1.0.5)
-// مرخصة لوجه الله تعالى (100% Free / No-Profit).
-// ═══════════════════════════════════════════════════════════════════════════════
+import 'dart:typed_data';
 
-import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
-import 'recitation_model_downloader.dart';
+/// Implementations verify that the entire model runs on the NPU, with fallback
+/// disabled, before returning a stream. Decoder work must stay off the UI isolate.
+abstract interface class ZipformerNpuStream {
+  /// Returns the cumulative transcription, or an empty string when unchanged.
+  Future<String> acceptPcm(Float32List samples);
+  Future<String> finish();
+  Future<void> close();
+}
+
+class ZipformerNpuUnavailable implements Exception {
+  const ZipformerNpuUnavailable([
+    this.message = 'هذه النسخة من مثاني لم تُجهّز لتشغيل Zipformer على NPU.',
+  ]);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 class ZipformerEngine {
-  static final ZipformerEngine _instance = ZipformerEngine._internal();
-  factory ZipformerEngine() => _instance;
-  ZipformerEngine._internal();
+  const ZipformerEngine({this.openVerifiedNpuStream});
 
-  sherpa.OnlineRecognizer? _recognizer;
-  sherpa.OnlineStream? _stream;
-  bool _isInitialized = false;
+  final Future<ZipformerNpuStream> Function()? openVerifiedNpuStream;
 
-  bool get isInitialized => _isInitialized;
+  // The bundled runtime cannot enforce NPU-only inference. A verified native
+  // adapter must be supplied by the platform before recording is enabled.
+  bool get isNpuSupported => openVerifiedNpuStream != null;
 
-  /// تهيئة المحرك بالأوزان المحلية وقاموس الرموز.
-  Future<bool> initialize() async {
-    if (_isInitialized && _recognizer != null) return true;
-
-    try {
-      final isReady = await RecitationModelDownloader.isModelReady();
-      if (!isReady) {
-        debugPrint('[ZipformerEngine] ملفات النموذج غير مكتملة محلياً.');
-        return false;
-      }
-
-      sherpa.initBindings();
-
-      final modelPath = await RecitationModelDownloader.getOnnxModelPath();
-      final tokensPath = await RecitationModelDownloader.getTokensPath();
-
-      if (!File(modelPath).existsSync() || !File(tokensPath).existsSync()) {
-        debugPrint('[ZipformerEngine] تعذر العثور على ملفات النموذج على القرص.');
-        return false;
-      }
-
-      final config = sherpa.OnlineRecognizerConfig(
-        feat: const sherpa.FeatureConfig(sampleRate: 16000, featureDim: 80),
-        model: sherpa.OnlineModelConfig(
-          zipformer2Ctc: sherpa.OnlineZipformer2CtcModelConfig(model: modelPath),
-          tokens: tokensPath,
-          numThreads: 2,
-          modelType: 'zipformer2_ctc',
-          provider: 'cpu',
-          debug: kDebugMode,
-        ),
-        enableEndpoint: true,
-        rule1MinTrailingSilence: 4.0,
-        rule2MinTrailingSilence: 2.0,
-        rule3MinUtteranceLength: 30.0,
-      );
-
-      _recognizer = sherpa.OnlineRecognizer(config);
-      _isInitialized = true;
-      debugPrint('[ZipformerEngine] تم تهيئة محرك Zipformer2-CTC بنجاح.');
-      return true;
-    } catch (e, stack) {
-      debugPrint('[ZipformerEngine] خطأ أثناء تهيئة المحرك: $e\n$stack');
-      _isInitialized = false;
-      return false;
-    }
-  }
-
-  /// بدء جلسة دفق صوتي جديدة.
-  void startStream() {
-    if (!_isInitialized || _recognizer == null) {
-      throw StateError('يجب تهيئة المحرك قبل بدء الدفق الصوتي.');
-    }
-    _stream?.free();
-    _stream = _recognizer!.createStream();
-  }
-
-  /// إرسال عينات صوتية 16kHz Float32 للمحرك.
-  void acceptWaveform(Float32List samples) {
-    if (_recognizer == null || _stream == null) return;
-
-    _stream!.acceptWaveform(samples: samples, sampleRate: 16000);
-    while (_recognizer!.isReady(_stream!)) {
-      _recognizer!.decode(_stream!);
-    }
-  }
-
-  /// إنهاء إدخال الدفق وإجراء التفكيك النهائي.
-  void finishInput() {
-    if (_recognizer == null || _stream == null) return;
-    _stream!.inputFinished();
-    while (_recognizer!.isReady(_stream!)) {
-      _recognizer!.decode(_stream!);
-    }
-  }
-
-  /// قراءة النتيجة الحالية للتفكيك الصوتي اللحظي.
-  sherpa.OnlineRecognizerResult? getCurrentResult() {
-    if (_recognizer == null || _stream == null) return null;
-    return _recognizer!.getResult(_stream!);
-  }
-
-  /// التحقق من كشف الصمت أو نهاية المقطع.
-  bool isEndpoint() {
-    if (_recognizer == null || _stream == null) return false;
-    return _recognizer!.isEndpoint(_stream!);
-  }
-
-  /// إعادة تعيين مجرى الدفق.
-  void resetStream() {
-    _stream?.free();
-    _stream = null;
-  }
-
-  /// تفريغ موارد المحرك.
-  void dispose() {
-    _stream?.free();
-    _stream = null;
-    _recognizer?.free();
-    _recognizer = null;
-    _isInitialized = false;
+  Future<ZipformerNpuStream> openStream() async {
+    final open = openVerifiedNpuStream;
+    if (open == null) throw const ZipformerNpuUnavailable();
+    return open();
   }
 }

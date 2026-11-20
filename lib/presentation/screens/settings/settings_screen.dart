@@ -13,7 +13,8 @@ import '../../../data/services/local_tafsir_service.dart';
 import '../../../core/database/collections.dart'; // Needed for MushafMetadata
 import '../../../l10n/app_localizations.dart';
 import 'recitation_diagnostic_screen.dart';
-import '../recitation/recitation_setup_view.dart';
+import '../recitation/recitation_screen.dart';
+import '../../providers/recitation_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -240,8 +241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             provider.setMushaf(mushaf.identifier!),
                         onDownload: isOnline
                             ? () {}
-                            : () =>
-                                provider.downloadMushaf(mushaf.identifier!),
+                            : () => provider.downloadMushaf(mushaf.identifier!),
                       );
                     }).toList(),
                   );
@@ -492,7 +492,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   Text(
-                    'فحص شامل: ميكروفون، نماذج، محرك ASR، التجويد',
+                    'إذن الميكروفون وملفات Zipformer وتهيئة NPU',
                     style: TextStyle(
                       fontFamily: 'Tajawal',
                       fontSize: 11,
@@ -514,7 +514,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildRecitationSettingsLink(BuildContext context, bool isDark) {
-    // استيراد وفتح RecitationSetupView كصفحة
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -542,27 +541,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'إعدادات التسميع',
-                    style: TextStyle(
-                      fontFamily: 'Tajawal',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    'اختيار السورة، وضع التسميع، تحميل النماذج',
-                    style: TextStyle(
-                      fontFamily: 'Tajawal',
-                      fontSize: 11,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
+            Expanded(
+              child: Consumer<RecitationProvider>(
+                builder: (context, recProvider, _) {
+                  final status = recProvider.recitationAvailabilityLabel;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'إعدادات ومحرك التسميع',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        status,
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 11,
+                          color:
+                              recProvider.isZipformerDownloaded &&
+                                  recProvider.engine ==
+                                      RecitationEngine.zipformer &&
+                                  recProvider.isNpuSupported
+                              ? Colors.green
+                              : Colors.orange,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             const Icon(
@@ -648,17 +659,33 @@ class _RecitationSetupPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'إعدادات التسميع',
-          style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+    final provider = context.watch<RecitationProvider>();
+    final hasActiveSession = provider.activeSessionConfig != null;
+    return PopScope<Object?>(
+      canPop: !hasActiveSession,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || !hasActiveSession) return;
+        final route = ModalRoute.of(context);
+        await provider.cancelRecording();
+        if (context.mounted && route?.isCurrent == true) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'إعدادات التسميع',
+            style: TextStyle(
+              fontFamily: 'Tajawal',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
         ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        body: const RecitationScreen(),
       ),
-      body: const RecitationSetupView(),
     );
   }
 }

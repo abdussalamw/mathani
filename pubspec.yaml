@@ -1,7 +1,7 @@
 name: mathani
 description: تطبيق قراءة وتدبر القرآن الكريم - مثاني
 publish_to: 'none'
-version: 1.0.2+12
+version: 1.0.2+18
 
 environment:
   sdk: '>=3.14.0 <4.0.0'
@@ -36,6 +36,7 @@ dependencies:
   # الأدوات (أساسي)
   intl: ^0.20.2
   archive: ^4.7.1 # Essential for Mushaf Zip
+  crypto: 3.0.7
   
   # Architecture & Core (Added for Phase 3)
   get_it: ^9.3.0

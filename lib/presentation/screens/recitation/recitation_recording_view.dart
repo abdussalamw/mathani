@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
-import 'package:mathani/data/services/audio_recorder_service.dart';
 import 'package:mathani/presentation/widgets/mushaf_page_widget.dart';
 import 'package:mathani/data/services/glyph_data_loader.dart';
 import 'package:mathani/data/models/page_glyph.dart';
@@ -13,7 +12,7 @@ import 'package:mathani/presentation/providers/mushaf_metadata_provider.dart';
 
 /// شاشة التسجيل — المتابعة اللحظية على المصحف
 class RecitationRecordingView extends StatefulWidget {
-  const RecitationRecordingView({Key? key}) : super(key: key);
+  const RecitationRecordingView({super.key});
 
   @override
   State<RecitationRecordingView> createState() =>
@@ -22,9 +21,8 @@ class RecitationRecordingView extends StatefulWidget {
 
 class _RecitationRecordingViewState extends State<RecitationRecordingView>
     with TickerProviderStateMixin {
-  Timer? _timer;
   Timer? _waveTimer;
-  int _elapsedMs = 0;
+  bool _readingAmplitude = false;
   late AnimationController _pulseController;
 
   // بيانات المصحف
@@ -44,10 +42,10 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
 
-    // تحميل الصفحة وبدء التسجيل
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _loadCurrentPage();
-      _startRecording();
+      _startWaveform();
     });
   }
 
@@ -70,65 +68,55 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
     }
   }
 
-  void _startRecording() {
+  void _startWaveform() {
     final provider = context.read<RecitationProvider>();
-    provider.startRecording();
-
-    _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (!mounted) return;
-      setState(() {
-        _elapsedMs += 100;
-      });
-      provider.updateRecordingDuration(_elapsedMs);
-    });
-
-    _waveTimer = Timer.periodic(const Duration(milliseconds: 80), (
-      timer,
-    ) async {
-      if (!mounted) return;
-      final provider = context.read<RecitationProvider>();
-      if (provider.isPaused) {
-        setState(() {
-          _waveformData.removeAt(0);
-          _waveformData.add(0.05); // قيمة منخفضة جداً للإيحاء بالتوقف
-        });
+    final sessionId = provider.activeSessionConfig?.sessionId;
+    _waveTimer = Timer.periodic(const Duration(milliseconds: 100), (_) async {
+      if (!mounted ||
+          _readingAmplitude ||
+          provider.state != RecitationState.recording ||
+          provider.activeSessionConfig?.sessionId != sessionId) {
         return;
       }
-
-      final amp = await AudioRecorderService().getAmplitude();
-      if (mounted) {
+      _readingAmplitude = true;
+      try {
+        final amplitude = await provider.getRecordingAmplitude();
+        if (!mounted ||
+            provider.state != RecitationState.recording ||
+            provider.activeSessionConfig?.sessionId != sessionId) {
+          return;
+        }
         setState(() {
           _waveformData.removeAt(0);
-          _waveformData.add(max(0.1, amp + (_random.nextDouble() * 0.05)));
+          _waveformData.add(max(0.1, amplitude + _random.nextDouble() * 0.05));
         });
+      } finally {
+        _readingAmplitude = false;
       }
     });
   }
 
-  void _togglePause() {
+  Future<void> _togglePause() async {
     final provider = context.read<RecitationProvider>();
     if (provider.isPaused) {
-      provider.resumeRecording();
+      await provider.resumeRecording();
     } else {
-      provider.pauseRecording();
+      await provider.pauseRecording();
     }
   }
 
-  void _stopRecording() {
-    _timer?.cancel();
+  Future<void> _stopRecording() async {
     _waveTimer?.cancel();
-    context.read<RecitationProvider>().stopRecording();
+    await context.read<RecitationProvider>().stopRecording();
   }
 
-  void _cancelRecording() {
-    _timer?.cancel();
+  Future<void> _cancelRecording() async {
     _waveTimer?.cancel();
-    context.read<RecitationProvider>().cancelRecording();
+    await context.read<RecitationProvider>().cancelRecording();
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     _waveTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
@@ -146,47 +134,6 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
     final provider = context.watch<RecitationProvider>();
     final mushafMetadata = context.watch<MushafMetadataProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // — معالجة حالة الخطأ: العودة لشاشة الإعداد تلقائياً —
-    if (provider.state == RecitationState.error) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) provider.goToSetup();
-      });
-    }
-
-    // — مؤشر تحميل النموذج (الخطوة الأكثر ثقلاً: ~5-15 ثانية) —
-    if (provider.isModelLoading) {
-      return Scaffold(
-        backgroundColor: isDark ? Colors.black : Colors.white,
-        body: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 24),
-              const CircularProgressIndicator(),
-              const SizedBox(height: 32),
-              const Text(
-                'جارٍ تحضير نموذج التسميع...',
-                style: TextStyle(
-                  fontFamily: 'Tajawal',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'يستغرق هذا بضعة ثوانٍ فقط لأول مرة',
-                style: TextStyle(
-                  fontFamily: 'Tajawal',
-                  fontSize: 13,
-                  color: isDark ? Colors.white54 : Colors.black45,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
     // مراقبة تغيير الصفحة
     if (_currentPageGlyph?.page != provider.currentPage && !_isLoadingPage) {
@@ -390,46 +337,11 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // حالة المحرك (إذا وجد خطأ)
-                  if (provider.state == RecitationState.error)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.error_outline_rounded,
-                            color: Colors.red,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              provider.errorMessage ?? 'خطأ في المحرك',
-                              style: const TextStyle(
-                                fontFamily: 'Tajawal',
-                                fontSize: 11,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => provider.startRecording(),
-                            child: const Text(
-                              'إعادة محاولة',
-                              style: TextStyle(
-                                fontFamily: 'Tajawal',
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   // الوقت + شدة الصوت
                   Row(
                     children: [
                       Text(
-                        _formatDuration(_elapsedMs),
+                        _formatDuration(provider.recordingDurationMs),
                         style: const TextStyle(
                           fontFamily: 'Tajawal',
                           fontSize: 22,
