@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
 import 'package:mathani/presentation/widgets/mushaf_page_widget.dart';
+import 'package:mathani/presentation/widgets/digital_khatt_mushaf_page_widget.dart';
+import 'package:mathani/data/services/digital_khatt_page_loader.dart';
 import 'package:mathani/data/services/glyph_data_loader.dart';
 import 'package:mathani/data/models/page_glyph.dart';
 import 'package:mathani/presentation/providers/mushaf_metadata_provider.dart';
@@ -52,6 +54,11 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
   Future<void> _loadCurrentPage() async {
     if (!mounted) return;
     final provider = context.read<RecitationProvider>();
+    if (context.read<MushafMetadataProvider>().currentMushafType ==
+        'single_font') {
+      setState(() => _isLoadingPage = false);
+      return;
+    }
 
     setState(() => _isLoadingPage = true);
     try {
@@ -133,10 +140,13 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
   Widget build(BuildContext context) {
     final provider = context.watch<RecitationProvider>();
     final mushafMetadata = context.watch<MushafMetadataProvider>();
+    final singleFont = mushafMetadata.currentMushafType == 'single_font';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // مراقبة تغيير الصفحة
-    if (_currentPageGlyph?.page != provider.currentPage && !_isLoadingPage) {
+    if (!singleFont &&
+        _currentPageGlyph?.page != provider.currentPage &&
+        !_isLoadingPage) {
       Future.microtask(() => _loadCurrentPage());
     }
 
@@ -145,7 +155,22 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
       body: Stack(
         children: [
           // 1. خلفية المصحف الحقيقية
-          if (_isLoadingPage || _currentPageGlyph == null)
+          if (singleFont)
+            DigitalKhattMushafPageWidget(
+              pageNumber: provider.currentPage,
+              fontFamily: mushafMetadata.currentMushafId ==
+                      'digital_khatt_old_madina'
+                  ? 'DigitalKhattOldMadina'
+                  : 'DigitalKhattMadina',
+              loader: mushafMetadata.currentMushafId ==
+                      'digital_khatt_old_madina'
+                  ? digitalKhattOldMadinaLoader
+                  : digitalKhattPageLoader,
+              selectedSurah: provider.matchedSurah,
+              selectedAyah: provider.matchedAyah,
+              wordVerdicts: provider.liveWordVerdicts,
+            )
+          else if (_isLoadingPage || _currentPageGlyph == null)
             const Center(child: CircularProgressIndicator())
           else
             Opacity(

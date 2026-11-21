@@ -8,33 +8,160 @@ class MushafNavigationProvider extends ChangeNotifier {
   MushafNavigationData? _currentNavigationData;
   String? _currentMushafId;
   bool _isLoading = false;
+  int _loadGeneration = 0;
 
   MushafNavigationData? get currentNavigationData => _currentNavigationData;
   String? get currentMushafId => _currentMushafId;
   bool get isLoading => _isLoading;
 
+  // Verse counts for the boundary immediately before a new surah.
+  // The navigation test checks every page against the bundled Quran.
+  static const _surahLengths = <int>[
+    7,
+    286,
+    200,
+    176,
+    120,
+    165,
+    206,
+    75,
+    129,
+    109,
+    123,
+    111,
+    43,
+    52,
+    99,
+    128,
+    111,
+    110,
+    98,
+    135,
+    112,
+    78,
+    118,
+    64,
+    77,
+    227,
+    93,
+    88,
+    69,
+    60,
+    34,
+    30,
+    73,
+    54,
+    45,
+    83,
+    182,
+    88,
+    75,
+    85,
+    54,
+    53,
+    89,
+    59,
+    37,
+    35,
+    38,
+    29,
+    18,
+    45,
+    60,
+    49,
+    62,
+    55,
+    78,
+    96,
+    29,
+    22,
+    24,
+    13,
+    14,
+    11,
+    11,
+    18,
+    12,
+    12,
+    30,
+    52,
+    52,
+    44,
+    28,
+    28,
+    20,
+    56,
+    40,
+    31,
+    50,
+    40,
+    46,
+    42,
+    29,
+    19,
+    36,
+    25,
+    22,
+    17,
+    19,
+    26,
+    30,
+    20,
+    15,
+    21,
+    11,
+    8,
+    8,
+    19,
+    5,
+    8,
+    8,
+    11,
+    11,
+    8,
+    3,
+    9,
+    5,
+    4,
+    7,
+    3,
+    6,
+    3,
+    5,
+    4,
+    5,
+    6,
+  ];
+
   /// تحديث المصحف وتحميل بياناته
   Future<void> updateMushaf(String mushafId) async {
-    if (_currentMushafId == mushafId && _currentNavigationData != null) {
+    if (_currentMushafId == mushafId &&
+        _currentNavigationData?.mushafId == mushafId &&
+        !_isLoading) {
       return; // البيانات محملة مسبقاً
     }
 
+    final gen = ++_loadGeneration;
     _isLoading = true;
     _currentMushafId = mushafId;
     notifyListeners();
 
+    MushafNavigationData? navData;
     try {
       if (mushafId == 'shamarly_15lines') {
-        _currentNavigationData = await ShamarlyDataLoader.loadFromJson();
+        navData = await ShamarlyDataLoader.loadFromJson();
       } else {
         // مصحف المدينة (الافتراضي)
-        _currentNavigationData = _loadMadaniData();
+        navData = _loadMadaniData();
       }
     } catch (e) {
       debugPrint('خطأ في تحميل بيانات المصحف: $e');
-      // fallback لمصحف المدينة
-      _currentNavigationData = _loadMadaniData();
-    } finally {
+      navData = mushafId == 'shamarly_15lines' ? null : _loadMadaniData();
+    }
+
+    // لا تعتمد إلا إذا كان هذا أحدث طلب لتجنب سباقات التبديل
+    if (gen == _loadGeneration) {
+      _currentNavigationData = navData;
       _isLoading = false;
       notifyListeners();
     }
@@ -377,42 +504,36 @@ class MushafNavigationProvider extends ChangeNotifier {
     // بيانات الصفحات مع أرقام السور
     final pageData = <int, PageInfo>{};
     for (int i = 1; i <= 604; i++) {
-      // حساب الجزء من رقم الصفحة
-      int juz = ((i - 1) ~/ 20) + 1;
-      if (juz > 30) juz = 30;
-
-      // إيجاد السور الموجودة في هذه الصفحة
-      List<int> surahs = [];
-      for (var entry in surahToPage.entries) {
-        if (entry.value == i) {
-          surahs.add(entry.key);
-        }
-      }
-      // إذا لم نجد سورة تبدأ في هذه الصفحة، نجد السورة الحالية
-      if (surahs.isEmpty) {
-        for (var entry in surahToPage.entries.toList().reversed) {
-          if (entry.value <= i) {
-            surahs.add(entry.key);
-            break;
-          }
+      // اشتقاق الجزء بدقة من بيانات الأجزاء الرسمية
+      int juz = 1;
+      for (int j = 30; j >= 1; j--) {
+        final info = juzData[j];
+        if (info != null && i >= info.startPage) {
+          juz = j;
+          break;
         }
       }
 
-      // ★ الإصلاح الجذري: تعبئة startSurah من أول سورة في الصفحة
-      final pageSurah = surahs.isNotEmpty ? surahs.first : 1;
-      // إذا كانت هذه أول صفحة في السورة → startAyah = 1
-      // وإلا → startAyah = 1 (تقريبي لعدم توفر بيانات أعمق)
-
+      final firstVerse = _pageFirstAyah[i]!;
+      final nextVerse = _pageFirstAyah[i + 1];
+      final lastSurah = nextVerse == null
+          ? 114
+          : nextVerse.$2 == 1
+          ? nextVerse.$1 - 1
+          : nextVerse.$1;
+      final lastAyah = nextVerse == null || nextVerse.$2 == 1
+          ? _surahLengths[lastSurah - 1]
+          : nextVerse.$2 - 1;
       pageData[i] = PageInfo(
         page: i,
         juz: juz,
         hizb: ((i - 1) ~/ 10) + 1,
         quarter: ((i - 1) ~/ 5) + 1,
-        surahs: surahs,
-        startSurah: pageSurah,
-        startAyah: 1,
-        endSurah: surahs.isNotEmpty ? surahs.last : pageSurah,
-        endAyah: 999, // سيتم تقليصه تلقائياً في AudioProvider
+        surahs: [for (var n = firstVerse.$1; n <= lastSurah; n++) n],
+        startSurah: firstVerse.$1,
+        startAyah: firstVerse.$2,
+        endSurah: lastSurah,
+        endAyah: lastAyah,
       );
     }
 
@@ -432,6 +553,14 @@ class MushafNavigationProvider extends ChangeNotifier {
 
   /// الحصول على رقم الصفحة من الآية
   int? getPageForAyah(int surahNumber, int ayahNumber) {
+    if (_currentMushafId == 'digital_khatt_1441' ||
+        _currentMushafId == 'digital_khatt_old_madina' ||
+        _currentMushafId == 'qcf2_v4_woff2' ||
+        _currentMushafId == 'madani_old_v1' ||
+        _currentMushafId == 'madani_font_v1') {
+      return pageForSurahAyah(surahNumber, ayahNumber);
+    }
+    if (_currentNavigationData?.mushafId != _currentMushafId) return null;
     return _currentNavigationData?.getPageForAyah(surahNumber, ayahNumber);
   }
 

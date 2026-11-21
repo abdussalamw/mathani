@@ -79,6 +79,10 @@ flutter:
     - assets/icons/
     - assets/fonts/tajawal/
     - assets/data/quran_metadata.json
+    - assets/data/digital_khatt_1441.json
+    - assets/data/digital_khatt_old_madina.json
+    - assets/fonts/digital_khatt/OFL.txt
+    - assets/fonts/digital_khatt/TEXT-LICENSE.txt
     - assets/data/quran_advanced.json
     - assets/data/reciters.json
     - assets/data/tokens.txt
@@ -91,6 +95,14 @@ flutter:
       fonts:
         - asset: assets/fonts/tajawal/Tajawal-Bold.ttf
           weight: 700
+
+    - family: DigitalKhattMadina
+      fonts:
+        - asset: assets/fonts/digital_khatt/madina.otf
+
+    - family: DigitalKhattOldMadina
+      fonts:
+        - asset: assets/fonts/digital_khatt/oldmadina.otf
 
     - family: QCF4_BSML
       fonts:

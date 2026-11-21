@@ -1,3 +1,9 @@
+import '../../data/services/mushaf_package.dart';
+import '../../data/services/qpc_v1_data_service.dart';
+import '../../data/services/qpc_v1_layout_service.dart';
+import '../../data/services/qpc_v1_alignment_service.dart';
+import '../../data/services/shamarly_data_loader.dart';
+
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -12,8 +18,6 @@ import '../../data/services/mushaf_downloader_service.dart'
 import '../../core/di/service_locator.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/entities/user_settings.dart';
-
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/services/qcf4_font_downloader.dart';
 
@@ -40,12 +44,12 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..identifier = 'madani_old_v1'
       ..nameArabic = 'مصحف المدينة ـ الرسم القديم'
       ..nameEnglish = 'Madani Mushaf - Old Script'
-      ..type =
-          'page_font' // New type for QPC V1
-      ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/qpc_v1_by_page.woff.zip'
-      ..localPath =
-          'mushafs/madani_old_v1' // Extracted path
+      ..type = 'page_font' // Type for QPC V1
+      ..baseUrl =
+          'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/qpc_v1_by_page.woff.zip'
+      ..localPath = 'mushafs/madani_old_v1' // Extracted path
       ..pageCount = 604
+      ..totalPages = 604
       ..isDownloaded = false,
 
     // 3. Madani Matching Shamarly (Images)
@@ -56,23 +60,37 @@ class MushafMetadataProvider extends ChangeNotifier {
       ..nameArabic = 'مصحف المدينة موافق للشمرلي'
       ..nameEnglish = 'Madani Matching Shamarly'
       ..type = 'image'
-      ..baseUrl = 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_images_shamrly.zip'
+      ..baseUrl =
+          'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/quran_images_shamrly.zip'
       ..imageExtension = 'png'
       ..pageCount = 521
       ..isDownloaded = false,
 
-    // 4. Medina 1441 segmented artwork (on-demand SVG pages)
+    // 4. Medina 1441 trial with a single bundled OpenType font
     db_models.MushafMetadata()
       ..id = db_models.fastHash('digital_khatt_1441')
       ..identifier = 'digital_khatt_1441'
       ..nameArabic = 'مصحف المدينة 1441 (تجريبي)'
       ..nameEnglish = 'Medina Mushaf 1441 (DigitalKhatt)'
-      ..type = 'svg'
+      ..type = 'single_font'
       ..pageCount = 604
       ..totalPages = 604
-      ..isDownloaded = false,
+      ..isDownloaded = true,
 
-    // 5. Digital (Hidden/Fallback)
+    // 5. Medina 1995 trial with a single bundled OpenType font
+    db_models.MushafMetadata()
+      ..id = db_models.fastHash('digital_khatt_old_madina')
+      ..identifier = 'digital_khatt_old_madina'
+      ..nameArabic = 'مصحف المدينة 1995 (تجريبي)'
+      ..nameEnglish = 'Old Medina Mushaf 1995 (DigitalKhatt)'
+      ..type = 'single_font'
+      ..baseUrl = null
+      ..localPath = 'assets/fonts/digital_khatt'
+      ..pageCount = 604
+      ..totalPages = 604
+      ..isDownloaded = true,
+
+    // 6. Digital (Hidden/Fallback)
     db_models.MushafMetadata()
       ..id = db_models.fastHash('madani_font_v1')
       ..identifier = 'madani_font_v1'
@@ -89,7 +107,8 @@ class MushafMetadataProvider extends ChangeNotifier {
       'madani_old_v1': 2,
       'shamarly_15lines': 3,
       'digital_khatt_1441': 4,
-      'madani_font_v1': 5,
+      'digital_khatt_old_madina': 5,
+      'madani_font_v1': 6,
     };
     list.sort((a, b) {
       final orderA = order[a.identifier] ?? 99;
@@ -105,9 +124,7 @@ class MushafMetadataProvider extends ChangeNotifier {
         ? _availableMushafs
         : _fallbackMushafs;
     return list
-        .where(
-          (m) => m.type != 'digital' && (!kIsWeb || m.type != 'svg'),
-        )
+        .where((m) => m.type != 'digital' && (!kIsWeb || m.type != 'single_font'))
         .toList();
   }
 
@@ -141,14 +158,19 @@ class MushafMetadataProvider extends ChangeNotifier {
   double _downloadProgress = 0.0;
   double get downloadProgress => _downloadProgress;
 
+  Object? _initializationError;
+  Object? get initializationError => _initializationError;
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
+  late final Future<void> initialized;
+
   MushafMetadataProvider() {
-    _init();
+    initialized = _init();
   }
 
   Future<void> _init() async {
+    _initializationError = null;
     _isLoading = true;
     notifyListeners();
 
@@ -192,6 +214,12 @@ class MushafMetadataProvider extends ChangeNotifier {
             existingItem.imageExtension = fallback.imageExtension;
             existingItem.nameArabic = fallback.nameArabic;
             existingItem.type = fallback.type;
+            if (fallback.type == 'single_font') {
+              existingItem.isDownloaded = true;
+              existingItem.localPath = fallback.localPath;
+            } else if (fallback.type == 'page_font') {
+              existingItem.localPath = fallback.localPath;
+            }
             existingItem.pageCount = fallback.pageCount;
 
             await isar.collection<db_models.MushafMetadata>().put(existingItem);
@@ -220,6 +248,7 @@ class MushafMetadataProvider extends ChangeNotifier {
       });
       await syncWithDownloadedFonts();
     } catch (e) {
+      _initializationError = e;
       debugPrint('MushafProvider Error: $e');
       _availableMushafs = _fallbackMushafs;
       _currentMushafId = 'qcf2_v4_woff2';
@@ -252,9 +281,9 @@ class MushafMetadataProvider extends ChangeNotifier {
   }
 
   Future<void> downloadMushaf(String identifier) async {
+    if (_isDownloading) throw StateError('يوجد تنزيل قيد التنفيذ');
     final mushaf = _availableMushafs.firstWhere(
       (m) => m.identifier == identifier,
-      orElse: () => _availableMushafs.first,
     );
 
     if (identifier != 'qcf2_v4_woff2' && mushaf.baseUrl == null) return;
@@ -278,35 +307,50 @@ class MushafMetadataProvider extends ChangeNotifier {
         );
         targetPath = '${appDir.path}/fonts';
       } else {
-        await mushaf_downloader.MushafDownloaderService.downloadAndExtract(
-          url: mushaf.baseUrl!,
-          destinationPath: targetPath,
-          onProgress: (progress) {
-            _downloadProgress = identifier == 'madani_old_v1'
-                ? progress * 0.9
-                : progress;
-            notifyListeners();
-          },
-        );
-
-        if (identifier == 'madani_old_v1') {
+        final target = Directory(targetPath);
+        await target.parent.create(recursive: true);
+        final stage = await target.parent.createTemp('.$identifier-install-');
+        try {
           await mushaf_downloader.MushafDownloaderService.downloadAndExtract(
-            url: 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/qpc_v1_json_data.zip',
-            destinationPath: targetPath,
-            onProgress: (p) {
-              _downloadProgress = 0.9 + (p * 0.1);
+            url: mushaf.baseUrl!,
+            destinationPath: stage.path,
+            onProgress: (progress) {
+              _downloadProgress = identifier == 'madani_old_v1'
+                  ? progress * 0.9
+                  : progress;
               notifyListeners();
             },
           );
+
+          if (identifier == 'madani_old_v1') {
+            await mushaf_downloader.MushafDownloaderService.downloadAndExtract(
+              url: 'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets/qpc_v1_json_data.zip',
+              destinationPath: stage.path,
+              onProgress: (p) {
+                _downloadProgress = 0.9 + (p * 0.1);
+                notifyListeners();
+              },
+            );
+          }
+          if (!await validMushafPackage(identifier, stage)) {
+            throw const FormatException('ملفات المصحف ناقصة أو تالفة');
+          }
+          commitMushafDirectory(stage, target);
+          if (identifier == 'madani_old_v1') {
+            QPCV1DataService().invalidate();
+            QPCV1LayoutService().invalidate();
+            QPCV1AlignmentService().invalidate();
+          } else if (identifier == 'shamarly_15lines') {
+            ShamarlyDataLoader.clearCache();
+          }
+        } finally {
+          if (await stage.exists()) await stage.delete(recursive: true);
         }
       }
 
       // Update metadata
       final isar = IsarService.instance.isar;
       await isar.writeTxn(() async {
-        mushaf.isDownloaded = true;
-        mushaf.localPath = targetPath;
-
         // Update in DB
         final existing = await isar
             .collection<db_models.MushafMetadata>()
@@ -321,10 +365,12 @@ class MushafMetadataProvider extends ChangeNotifier {
         }
       });
 
+      mushaf.isDownloaded = true;
+      mushaf.localPath = targetPath;
       notifyListeners();
     } catch (e) {
       debugPrint('Download failed: $e');
-      // Show error via snackbar or other UI mechanism if possible
+      rethrow;
     } finally {
       _isDownloading = false;
       _currentDownloadingId = null;
@@ -337,43 +383,57 @@ class MushafMetadataProvider extends ChangeNotifier {
     try {
       final isar = IsarService.instance.isar;
       final appDir = await getApplicationDocumentsDirectory();
-      final prefs = await SharedPreferences.getInstance();
+
+      // 1. Verify QCF2 Fonts
+      final qcfValid = await QCF4FontDownloader.areAllFontsAvailable();
+
+      // 2. Verify QPC V1 Fonts & Glyphs
+      final qpcDir = Directory('${appDir.path}/mushafs/madani_old_v1');
+      final shamarlyDir = Directory('${appDir.path}/mushafs/shamarly_15lines');
+      recoverMushafDirectory(qpcDir);
+      recoverMushafDirectory(shamarlyDir);
+      final qpcValid = await validMushafPackage('madani_old_v1', qpcDir);
+      final shamarlyValid = await validMushafPackage(
+        'shamarly_15lines',
+        shamarlyDir,
+      );
 
       await isar.writeTxn(() async {
-        // 1. Check QCF2 Fonts
-        final areFontsDownloaded = prefs.getBool('fonts_downloaded') ?? false;
-        final qcf2 = await isar
-            .collection<db_models.MushafMetadata>()
-            .filter()
-            .identifierEqualTo('qcf2_v4_woff2')
-            .findFirst();
-        if (qcf2 != null && areFontsDownloaded) {
-          qcf2.isDownloaded = true;
-          qcf2.localPath = '${appDir.path}/fonts';
-          await isar.collection<db_models.MushafMetadata>().put(qcf2);
-        }
-
-        // 2. Check other directories
         final mushafs = await isar
             .collection<db_models.MushafMetadata>()
             .where()
             .findAll();
-        for (var m in mushafs) {
-          if (m.identifier == 'qcf2_v4_woff2' || m.type == 'digital') continue;
 
-          final dir = Directory('${appDir.path}/mushafs/${m.identifier}');
-          if (await dir.exists()) {
-            final files = dir.listSync();
-            if (files.isNotEmpty) {
-              m.isDownloaded = true;
-              m.localPath = dir.path;
-              await isar.collection<db_models.MushafMetadata>().put(m);
-            }
+        for (var m in mushafs) {
+          if (m.type == 'digital' || m.type == 'single_font') {
+            m.isDownloaded = true;
+          } else if (m.identifier == 'qcf2_v4_woff2') {
+            m.isDownloaded = qcfValid;
+            if (qcfValid) m.localPath = '${appDir.path}/fonts';
+          } else if (m.identifier == 'madani_old_v1') {
+            m.isDownloaded = qpcValid;
+            if (qpcValid) m.localPath = qpcDir.path;
+          } else if (m.identifier == 'shamarly_15lines') {
+            m.isDownloaded = shamarlyValid;
+            if (shamarlyValid) m.localPath = shamarlyDir.path;
           }
+          await isar.collection<db_models.MushafMetadata>().put(m);
         }
       });
+
+      // Synchronize in-memory list
+      final updatedMushafs = await isar
+          .collection<db_models.MushafMetadata>()
+          .where()
+          .findAll();
+      if (updatedMushafs.isNotEmpty) {
+        _sortMushafs(updatedMushafs);
+        _availableMushafs = updatedMushafs;
+      }
+      notifyListeners();
     } catch (e) {
       debugPrint('Sync error: $e');
+      rethrow;
     }
   }
 }

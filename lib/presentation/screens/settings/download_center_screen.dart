@@ -1,3 +1,4 @@
+import '../../widgets/download_feedback.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
@@ -216,13 +217,12 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                 (m) => _buildDownloadCard(
                   context,
                   title: m.nameArabic ?? m.identifier!,
-                  subtitle: m.type == 'svg'
-                      ? 'عرض متصل حسب الطلب — تُحمّل الصفحة عند فتحها'
+                  subtitle: m.type == 'single_font'
+                      ? 'خط واحد مضمّن · يعمل دون اتصال'
                       : m.type == 'digital'
                       ? 'مصحف رقمي'
                       : 'مصحف مصور',
                   isDownloaded: m.isDownloaded || m.type == 'digital',
-                  isOnline: m.type == 'svg',
                   isDownloading:
                       provider.isDownloading &&
                       provider.currentDownloadingId == m.identifier,
@@ -231,12 +231,12 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                           provider.currentDownloadingId == m.identifier
                       ? provider.downloadProgress
                       : 0,
-                  size: m.type == 'svg'
-                      ? 'حسب الطلب'
+                  size: m.type == 'single_font'
+                      ? 'مضمّن'
                       : m.identifier == 'shamarly_15lines'
                       ? '74 MB'
                       : '50 MB',
-                  onDownload: () => provider.downloadMushaf(m.identifier!),
+                  onDownload: () => showDownloadFailure(context, provider.downloadMushaf(m.identifier!)),
                   onActivate: () => provider.setMushaf(m.identifier!),
                   isSelected: provider.currentMushafId == m.identifier,
                 ),
@@ -261,7 +261,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
               isDownloading: local.isDownloading,
               progress: local.downloadProgress,
               size: '4 MB',
-              onDownload: () => local.downloadAndExtractTafsir(),
+              onDownload: () => showDownloadFailure(context,local.downloadAndExtractTafsir()),
               onActivate: () => settings.updateDefaultTafsir('muyassar'),
               isSelected: settings.defaultTafsir == 'muyassar',
             ),
@@ -283,10 +283,9 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
           (false, _, _) =>
             provider.npuUnavailableReason ?? 'مسار NPU غير متاح للجهاز حاليًا.',
           (true, true, _) => provider.zipformerStatusText,
-          (true, false, false) =>
-            provider.zipformerStatusText.isEmpty
-                ? 'حزمة Hexagon ومرجع الفونيمات للتنزيل.'
-                : provider.zipformerStatusText,
+          (true, false, false) => provider.zipformerStatusText.isEmpty
+              ? 'حزمة Hexagon ومرجع الفونيمات للتنزيل.'
+              : provider.zipformerStatusText,
           (true, false, true) => 'الملفات موجودة. يُختبر NPU عند بدء التسميع.',
         };
         return Column(
@@ -294,7 +293,6 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
             _buildDownloadCard(
               context,
               title: 'محرك التسميع الذكي (Zipformer V3)',
-              icon: Icons.mic_rounded,
               subtitle: npuStatus,
               isDownloaded: provider.isZipformerDownloaded,
               isDownloading: provider.isZipformerDownloading,
@@ -306,25 +304,23 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                   ? provider.downloadZipformerModel
                   : null,
               onActivate: provider.isNpuSupported
-                  ? () =>
-                        provider.setRecitationEngine(RecitationEngine.zipformer)
+                  ? () => provider.setRecitationEngine(RecitationEngine.zipformer)
                   : null,
-              onDelete:
-                  provider.isZipformerDownloaded &&
+              onDelete: provider.isZipformerDownloaded &&
                       provider.activeSessionConfig == null
                   ? () => _confirmDeleteModel(
-                      context,
-                      'محرك Zipformer V3',
-                      provider.deleteZipformerModel,
-                    )
+                        context,
+                        'محرك Zipformer V3',
+                        provider.deleteZipformerModel,
+                      )
                   : null,
               isSelected: provider.engine == RecitationEngine.zipformer,
             ),
             _buildDownloadCard(
               context,
               title: 'محرك التسميع الكلاسيكي (Whisper)',
-              icon: Icons.mic_rounded,
-              subtitle: 'قيد التطوير إلى حين إصلاح تحويل النموذج.',
+              subtitle:
+                  'قيد التطوير إلى حين إصلاح تحويل النموذج.',
               isDownloaded: provider.isWhisperDownloaded,
               isDownloading: false,
               progress: 0,
@@ -349,10 +345,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(
           'حذف $modelTitle',
-          style: const TextStyle(
-            fontFamily: 'Tajawal',
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
         ),
         content: Text(
           'هل ترغب في حذف ملفات $modelTitle لتوفير المساحة؟ يمكنك إعادة تنزيلها لاحقاً في أي وقت.',
@@ -387,8 +380,6 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
     required bool isDownloading,
     required double progress,
     required String size,
-    bool isOnline = false,
-    IconData icon = Icons.menu_book_rounded,
     VoidCallback? onDownload,
     VoidCallback? onActivate,
     required bool isSelected,
@@ -425,7 +416,11 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
               color: AppColors.brandGold.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: AppColors.brandGold, size: 24),
+            child: const Icon(
+              Icons.mic_rounded,
+              color: AppColors.brandGold,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 12),
           // Content
@@ -456,9 +451,8 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: (badgeColor ?? AppColors.brandGold).withValues(
-                            alpha: 0.12,
-                          ),
+                          color: (badgeColor ?? AppColors.brandGold)
+                              .withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: (badgeColor ?? AppColors.brandGold)
@@ -519,8 +513,7 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
               ),
               if (onDownload != null || onActivate != null || onDelete != null)
                 const SizedBox(height: 8),
-              if ((isDownloaded || isOnline) &&
-                  (onActivate != null || onDelete != null))
+              if (isDownloaded && (onActivate != null || onDelete != null))
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -543,9 +536,8 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                         backgroundColor: isSelected
                             ? Colors.green.withValues(alpha: 0.1)
                             : AppColors.brandGold,
-                        foregroundColor: isSelected
-                            ? Colors.green
-                            : Colors.white,
+                        foregroundColor:
+                            isSelected ? Colors.green : Colors.white,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,

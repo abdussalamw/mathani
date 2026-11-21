@@ -1,3 +1,4 @@
+import '../../widgets/download_feedback.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
@@ -80,13 +81,13 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                   provider.currentDownloadingId == mushaf.identifier;
               // تحقق خاص لـ qcf2 - إذا لم يكن محملاً يحتاج تحميل
               final isQcf2 = mushaf.identifier == 'qcf2_v4_woff2';
-              final isOnDemandSvg = mushaf.type == 'svg';
+              final isSingleFont = mushaf.type == 'single_font';
 
               // Needs download if:
               // 1. Not isDownloaded AND has a remote URL (Zip, Tar, or specific QCF2 logic)
               final hasUrl = mushaf.baseUrl != null;
               final needsDownload =
-                  !mushaf.isDownloaded && !isOnDemandSvg && (hasUrl || isQcf2);
+                  !mushaf.isDownloaded && (hasUrl || isQcf2);
 
               return Container(
                 decoration: BoxDecoration(
@@ -176,8 +177,8 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    isOnDemandSvg
-                                        ? 'عرض متجهي تجريبي عبر الإنترنت — تُحمّل الصفحة عند فتحها'
+                                    isSingleFont
+                                        ? 'خط واحد مضمّن · يعمل دون اتصال'
                                         : (mushaf.type ?? '').contains('font')
                                         ? (mushaf.identifier != null &&
                                                   mushaf.identifier!.contains(
@@ -185,7 +186,7 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                                                   )
                                               ? 'خطوط الرسم العثماني (QCF2) الماركة'
                                               : 'نسخة رقمية خفيفة وسريعة')
-                                        : 'نسخة طباعة عالية الدقة (تحتاج إنترنت للتحميل)', // Changed from "Picture version" to "High Quality Print"
+                                        : 'نسخة طباعة عالية الدقة (تحتاج إنترنت للتحميل)',
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: 12,
@@ -264,7 +265,7 @@ class _MushafSelectionScreenState extends State<MushafSelectionScreen> {
                               ),
                               onPressed: () {
                                 if (mushaf.identifier != null) {
-                                  provider.downloadMushaf(mushaf.identifier!);
+                                  showDownloadFailure(context,provider.downloadMushaf(mushaf.identifier!));
                                 }
                               },
                             )

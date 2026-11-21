@@ -1,3 +1,4 @@
+import '../../widgets/download_feedback.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
@@ -5,8 +6,6 @@ import '../../providers/settings_provider.dart';
 import '../../providers/mushaf_metadata_provider.dart';
 import '../../providers/audio_provider.dart';
 import '../../../core/constants/app_colors.dart';
-
-import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../data/models/reciter.dart';
 import '../../../data/services/local_tafsir_service.dart';
@@ -32,10 +31,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadVersion();
   }
 
-  Future<void> _loadVersion() async {
-    final info = await PackageInfo.fromPlatform();
+  void _loadVersion() {
     setState(() {
-      _version = info.version;
+      _version = '1.0.2';
     });
   }
 
@@ -192,7 +190,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ) {
                       final isSelected =
                           provider.currentMushafId == mushaf.identifier;
-                      final isOnline = mushaf.type == 'svg';
                       final isDownloaded =
                           mushaf.isDownloaded || mushaf.type == 'digital';
                       final isDownloading =
@@ -215,12 +212,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (isDownloading) {
                         statusText =
                             '${(provider.downloadProgress * 100).toInt()}%';
-                      } else if (isOnline) {
-                        statusText = AppLocalizations.of(context)!
-                            .settingsOnline;
                       } else if (mushaf.type == 'digital') {
                         statusText = AppLocalizations.of(context)!
                             .settingsReady;
+                      } else if (mushaf.type == 'single_font') {
+                        statusText = 'خط واحد مضمّن · يعمل دون اتصال';
                       } else if (isDownloaded) {
                         statusText = AppLocalizations.of(context)!
                             .settingsDownloaded;
@@ -233,15 +229,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         subtitle: statusText,
                         isSelected: isSelected,
                         isDownloaded: isDownloaded,
-                        isOnline: isOnline,
                         isDownloading: isDownloading,
                         progress: provider.downloadProgress,
                         sizeEstimate: sizeEstimate,
                         onActivate: () =>
                             provider.setMushaf(mushaf.identifier!),
-                        onDownload: isOnline
-                            ? () {}
-                            : () => provider.downloadMushaf(mushaf.identifier!),
+                        onDownload: () => showDownloadFailure(context, provider.downloadMushaf(mushaf.identifier!)),
                       );
                     }).toList(),
                   );
@@ -288,17 +281,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         .read<SettingsProvider>()
                         .updateDefaultTafsir('muyassar'),
                     onDownload: () =>
-                        local.downloadAndExtractTafsir().catchError((e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                '${AppLocalizations.of(context)!.error}: $e',
-                                style: const TextStyle(fontFamily: 'Tajawal'),
-                              ),
-                            ),
-                          );
-                        }),
+                        showDownloadFailure(context,local.downloadAndExtractTafsir()),
                   );
                 },
               ),
@@ -561,8 +544,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(
                           fontFamily: 'Tajawal',
                           fontSize: 11,
-                          color:
-                              recProvider.isZipformerDownloaded &&
+                          color: recProvider.isZipformerDownloaded &&
                                   recProvider.engine ==
                                       RecitationEngine.zipformer &&
                                   recProvider.isNpuSupported
@@ -675,10 +657,7 @@ class _RecitationSetupPage extends StatelessWidget {
         appBar: AppBar(
           title: const Text(
             'إعدادات التسميع',
-            style: TextStyle(
-              fontFamily: 'Tajawal',
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
           backgroundColor: Colors.transparent,

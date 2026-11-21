@@ -5,6 +5,7 @@ import 'package:mathani/data/services/glyph_data_loader.dart';
 import 'package:mathani/presentation/widgets/mushaf_page_widget.dart';
 import 'package:mathani/presentation/widgets/mushaf_image_widget.dart';
 import 'package:mathani/presentation/widgets/digital_khatt_mushaf_page_widget.dart';
+import '../../../data/services/digital_khatt_page_loader.dart';
 import 'package:mathani/presentation/widgets/reader_page_frame.dart';
 import 'package:mathani/presentation/widgets/reader_loading_indicator.dart';
 import 'package:mathani/core/constants/app_colors.dart';
@@ -65,7 +66,43 @@ class SensitivePageScrollPhysics extends PageScrollPhysics {
 }
 
 class _MushafScreenState extends State<MushafScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
+  bool _readerActive = false;
+  bool _routeVisible = true;
+  late UiProvider _visibilityUi;
+  bool _foreground = true;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _syncReaderActivity();
+  }
+
+  void _syncReaderActivity() {
+    final active =
+        _foreground &&
+        _routeVisible &&
+        _visibilityUi.currentTabIndex == 1 &&
+        !_visibilityUi.showingTafsir;
+    if (active == _readerActive) return;
+    _readerActive = active;
+    _setReaderWakelock(active);
+    if (!active) {
+      _autoScrollTimer?.cancel();
+    } else if (_isAutoScrolling && !_isAutoScrollPaused) {
+      _autoScrollStartTime = DateTime.now();
+      _startAutoScrollTimer();
+    }
+  }
+
+  Future<void> _setReaderWakelock(bool enable) async {
+    try {
+      await WakelockPlus.toggle(enable: enable);
+    } catch (e) {
+      debugPrint('Reader wake lock: $e');
+    }
+  }
+
   final GlyphDataLoader _loader = GlyphDataLoader();
   List<PageGlyph>? _pages;
   bool _isLoading = true;
@@ -129,7 +166,11 @@ class _MushafScreenState extends State<MushafScreen>
       }
     });
 
-    WakelockPlus.enable();
+    _visibilityUi = context.read<UiProvider>()
+      ..addListener(_syncReaderActivity);
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    _foreground = lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -331,6 +372,8 @@ class _MushafScreenState extends State<MushafScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _routeVisible = ModalRoute.of(context)?.isCurrent ?? true;
+    _syncReaderActivity();
     final navigationMode = context.read<SettingsProvider>().navigationMode;
     if (_lastNavigationMode != null && _lastNavigationMode != navigationMode) {
       _resetSecondaryDrag();
@@ -491,6 +534,11 @@ class _MushafScreenState extends State<MushafScreen>
       }
       if (_isAutoScrollPaused) return; // إيقاف مؤقت - لا تتحرك
 
+      final ui = context.read<UiProvider>();
+      if (ui.currentTabIndex != 1 || ui.showingTafsir) {
+        return; // لا تمرر إذا كان القارئ غير ظاهر في الواجهة
+      }
+
       final settings = context.read<SettingsProvider>();
       final currentController = _innerScrollControllers[_currentPage];
 
@@ -581,7 +629,9 @@ class _MushafScreenState extends State<MushafScreen>
     for (var controller in _innerScrollControllers.values) {
       controller.dispose();
     }
-    WakelockPlus.disable();
+    _visibilityUi.removeListener(_syncReaderActivity);
+    WidgetsBinding.instance.removeObserver(this);
+    if (_readerActive) _setReaderWakelock(false);
     super.dispose();
   }
 
@@ -1079,9 +1129,24 @@ class _MushafScreenState extends State<MushafScreen>
 
     Widget pageContent;
 
-    if (currentType == 'svg') {
+    if (currentType == 'single_font') {
+      final isOldMadina = currentId == 'digital_khatt_old_madina';
       pageContent = DigitalKhattMushafPageWidget(
         pageNumber: _pages![index].page,
+        fontFamily: isOldMadina
+            ? 'DigitalKhattOldMadina'
+            : 'DigitalKhattMadina',
+        loader: isOldMadina
+            ? digitalKhattOldMadinaLoader
+            : digitalKhattPageLoader,
+        wordVerdicts: uiProvider.isRecitationActive
+            ? context.read<RecitationProvider>().liveWordVerdicts
+            : const {},
+        selectedSurah: _selectedSurah,
+        selectedAyah: _selectedAyah,
+        onAyahLongPress: (_isAutoScrolling || _isAutoScrollPaused)
+            ? null
+            : _onAyahInteraction,
       );
     } else if (currentType == 'image') {
       final mushafProvider = context.read<MushafMetadataProvider>();
@@ -1237,7 +1302,7 @@ class _MushafScreenState extends State<MushafScreen>
       ),
       body: const Center(
         child: Text(
-          'ظ„ط§ طھظˆط¬ط¯ ط¨ظٹط§ظ†ط§طھ',
+          'لا توجد بيانات',
           style: TextStyle(fontFamily: 'Tajawal', fontSize: 18),
         ),
       ),

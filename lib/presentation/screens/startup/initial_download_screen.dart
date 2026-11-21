@@ -7,7 +7,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../data/services/local_tafsir_service.dart';
 import '../../providers/mushaf_metadata_provider.dart';
 import '../../providers/settings_provider.dart';
-import '../home/main_shell_screen.dart';
 
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -29,6 +28,7 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
   bool _hasError = false;
   MushafMetadataProvider? _downloadProvider;
   bool _wakelockEnabled = false;
+  String? _readyMushafId;
 
   @override
   void initState() {
@@ -37,7 +37,7 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
       if (!mounted) return;
       final provider = context.read<MushafMetadataProvider>();
       final downloadableMushafs = provider.availableMushafs
-          .where((m) => m.type != 'svg')
+          .where((m) => m.type != 'single_font')
           .toList();
       if (downloadableMushafs.isNotEmpty) {
         setState(() {
@@ -70,9 +70,7 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
   }
 
   void _navigateToHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainShellScreen()),
-    );
+    Navigator.of(context).pushReplacementNamed('/home');
   }
 
   Future<void> _startDownload() async {
@@ -85,6 +83,7 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
     setState(() {
       _isDownloading = true;
       _hasError = false;
+      _readyMushafId = null;
       _statusMessage = l10n.initDownloading;
       _mushafProgress = 0.0;
       _tafsirProgress = 0.0;
@@ -104,14 +103,18 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
         _statusMessage = l10n.initDownloading;
       });
 
-      // نستمع لمؤشر تقدم تحميل المصحف من المزود
-      _downloadProvider = provider;
-      provider.addListener(_onProviderChange);
-      try {
-        await provider.downloadMushaf(mushafId);
-      } finally {
-        provider.removeListener(_onProviderChange);
-        _downloadProvider = null;
+      if (!provider.availableMushafs.any(
+        (m) => m.identifier == mushafId && m.isDownloaded,
+      )) {
+        // نستمع لمؤشر تقدم تحميل المصحف من المزود
+        _downloadProvider = provider;
+        provider.addListener(_onProviderChange);
+        try {
+          await provider.downloadMushaf(mushafId);
+        } finally {
+          provider.removeListener(_onProviderChange);
+          _downloadProvider = null;
+        }
       }
       if (!mounted) return;
       if (!provider.availableMushafs.any(
@@ -119,18 +122,26 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
       )) {
         throw Exception(l10n.errorUnknown);
       }
-      setState(() => _mushafProgress = 1.0);
+      setState(() {
+        _mushafProgress = 1.0;
+        _readyMushafId = mushafId;
+      });
 
       // 3. تحميل التفسير الميسر
       setState(() {
         _statusMessage = l10n.initTafsir;
       });
 
-      await LocalTafsirService.instance.downloadAndExtractTafsir(
-        onProgress: (p) {
-          if (mounted) setState(() => _tafsirProgress = p);
-        },
-      );
+      final tafsir = LocalTafsirService.instance;
+      await tafsir.loadTafsirData();
+      if (!mounted) return;
+      if (!tafsir.isLoaded) {
+        await tafsir.downloadAndExtractTafsir(
+          onProgress: (p) {
+            if (mounted) setState(() => _tafsirProgress = p);
+          },
+        );
+      }
 
       // التحقق من الجودة بعد التحميل
       if (LocalTafsirService.instance.totalEntries == 0) {
@@ -149,7 +160,9 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
     } catch (e) {
       if (mounted) {
         debugPrint('Initial Download Error: $e');
-        final lastErr = LocalTafsirService.instance.lastError;
+        final lastErr = _readyMushafId == mushafId
+            ? LocalTafsirService.instance.lastError
+            : null;
         setState(() {
           _isDownloading = false;
           _hasError = true;
@@ -193,7 +206,7 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
           child: Consumer<MushafMetadataProvider>(
             builder: (context, provider, child) {
               final downloadableMushafs = provider.availableMushafs
-                  .where((m) => m.type != 'svg')
+                  .where((m) => m.type != 'single_font')
                   .toList();
               if (downloadableMushafs.isEmpty) {
                 return const Center(child: CircularProgressIndicator());
@@ -271,6 +284,13 @@ class _InitialDownloadScreenState extends State<InitialDownloadScreen> {
                     const SizedBox(height: 32),
 
                     if (!_isDownloading) ...[
+                      if (_hasError &&
+                          _readyMushafId != null &&
+                          _readyMushafId == _selectedMushafId)
+                        TextButton(
+                          onPressed: _navigateToHome,
+                          child: Text(l10n.continueReading),
+                        ),
                       Expanded(
                         child: ListView.separated(
                           itemCount: downloadableMushafs.length,

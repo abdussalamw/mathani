@@ -1,113 +1,155 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:mathani/data/services/digital_khatt_page_loader.dart';
 
-void main() {
-  late Directory cacheDirectory;
-
-  setUp(() async {
-    cacheDirectory = await Directory.systemTemp.createTemp(
-      'digital-khatt-pages-',
+class _Bundle extends CachingAssetBundle {
+  var loads = 0;
+  var fail = false;
+  @override
+  Future<String> loadString(String key, {bool cache = true}) async {
+    expect(
+      key,
+      anyOf(
+        DigitalKhattPageLoader.layoutAsset1441,
+        DigitalKhattPageLoader.layoutAssetOldMadina,
+      ),
     );
-  });
+    loads++;
+    if (fail) throw StateError('asset error');
+    return File(key).readAsString();
+  }
 
-  tearDown(() async {
-    await cacheDirectory.delete(recursive: true);
-  });
-
-  test('requests the selected page and reuses its local cache', () async {
-    var requestCount = 0;
-    final client = MockClient((request) async {
-      requestCount++;
-      expect(request.url.host, 'mushafcatalog.digitalkhatt.org');
-      expect(request.url.path, '/api/page.svg');
-      expect(request.url.queryParameters, {
-        'page': '1',
-        'interior': '1',
-        'kashida': 'middle',
-      });
-      return http.Response(_pageSvg(1), HttpStatus.ok);
-    });
-    final loader = DigitalKhattPageLoader(
-      client: client,
-      cacheDirectory: cacheDirectory,
-    );
-
-    expect(await loader.loadPage(1), _pageSvg(1));
-    expect(await loader.loadPage(1), _pageSvg(1));
-    expect(requestCount, 1);
-    expect(File('${cacheDirectory.path}/page001.svg').existsSync(), isTrue);
-    client.close();
-  });
-
-  test('rejects page numbers outside the 604-page edition', () async {
-    final client = MockClient((_) async {
-      fail('An invalid page must not be requested.');
-    });
-    final loader = DigitalKhattPageLoader(
-      client: client,
-      cacheDirectory: cacheDirectory,
-    );
-
-    await expectLater(loader.loadPage(605), throwsRangeError);
-    client.close();
-  });
-
-  test('rejects unsuccessful or malformed page responses', () async {
-    final client = MockClient((_) async {
-      return http.Response('not an SVG', HttpStatus.ok);
-    });
-    final loader = DigitalKhattPageLoader(
-      client: client,
-      cacheDirectory: cacheDirectory,
-    );
-
-    await expectLater(loader.loadPage(2), throwsFormatException);
-    client.close();
-  });
-
-  test('limits the local cache to twelve pages', () async {
-    final client = MockClient((request) async {
-      final page = int.parse(request.url.queryParameters['page']!);
-      return http.Response(_pageSvg(page), HttpStatus.ok);
-    });
-    final loader = DigitalKhattPageLoader(
-      client: client,
-      cacheDirectory: cacheDirectory,
-    );
-
-    for (var page = 1; page <= 13; page++) {
-      await loader.loadPage(page);
-    }
-
-    final cachedPages = await cacheDirectory
-        .list()
-        .where((entity) => entity.path.endsWith('.svg'))
-        .length;
-    expect(cachedPages, 12);
-    client.close();
-  });
-
-  test('surfaces HTTP failures instead of caching an error response', () async {
-    final client = MockClient(
-      (_) async =>
-          http.Response('service unavailable', HttpStatus.serviceUnavailable),
-    );
-    final loader = DigitalKhattPageLoader(
-      client: client,
-      cacheDirectory: cacheDirectory,
-    );
-
-    await expectLater(loader.loadPage(4), throwsA(isA<HttpException>()));
-    expect(File('${cacheDirectory.path}/page004.svg').existsSync(), isFalse);
-    client.close();
-  });
+  @override
+  Future<ByteData> load(String key) => throw UnsupportedError(key);
 }
 
-String _pageSvg(int page) {
-  final paddedPage = page.toString().padLeft(3, '0');
-  return '<svg data-page="page$paddedPage"><path d="M0 0h1v1z"/></svg>';
+void main() {
+  test('shares one offline layout and retries a failed asset read', () async {
+    final bundle = _Bundle()..fail = true;
+    final loader = DigitalKhattPageLoader(bundle: bundle);
+    await expectLater(loader.loadPage(1), throwsStateError);
+    bundle.fail = false;
+    final pages = await Future.wait([loader.loadPage(1), loader.loadPage(604)]);
+    expect(bundle.loads, 2);
+    expect(pages.first.length, 8);
+    expect(pages.last.length, 15);
+    expect(pages.last.last.runs.last.ayah, 6);
+    await expectLater(loader.loadPage(605), throwsRangeError);
+  });
+
+  test(
+    'each word and verse ending is on its original QCF4 page and line',
+    () async {
+      final bundle = _Bundle();
+      final loader = DigitalKhattPageLoader(bundle: bundle);
+      final reference = jsonDecode(
+        await File('sorse/quran_fonts_qfc4/quran_glyphs.json').readAsString(),
+      ) as List;
+      final ending = RegExp(r'^۝[٠-٩]+$');
+      int words = 0, endings = 0, headers = 0, basmalas = 0;
+      for (final page in reference) {
+        final lines = await loader.loadPage(page['page']);
+        final original = page['lines'] as List;
+        expect(lines.length, original.length);
+        for (var i = 0; i < lines.length; i++) {
+          final expected = [
+            for (final g in original[i]['glyphs'])
+              if (g['type'] == 1 ||
+                  g['type'] == 2 ||
+                  g['type'] == 6 ||
+                  g['type'] == 8)
+                (g['surah'] as int, (g['ayah'] ?? 0) as int, g['type'] as int),
+          ];
+          final actual = <(int, int, int)>[];
+          for (final run in lines[i].runs) {
+            if (run.ayah == 0) {
+              final header = run.text.startsWith('سُورَةُ ');
+              if (header) {
+                headers++;
+              } else {
+                basmalas++;
+              }
+              actual.add((run.surah, 0, header ? 6 : 8));
+            } else {
+              for (final word in run.text.split(' ')) {
+                final isEnd = ending.hasMatch(word);
+                if (isEnd) {
+                  final digits = word
+                      .substring(1)
+                      .codeUnits
+                      .map((c) => c - 0x660)
+                      .join();
+                  expect(int.parse(digits), run.ayah);
+                  endings++;
+                } else {
+                  words++;
+                }
+                actual.add((run.surah, run.ayah, isEnd ? 2 : 1));
+              }
+            }
+          }
+          expect(
+            actual,
+            expected,
+            reason: 'page ${page['page']}, line ${i + 1}',
+          );
+        }
+      }
+      expect([words, endings, headers, basmalas], [77433, 6236, 114, 112]);
+      expect(bundle.loads, 1);
+    },
+  );
+
+  test(
+    'Old Madina 1995 loader verifies all 604 pages, 6236 verses, headers and basmalas',
+    () async {
+      final bundle = _Bundle();
+      final loader = DigitalKhattPageLoader(
+        bundle: bundle,
+        layoutAsset: DigitalKhattPageLoader.layoutAssetOldMadina,
+      );
+      final p1 = await loader.loadPage(1);
+      final p2 = await loader.loadPage(2);
+      final p3 = await loader.loadPage(3);
+      final p604 = await loader.loadPage(604);
+
+      expect(p1.length, 8);
+      expect(p2.length, 8);
+      expect(p3.length, 15);
+      expect(p604.length, 15);
+
+      final ending = RegExp(r'^۝[٠-٩]+$');
+      int endings = 0, headers = 0, basmalas = 0;
+
+      for (var p = 1; p <= 604; p++) {
+        final lines = await loader.loadPage(p);
+        expect(lines.length, (p <= 2) ? 8 : 15);
+        for (final line in lines) {
+          for (final run in line.runs) {
+            if (run.ayah == 0) {
+              if (run.text.startsWith('سُورَةُ ')) {
+                headers++;
+              } else {
+                basmalas++;
+              }
+            } else {
+              for (final word in run.text.split(' ')) {
+                if (ending.hasMatch(word)) {
+                  endings++;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      expect(endings, 6236);
+      expect(headers, 114);
+      expect(basmalas, 112);
+      expect(bundle.loads, 1);
+    },
+  );
 }
