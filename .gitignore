@@ -80,6 +80,7 @@ scripts/*.csv
 /tadabur/
 /ai_lab/
 /model_zipformer/
+docs/application_audit_*.md
 analyze_log.txt
 _chk.ps1
 fix_tadabbur_model.py

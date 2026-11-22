@@ -1,7 +1,7 @@
 name: mathani
 description: تطبيق قراءة وتدبر القرآن الكريم - مثاني
 publish_to: 'none'
-version: 1.0.2+18
+version: 1.0.2+19
 
 environment:
   sdk: '>=3.14.0 <4.0.0'
@@ -86,6 +86,7 @@ flutter:
     - assets/data/quran_advanced.json
     - assets/data/reciters.json
     - assets/data/tokens.txt
+    - assets/data/zipformer-v3-sm8650-softplus_ctx.onnx
     - assets/images/
 
   fonts:
