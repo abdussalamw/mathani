@@ -87,7 +87,7 @@ abstract final class ZipformerAndroidNpu {
   }
 }
 
-class _AndroidNpuStream implements ZipformerNpuStream {
+class _AndroidNpuStream implements ZipformerTimedNpuStream {
   _AndroidNpuStream(this._session);
 
   final int _session;
@@ -99,6 +99,25 @@ class _AndroidNpuStream implements ZipformerNpuStream {
 
   @override
   Future<String> finish() => _decode('finish');
+
+  @override
+  Future<List<ZipformerTokenTiming>> readTokenTimings() async {
+    if (_closed) return const [];
+    final data = await ZipformerAndroidNpu._channel.invokeMethod<Int32List>(
+      'tokenTimings',
+      {'session': _session},
+    );
+    if (data == null || data.length % 4 != 0) return const [];
+    return [
+      for (var i = 0; i < data.length; i += 4)
+        (
+          rawStart: data[i],
+          rawEnd: data[i + 1],
+          startMs: data[i + 2],
+          endMs: data[i + 3],
+        ),
+    ];
+  }
 
   Future<String> _decode(String method, [Float32List? samples]) async {
     if (_closed) throw StateError('Zipformer session has closed');

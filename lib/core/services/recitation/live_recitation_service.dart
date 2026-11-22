@@ -7,7 +7,12 @@ import 'package:path_provider/path_provider.dart';
 import '../../../data/services/audio_recorder_service.dart';
 import 'zipformer_engine.dart';
 
-typedef LiveRecitationResult = ({String phonemes, String? audioPath});
+typedef LiveRecitationResult = ({
+  String phonemes,
+  String? audioPath,
+  int audioDurationMs,
+  List<ZipformerTokenTiming> tokenTimings,
+});
 
 class LiveRecitationService {
   LiveRecitationService({
@@ -67,6 +72,7 @@ class LiveRecitationService {
   Future<String> start({
     required void Function(String) onPartial,
     required void Function(Object, StackTrace) onError,
+    void Function()? onFirstPcm,
   }) {
     final capture = _capture;
     return _serialize(() async {
@@ -95,7 +101,7 @@ class LiveRecitationService {
         final stream = await _recorder.startPcm();
         _ensureActive(capture);
         capture.subscription = stream.listen(
-          (chunk) => _queueChunk(capture, chunk, onPartial),
+          (chunk) => _queueChunk(capture, chunk, onPartial, onFirstPcm),
           onError: (Object error, StackTrace stack) =>
               _signalFailure(capture, error, stack),
           onDone: () {
@@ -121,6 +127,7 @@ class LiveRecitationService {
     _Capture capture,
     Uint8List chunk,
     void Function(String) onPartial,
+    void Function()? onFirstPcm,
   ) {
     if (capture.cancelled || capture.failure != null || chunk.isEmpty) return;
     if (capture.pendingBytes + chunk.length > _maxPendingBytes) {
@@ -152,9 +159,11 @@ class LiveRecitationService {
             samples[i] = data.getInt16(i * 2, Endian.little) / 32768.0;
           }
 
+          final firstPcm = capture.writtenBytes == 0;
           await capture.wave!.writeFrom(bytes, 0, length);
           capture.writtenBytes += length;
           if (capture.cancelled || capture.failure != null) return;
+          if (firstPcm && !capture.stopping) onFirstPcm?.call();
 
           final phonemes = await capture.decoder!.acceptPcm(samples);
           if (!capture.cancelled &&
@@ -202,8 +211,20 @@ class LiveRecitationService {
         if (capture.trailingByte != null) {
           throw const FormatException('انتهى البث بعينة صوتية غير مكتملة.');
         }
-        final phonemes = await capture.decoder!.finish();
+        final decoder = capture.decoder!;
+        final phonemes = await decoder.finish();
         _ensureActive(capture);
+        var tokenTimings = const <ZipformerTokenTiming>[];
+        if (decoder is ZipformerTimedNpuStream && phonemes.isNotEmpty) {
+          try {
+            tokenTimings = await decoder.readTokenTimings();
+          } on Exception {
+            // The word results can still be saved without audio clip positions.
+          }
+        }
+        _ensureActive(capture);
+        final audioDurationMs =
+            capture.writtenBytes * 1000 ~/ (recitationSampleRate * 2);
         final audioPath = capture.writtenBytes == 0 ? null : capture.file!.path;
         if (audioPath != null) {
           await capture.wave!.setPosition(0);
@@ -213,7 +234,12 @@ class LiveRecitationService {
         _ensureActive(capture);
         await _release(capture, keepAudio: audioPath != null);
         _ensureActive(capture);
-        return (phonemes: phonemes, audioPath: audioPath);
+        return (
+          phonemes: phonemes,
+          audioPath: audioPath,
+          audioDurationMs: audioDurationMs,
+          tokenTimings: tokenTimings,
+        );
       } catch (_) {
         await _release(capture);
         rethrow;

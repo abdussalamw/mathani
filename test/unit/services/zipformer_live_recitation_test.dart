@@ -63,7 +63,7 @@ class _Decoder implements ZipformerNpuStream {
   Future<String> acceptPcm(Float32List chunk) async {
     samples.addAll(chunk);
     await onSamples?.call();
-    return 'partial';
+    return 'partial_${samples.length}';
   }
 
   @override
@@ -227,7 +227,7 @@ void main() {
       final stopped = Completer<Object>();
       final decoder = _Decoder(
         onSamples: () {
-          inDecoder.complete();
+          if (!inDecoder.isCompleted) inDecoder.complete();
           return completeDecode.future;
         },
       );
@@ -254,6 +254,110 @@ void main() {
       expect(decoder.finishes, 0);
       expect(decoder.closes, 1);
       expect(recorder.cancels, 1);
+    },
+  );
+
+  test(
+    'simulates temporary slowdown: measures audio accumulation, alert latency, and verifies sample order preservation',
+    () async {
+      // 1. Setup a decoder that simulates backpressure (delays processing of early chunks)
+      var decodeCalls = 0;
+      final firstDecodeStarted = Completer<void>();
+      final delayCompleter = Completer<void>();
+      final partials = <String>[];
+
+      final decoder = _Decoder(
+        onSamples: () async {
+          decodeCalls++;
+          // Simulate temporary processing delay on the first chunk
+          if (decodeCalls == 1) {
+            if (!firstDecodeStarted.isCompleted) firstDecodeStarted.complete();
+            await delayCompleter.future;
+          }
+        },
+      );
+
+      service = LiveRecitationService(
+        engine: ZipformerEngine(openVerifiedNpuStream: () async => decoder),
+        recorder: recorder,
+        temporaryDirectory: () async => directory,
+      );
+
+      await service.prepare();
+      final savedPath = await service.start(
+        onPartial: partials.add,
+        onError: failIfNotExpected,
+      );
+
+      // 2. Stream audio chunks (each chunk represents 100ms = 1600 samples = 3200 bytes)
+      // We will emit 10 chunks = 1.0 second of audio (32,000 bytes total accumulation)
+      const chunkCount = 10;
+      const samplesPerChunk = 1600;
+      final expectedSamples = <double>[];
+
+      Uint8List makeChunk(int chunkIndex) {
+        final byteData = ByteData(samplesPerChunk * 2);
+        for (var s = 0; s < samplesPerChunk; s++) {
+          final sampleVal = ((chunkIndex * samplesPerChunk + s) % 30000) - 15000;
+          byteData.setInt16(s * 2, sampleVal, Endian.little);
+          expectedSamples.add(
+            sampleVal < 0 ? sampleVal / 32768.0 : sampleVal / 32767.0,
+          );
+        }
+        return byteData.buffer.asUint8List();
+      }
+
+      // Emit first chunk and wait for decoder to pause inside it
+      recorder.emit(makeChunk(0));
+      await firstDecodeStarted.future;
+      expect(decodeCalls, 1);
+
+      // Emit remaining 9 chunks (28,800 bytes) while decoder is paused
+      for (var c = 1; c < chunkCount; c++) {
+        recorder.emit(makeChunk(c));
+      }
+
+      // At this point, chunk 1 is paused in decoder, and chunks 2..10 are queued in memory.
+      // Accumulated queued bytes = 9 * 3200 = 28,800 bytes (~0.9s of audio queued).
+      // Since 28,800 <= 64,000 (2s limit), capture remains healthy and does NOT crash.
+      expect(decodeCalls, 1);
+
+      // 3. Release the temporary slowdown (decoder catches up)
+      final stopwatch = Stopwatch()..start();
+      delayCompleter.complete();
+
+      // Wait for all 10 chunks to be decoded in live stream
+      while (decodeCalls < chunkCount) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+
+      // Drain all queued chunks and finish the session
+      final result = await service.finish();
+      stopwatch.stop();
+
+      // 4. Verification of sample order and data integrity:
+      // a) Decoder processed all samples in exact FIFO sequence
+      expect(decoder.samples.length, expectedSamples.length);
+      for (var i = 0; i < expectedSamples.length; i++) {
+        expect(
+          decoder.samples[i],
+          closeTo(expectedSamples[i], 1e-6),
+          reason: 'Sample at index $i diverged in order or value',
+        );
+      }
+
+      // b) WAV file recorded on disk has identical length and headers
+      final wavBytes = await File(savedPath).readAsBytes();
+      expect(wavBytes.length, 44 + (chunkCount * samplesPerChunk * 2));
+      final wavHeader = ByteData.sublistView(wavBytes);
+      expect(wavHeader.getUint32(24, Endian.little), 16000); // 16 kHz
+      expect(wavHeader.getUint32(40, Endian.little), chunkCount * samplesPerChunk * 2);
+
+      // c) Latency measurement:
+      // Once the bottleneck cleared, all 10 chunks were processed rapidly
+      expect(result.phonemes, 'final');
+      expect(partials.length, chunkCount);
+      expect(stopwatch.elapsedMilliseconds, lessThan(1000));
     },
   );
 }

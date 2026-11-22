@@ -2,11 +2,14 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
+import 'package:mathani/data/models/recitation_result.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
 import 'package:mathani/presentation/providers/ui_provider.dart';
+import 'package:mathani/presentation/screens/recitation/recitation_result_view.dart';
+import 'package:mathani/presentation/screens/recitation/recitation_screen.dart';
 
 /// شريط التسميع الذكي الصغير — يظهر فوق BottomNavigationBar
 class RecitationMiniBar extends StatefulWidget {
@@ -410,6 +413,7 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     if (recProvider.currentResult != null) {
       final result = recProvider.currentResult!;
       final isExcellent = result.accuracyPercent >= 80;
+      final unconfirmedCount = result.unconfirmedWords;
       return Container(
         padding: EdgeInsets.fromLTRB(
           16,
@@ -477,21 +481,20 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              '(${result.correctWords}/${result.totalWords} كلمة)',
-              style: const TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 11,
-                color: AppColors.mutedText,
-                fontWeight: FontWeight.w500,
+            Expanded(
+              child: Text(
+                '(${result.correctWords}/${result.gradedWords} كلمة)'
+                '${unconfirmedCount == 0 ? '' : '\nغير مؤكدة ($unconfirmedCount)'}',
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 11,
+                  color: AppColors.mutedText,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-            const Spacer(),
-            // زر توسيع النتائج بالهوية الذهبية للتطبيق
             GestureDetector(
-              onTap: () {
-                uiProvider.setShowRecitationResults(true);
-              },
+              onTap: () => _openResult(result, canReplay: true),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
@@ -641,21 +644,30 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                 const SizedBox(width: 12),
                 // العدادات ببطاقات كبسولية أنيقة
                 if (isRecording) ...[
-                  _buildBadge(
-                    'آيات',
-                    '${recProvider.matchedAyahsCount}',
-                    Icons.menu_book_rounded,
-                    Colors.blue,
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _buildBadge(
+                        'آيات',
+                        '${recProvider.matchedAyahsCount}',
+                        Icons.menu_book_rounded,
+                        Colors.blue,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  _buildBadge(
-                    'أخطاء',
-                    '${recProvider.mistakesCount}',
-                    Icons.error_outline_rounded,
-                    Colors.red,
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _buildBadge(
+                        'أخطاء',
+                        '${recProvider.mistakesCount}',
+                        Icons.error_outline_rounded,
+                        Colors.red,
+                      ),
+                    ),
                   ),
                 ],
-                const Spacer(),
                 // وقت التسجيل والتوقيف المؤقت
                 if (isRecording) ...[
                   GestureDetector(
@@ -848,33 +860,50 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                 ],
               ),
             ],
-            // النص المكتشف بشكل رائع ومميز
-            if (isRecording && recProvider.liveTranscript.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.02)
-                      : Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  recProvider.liveTranscript,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white70 : Colors.black54,
+            if (isRecording) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.02)
+                            : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        recProvider.liveReadingStatus,
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.start,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.white70 : Colors.black54,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  IconButton(
+                    key: const Key('recitation-minibar-verse-visibility'),
+                    tooltip: recProvider.hideVerses
+                        ? 'إظهار الآيات'
+                        : 'إخفاء الآيات',
+                    icon: Icon(
+                      recProvider.hideVerses
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      size: 20,
+                    ),
+                    onPressed: recProvider.toggleVerseVisibility,
+                  ),
+                ],
               ),
             ],
           ],
@@ -968,7 +997,6 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     RecitationProvider recProvider,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final uiProvider = context.read<UiProvider>();
 
     showModalBottomSheet(
       context: context,
@@ -1048,8 +1076,7 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                   return InkWell(
                     onTap: () {
                       Navigator.pop(context);
-                      recProvider.selectSession(session);
-                      uiProvider.setShowRecitationResults(true);
+                      _openResult(RecitationResult.fromSession(session));
                     },
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
@@ -1138,10 +1165,54 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
                   );
                 },
               ),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _openHistory();
+                  },
+                  child: const Text('السجل الكامل'),
+                ),
+              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  void _openHistory() {
+    if (!mounted) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(
+          body: RecitationScreen(initialTab: RecitationTab.history),
+        ),
+      ),
+    );
+  }
+
+  void _openResult(RecitationResult result, {bool canReplay = false}) {
+    if (!mounted) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (detailContext) => Scaffold(
+          body: RecitationResultView(
+            resultOverride: result,
+            onReplay: canReplay
+                ? () {
+                    Navigator.of(detailContext).pop();
+                    if (mounted) context.read<RecitationProvider>().reset();
+                  }
+                : null,
+            onOpenHistory: () {
+              Navigator.of(detailContext).pop();
+              _openHistory();
+            },
+          ),
+        ),
+      ),
     );
   }
 
@@ -1297,7 +1368,6 @@ class _RecitationMiniBarState extends State<RecitationMiniBar>
     final uiProvider = context.read<UiProvider>();
     final stopping = recProvider.stopRecording();
     uiProvider.setRecitationActive(false);
-    uiProvider.setShowRecitationResults(false);
     await stopping;
   }
 }

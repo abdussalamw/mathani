@@ -46,6 +46,9 @@ class RecitationSetupView extends StatelessWidget {
                 const SizedBox(height: 24),
               ],
 
+              _buildPracticeOptions(context, provider),
+              const SizedBox(height: 16),
+
               // ─── عرض الأخطاء إن وجدت ───
               if (provider.errorMessage != null) ...[
                 Container(
@@ -88,11 +91,46 @@ class RecitationSetupView extends StatelessWidget {
               _buildStartButton(context, provider),
               const SizedBox(height: 16),
 
-              // ─── زر السجل ───
-              _buildHistoryButton(context, provider, isDark),
+              // ─── إجراءات إضافية ───
+              _buildSecondaryActions(provider),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPracticeOptions(
+    BuildContext context,
+    RecitationProvider provider,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile(
+            secondary: const Icon(Icons.visibility_off_outlined),
+            title: const Text('إخفاء الآيات أثناء التسميع'),
+            subtitle: const Text('تظهر الكلمات تدريجيًا بعد تأكيد قراءتها'),
+            value: provider.hideVerses,
+            onChanged: provider.setHideVerses,
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          SwitchListTile(
+            secondary: const Icon(Icons.pause_circle_outline),
+            title: const Text('التوقف عند الخطأ المؤكّد'),
+            subtitle: const Text(
+              'تنتظر المتابعة تصحيح كلمة تغيّرت أو تم تجاوزها',
+            ),
+            value: provider.stopOnConfirmedError,
+            onChanged: provider.setStopOnConfirmedError,
+          ),
+        ],
       ),
     );
   }
@@ -526,83 +564,21 @@ class RecitationSetupView extends StatelessWidget {
     );
   }
 
-  Widget _buildHistoryButton(
-    BuildContext context,
-    RecitationProvider provider,
-    bool isDark,
-  ) {
-    return Row(
+  Widget _buildSecondaryActions(RecitationProvider provider) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 12,
+      runSpacing: 8,
       children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => provider.goToHistory(),
-            icon: const Icon(Icons.history_rounded, size: 16),
-            label: const Text(
-              'سجل التسميعات',
-              style: TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.brandGold,
-              side: BorderSide(
-                color: AppColors.brandGold.withValues(alpha: 0.3),
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
+        OutlinedButton.icon(
+          onPressed: provider.goToAnalytics,
+          icon: const Icon(Icons.analytics_rounded, size: 18),
+          label: const Text('لوحة التحليلات'),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => provider.goToAnalytics(),
-            icon: const Icon(Icons.analytics_rounded, size: 16),
-            label: const Text(
-              'لوحة التحليلات',
-              style: TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.brandGold,
-              side: BorderSide(
-                color: AppColors.brandGold.withValues(alpha: 0.3),
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        // زر معاينة تقرير تجريبي
-        SizedBox(
-          width: double.infinity,
-          child: TextButton.icon(
-            onPressed: () => provider.loadDemoResult(),
-            icon: const Icon(
-              Icons.preview_rounded,
-              size: 18,
-              color: AppColors.brandGold,
-            ),
-            label: const Text(
-              'معاينة شكل تقرير التسميع وتلوين الكلمات (Demo)',
-              style: TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 13,
-                color: AppColors.brandGold,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+        TextButton.icon(
+          onPressed: provider.loadDemoResult,
+          icon: const Icon(Icons.preview_rounded, size: 18),
+          label: const Text('معاينة تقرير تجريبي'),
         ),
       ],
     );
@@ -694,33 +670,14 @@ class RecitationSetupView extends StatelessWidget {
   }
 
   Widget _buildQuickEngineSwitch(RecitationProvider provider, bool isDark) {
-    return Row(
-      children: [
-        Expanded(
-          child: _EngineSwitchChip(
-            title: 'Zipformer V3',
-            size: '164 MB',
-            badge: 'المعتمد',
-            isDownloaded: provider.isZipformerDownloaded,
-            isSelected: provider.engine == RecitationEngine.zipformer,
-            isDark: isDark,
-            onTap: () =>
-                provider.setRecitationEngine(RecitationEngine.zipformer),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _EngineSwitchChip(
-            title: 'Whisper',
-            size: '142 MB',
-            badge: 'قيد التطوير',
-            isDownloaded: provider.isWhisperDownloaded,
-            isSelected: false,
-            isDark: isDark,
-            onTap: null,
-          ),
-        ),
-      ],
+    return _EngineSwitchChip(
+      title: 'محرك Zipformer V3 (المعتمد عبر NPU)',
+      size: '164 MB',
+      badge: 'المعتمد',
+      isDownloaded: provider.isZipformerDownloaded,
+      isSelected: true,
+      isDark: isDark,
+      onTap: () => provider.setRecitationEngine(RecitationEngine.zipformer),
     );
   }
 

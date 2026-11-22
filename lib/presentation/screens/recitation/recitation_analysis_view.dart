@@ -113,34 +113,6 @@ class RecitationAnalysisView extends StatelessWidget {
             ),
             const SizedBox(height: 40),
 
-            // ─── النص المتدفق (الكلمات الحية) ───
-            if (provider.liveTranscript.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1E22) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppColors.brandGold.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    provider.liveTranscript,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontFamily: 'QCF4_BSML', // أو Tajawal
-                      fontSize: 22,
-                      height: 1.8,
-                      color: AppColors.brandGold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-
             // ─── خطوات التحليل ───
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 48),

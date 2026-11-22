@@ -6,10 +6,12 @@ import 'package:provider/provider.dart';
 import 'package:mathani/core/constants/app_colors.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
 import 'package:mathani/presentation/widgets/mushaf_page_widget.dart';
+import 'package:mathani/presentation/widgets/mushaf_image_widget.dart';
 import 'package:mathani/presentation/widgets/digital_khatt_mushaf_page_widget.dart';
 import 'package:mathani/data/services/digital_khatt_page_loader.dart';
 import 'package:mathani/data/services/glyph_data_loader.dart';
 import 'package:mathani/data/models/page_glyph.dart';
+import 'package:mathani/data/providers/mushaf_navigation_provider.dart';
 import 'package:mathani/presentation/providers/mushaf_metadata_provider.dart';
 
 /// شاشة التسجيل — المتابعة اللحظية على المصحف
@@ -54,8 +56,10 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
   Future<void> _loadCurrentPage() async {
     if (!mounted) return;
     final provider = context.read<RecitationProvider>();
-    if (context.read<MushafMetadataProvider>().currentMushafType ==
-        'single_font') {
+    final mushafType = context.read<MushafMetadataProvider>().currentMushafType;
+    if (mushafType == 'single_font' ||
+        mushafType == 'image' ||
+        mushafType == 'page_font') {
       setState(() => _isLoadingPage = false);
       return;
     }
@@ -140,11 +144,19 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
   Widget build(BuildContext context) {
     final provider = context.watch<RecitationProvider>();
     final mushafMetadata = context.watch<MushafMetadataProvider>();
-    final singleFont = mushafMetadata.currentMushafType == 'single_font';
+    final mushafType = mushafMetadata.currentMushafType;
+    final singleFont = mushafType == 'single_font';
+    final pageImage = mushafType == 'image';
+    final hasPageLayout = mushafType == 'page_font';
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final revealedWordKeys = provider.hideVerses
+        ? provider.revealedWordKeys
+        : null;
 
     // مراقبة تغيير الصفحة
     if (!singleFont &&
+        !pageImage &&
+        !hasPageLayout &&
         _currentPageGlyph?.page != provider.currentPage &&
         !_isLoadingPage) {
       Future.microtask(() => _loadCurrentPage());
@@ -158,30 +170,38 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
           if (singleFont)
             DigitalKhattMushafPageWidget(
               pageNumber: provider.currentPage,
-              fontFamily: mushafMetadata.currentMushafId ==
-                      'digital_khatt_old_madina'
+              fontFamily:
+                  mushafMetadata.currentMushafId == 'digital_khatt_old_madina'
                   ? 'DigitalKhattOldMadina'
                   : 'DigitalKhattMadina',
-              loader: mushafMetadata.currentMushafId ==
-                      'digital_khatt_old_madina'
+              loader:
+                  mushafMetadata.currentMushafId == 'digital_khatt_old_madina'
                   ? digitalKhattOldMadinaLoader
                   : digitalKhattPageLoader,
               selectedSurah: provider.matchedSurah,
               selectedAyah: provider.matchedAyah,
               wordVerdicts: provider.liveWordVerdicts,
+              revealedWordKeys: revealedWordKeys,
             )
-          else if (_isLoadingPage || _currentPageGlyph == null)
+          else if (pageImage)
+            _buildImagePage(provider, mushafMetadata, revealedWordKeys)
+          else if (_currentPageGlyph == null && !hasPageLayout)
             const Center(child: CircularProgressIndicator())
           else
             Opacity(
               opacity: 0.9,
               child: MushafPageWidget(
-                page: _currentPageGlyph!,
+                page: hasPageLayout
+                    ? PageGlyph(page: provider.currentPage, lines: [])
+                    : _currentPageGlyph!,
                 mushafId: mushafMetadata.currentMushafId,
+                isDigital: mushafType == 'digital',
                 selectedSurah:
                     provider.matchedSurah, // تلوين الآية المكتشفة لحظياً
                 selectedAyah: provider.matchedAyah,
                 showInfo: true,
+                wordVerdicts: provider.liveWordVerdicts,
+                revealedWordKeys: revealedWordKeys,
               ),
             ),
 
@@ -207,6 +227,18 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                   IconButton(
                     icon: const Icon(Icons.close_rounded, color: Colors.white),
                     onPressed: _cancelRecording,
+                  ),
+                  IconButton(
+                    tooltip: provider.hideVerses
+                        ? 'إظهار الآيات'
+                        : 'إخفاء الآيات',
+                    onPressed: provider.toggleVerseVisibility,
+                    icon: Icon(
+                      provider.hideVerses
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: Colors.white,
+                    ),
                   ),
                   const Spacer(),
                   Container(
@@ -403,30 +435,29 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // النص المكتشف (Transcript)
-                  if (provider.liveTranscript.isNotEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        provider.liveTranscript,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontFamily: 'Tajawal',
-                          fontSize: 13,
-                          color: AppColors.mutedText,
-                        ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      provider.liveReadingStatus,
+                      textDirection: TextDirection.rtl,
+                      textAlign: TextAlign.start,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 13,
+                        color: AppColors.mutedText,
                       ),
                     ),
+                  ),
                   const SizedBox(height: 16),
                   // أزرار التحكم
                   Row(
@@ -496,6 +527,28 @@ class _RecitationRecordingViewState extends State<RecitationRecordingView>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildImagePage(
+    RecitationProvider provider,
+    MushafMetadataProvider metadata,
+    Set<String>? revealedWordKeys,
+  ) {
+    final nav = context.watch<MushafNavigationProvider>();
+    final mushaf = metadata.availableMushafs.firstWhere(
+      (entry) => entry.identifier == metadata.currentMushafId,
+    );
+    final surah = provider.matchedSurah ?? provider.selectedSurah;
+    final ayah = provider.matchedAyah ?? provider.startAyah;
+    final page = surah == null ? null : nav.getPageForAyah(surah, ayah);
+    return MushafImageWidget(
+      pageNumber: page ?? 1,
+      mushafId: metadata.currentMushafId,
+      baseUrl: mushaf.baseUrl ?? '',
+      imageExtension: mushaf.imageExtension ?? 'jpg',
+      showInfo: false,
+      revealedWordKeys: revealedWordKeys,
     );
   }
 

@@ -20,10 +20,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mathani/core/services/recitation/recitation_model_downloader.dart';
 import 'package:mathani/core/services/recitation/live_recitation_service.dart';
 import 'package:mathani/core/services/recitation/recitation_phoneme_repository.dart';
+import 'package:mathani/core/services/recitation/zipformer_audio_timeline.dart';
 import 'package:mathani/core/services/recitation/zipformer_alignment.dart';
 import 'package:mathani/core/services/recitation/recitation_models.dart';
 import 'package:mathani/core/services/recitation/zipformer_android_npu.dart';
 import 'package:mathani/core/services/recitation/zipformer_engine.dart';
+import 'package:mathani/core/utils/phoneme_utils.dart';
 
 import 'dart:convert';
 
@@ -154,11 +156,25 @@ class RecitationProvider extends ChangeNotifier {
 
   // النتائج
   RecitationResult? _currentResult;
+  RecitationSession? _currentResultSession;
 
   // المتابعة اللحظية
   int? _matchedSurah;
   int? _matchedAyah;
   int _currentPage = 1;
+  bool _microphoneReady = false;
+  String _liveReadingWords = '';
+  WordMatchEvent? _blockedWord;
+  Set<String> _revealedWordKeys = const {};
+  Set<String> get revealedWordKeys => _revealedWordKeys;
+
+  static const _hideVersesKey = 'recitation_hide_verses';
+  static const _stopOnConfirmedErrorKey = 'recitation_stop_on_confirmed_error';
+  final _changedPracticePreferences = <String>{};
+  bool _hideVerses = false;
+  bool get hideVerses => _hideVerses;
+  bool _stopOnConfirmedError = false;
+  bool get stopOnConfirmedError => _stopOnConfirmedError;
 
   // السجل
   final List<RecitationSession> _sessions = [];
@@ -279,6 +295,15 @@ class RecitationProvider extends ChangeNotifier {
   int? get matchedAyah => _matchedAyah;
   int get currentPage => _currentPage;
   String get liveTranscript => _currentTranscript;
+  String get liveReadingStatus {
+    if (isPaused) return 'التسميع متوقف مؤقتًا';
+    if (!_microphoneReady) return 'جارٍ فتح الميكروفون...';
+    if (_blockedWord != null) {
+      return 'أعد الكلمة عند موضع التوقف أو اضغط «لقّنّي»';
+    }
+    if (_liveReadingWords.isNotEmpty) return _liveReadingWords;
+    return _currentTranscript.isEmpty ? 'جاهز للقراءة' : 'أستمع إليك…';
+  }
 
   /// نسبة الثقة الإجمالية الحالية (0.0 - 1.0) — تعتمد على نتيجة الجلسة إن وُجدت
   double get overallConfidence => _currentResult?.accuracy ?? 0.0;
@@ -292,6 +317,7 @@ class RecitationProvider extends ChangeNotifier {
   late final ZipformerAlignment _alignment = ZipformerAlignment(
     _phonemeRepository,
   );
+  ZipformerAlignmentSession? _alignmentSession;
 
   RecitationProvider({
     LiveRecitationService? liveService,
@@ -310,8 +336,56 @@ class RecitationProvider extends ChangeNotifier {
        _quranRepository = quranRepository ?? sl<QuranRepository>() {
     if (loadInitialState) {
       unawaited(_loadEnginePreference());
+      unawaited(_loadPracticePreferences());
       unawaited(checkModelsState());
       unawaited(loadSessions());
+    }
+  }
+
+  Future<void> _loadPracticePreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_disposed) return;
+      if (!_changedPracticePreferences.contains(_hideVersesKey)) {
+        _hideVerses = prefs.getBool(_hideVersesKey) ?? false;
+      }
+      if (!_changedPracticePreferences.contains(_stopOnConfirmedErrorKey)) {
+        _stopOnConfirmedError =
+            prefs.getBool(_stopOnConfirmedErrorKey) ?? false;
+      }
+      notifyListeners();
+    } catch (error) {
+      debugPrint('Error loading recitation practice preferences: $error');
+    }
+  }
+
+  void setHideVerses(bool hidden) {
+    if (_disposed || _hideVerses == hidden) return;
+    _hideVerses = hidden;
+    _savePracticePreference(_hideVersesKey, hidden);
+    notifyListeners();
+  }
+
+  void toggleVerseVisibility() => setHideVerses(!_hideVerses);
+
+  void setStopOnConfirmedError(bool enabled) {
+    if (_disposed || _hasSession || _stopOnConfirmedError == enabled) return;
+    _stopOnConfirmedError = enabled;
+    _savePracticePreference(_stopOnConfirmedErrorKey, enabled);
+    notifyListeners();
+  }
+
+  void _savePracticePreference(String key, bool value) {
+    _changedPracticePreferences.add(key);
+    unawaited(_writePracticePreference(key, value));
+  }
+
+  Future<void> _writePracticePreference(String key, bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(key, value);
+    } catch (error) {
+      debugPrint('Error saving recitation practice preference: $error');
     }
   }
 
@@ -396,6 +470,7 @@ class RecitationProvider extends ChangeNotifier {
     if (_hasSession) return;
     _state = RecitationState.setup;
     _currentResult = null;
+    _currentResultSession = null;
     notifyListeners();
   }
 
@@ -416,7 +491,7 @@ class RecitationProvider extends ChangeNotifier {
           .where()
           .sortByCreatedAtDesc()
           .findAll();
-
+      if (_disposed) return;
       _allSessions.clear();
       _allSessions.addAll(savedSessions);
 
@@ -431,9 +506,9 @@ class RecitationProvider extends ChangeNotifier {
   Future<void> saveSession(RecitationSession session) async {
     try {
       final isar = IsarService.instance.isar;
-      await isar.writeTxn(() async {
-        await isar.recitationSessions.put(session);
-      });
+      session.id = await isar.writeTxn(
+        () => isar.recitationSessions.put(session),
+      );
       await loadSessions();
     } catch (e) {
       debugPrint('Error saving recitation session: $e');
@@ -442,6 +517,54 @@ class RecitationProvider extends ChangeNotifier {
       _sessions.addAll(_allSessions.take(3));
       notifyListeners();
     }
+  }
+
+  Future<RecitationResult> setReviewItemDismissed(
+    RecitationResult result,
+    RecitationReviewItem item, {
+    required bool dismissed,
+  }) async {
+    if (_disposed) throw StateError('مراجعة الجلسة غير متاحة.');
+    final id = result.sessionId;
+    if (id == null) {
+      if (!identical(result, _currentResult)) {
+        throw StateError('هذه الجلسة غير متاحة للتعديل.');
+      }
+      final record = _currentResultSession;
+      final updated = record == null
+          ? result.withReviewItemDismissal(item, dismissed: dismissed)
+          : RecitationResult.updateSessionReview(
+              record,
+              item,
+              dismissed: dismissed,
+            );
+      _currentResult = updated;
+      notifyListeners();
+      return updated;
+    }
+
+    final isar = IsarService.instance.isar;
+    final (record, updated) = await isar.writeTxn(() async {
+      final latest = await isar.recitationSessions.get(id);
+      if (latest == null) {
+        throw StateError('الجلسة محفوظة سابقًا ولم تعد متاحة.');
+      }
+      final result = RecitationResult.updateSessionReview(
+        latest,
+        item,
+        dismissed: dismissed,
+      );
+      await isar.recitationSessions.put(latest);
+      return (latest, result);
+    });
+    if (_disposed) return updated;
+    if (_currentResult?.sessionId == id) _currentResult = updated;
+    for (final sessions in [_allSessions, _sessions]) {
+      final index = sessions.indexWhere((session) => session.id == id);
+      if (index >= 0) sessions[index] = record;
+    }
+    notifyListeners();
+    return updated;
   }
 
   Future<void> checkModelsState() async {
@@ -686,11 +809,22 @@ class RecitationProvider extends ChangeNotifier {
       startTime: DateTime.now(),
     );
     _activeSessionConfig = session;
+    _alignmentSession = _alignment.newSession(
+      surah: session.surahNumber,
+      startAyah: session.surahNumber == null ? null : session.startAyah,
+      endAyah: session.surahNumber == null ? null : session.endAyah,
+      stopOnConfirmedError: _stopOnConfirmedError,
+    );
+    _microphoneReady = false;
+    _liveReadingWords = '';
+    _blockedWord = null;
+    _revealedWordKeys = const {};
     _state = RecitationState.preparing;
     _analysisStep = 'جارٍ تجهيز محرك التسميع والإذن بالتسجيل...';
     _analysisProgress = 0;
     _errorMessage = null;
     _currentResult = null;
+    _currentResultSession = null;
     _matchedSurah = session.surahNumber;
     _matchedAyah = session.surahNumber == null ? null : session.startAyah;
     _currentPage = _matchedSurah == null
@@ -737,6 +871,11 @@ class RecitationProvider extends ChangeNotifier {
       stage = RecitationDiagnosticStage.recording;
       final path = await _liveService.start(
         onPartial: (phonemes) => _queueHypothesis(session, phonemes),
+        onFirstPcm: () {
+          if (!_isCurrent(session)) return;
+          _microphoneReady = true;
+          if (_state == RecitationState.recording) notifyListeners();
+        },
         onError: (_, _) {
           if (_isCurrent(session)) {
             unawaited(
@@ -750,7 +889,7 @@ class RecitationProvider extends ChangeNotifier {
       );
       if (!_isCurrent(session)) return null;
       _state = RecitationState.recording;
-      _currentTranscript = 'جارٍ الاستماع...';
+      _currentTranscript = '';
       _recordingClock.start();
       notifyListeners();
       return path;
@@ -763,6 +902,7 @@ class RecitationProvider extends ChangeNotifier {
         }
         if (_isCurrent(session)) {
           _activeSessionConfig = null;
+          _alignmentSession = null;
           _state = RecitationState.error;
           final message = switch (stage) {
             RecitationDiagnosticStage.reference =>
@@ -780,18 +920,6 @@ class RecitationProvider extends ChangeNotifier {
       return null;
     }
   }
-
-  List<ZipformerVerseAlignment> _align(
-    RecitationSessionConfig session,
-    String phonemes,
-  ) => _alignment.align(
-    phonemes,
-    surah: session.surahNumber,
-    startAyah: session.mode == RecitationMode.selected
-        ? session.startAyah
-        : null,
-    endAyah: session.mode == RecitationMode.selected ? session.endAyah : null,
-  );
 
   void _queueHypothesis(RecitationSessionConfig session, String phonemes) {
     if (!_isCurrent(session) || _state != RecitationState.recording) return;
@@ -811,28 +939,74 @@ class RecitationProvider extends ChangeNotifier {
         return;
       }
       try {
-        final verses = _align(session, next);
-        if (verses.isNotEmpty) {
-          final parts = verses.last.verse.verseKey.split(':');
-          final surah = int.parse(parts[0]);
-          final ayah = int.parse(parts[1]);
+        final verses = _alignmentSession!.update(next);
+        final active = verses.lastOrNull;
+        _blockedWord = active?.blockedWord;
+        final words = _reportedWords(verses);
+        final confirmed = words
+            .where((word) => word.verdict == WordVerdict.correct)
+            .toList(growable: false);
+        if (confirmed.isNotEmpty) {
+          var position = confirmed.length - 1;
+          final replay = verses.reversed
+              .where((verse) => verse.activeWordIndex != null)
+              .firstOrNull;
+          if (replay != null) {
+            final [surah, ayah] = replay.verse.verseKey
+                .split(':')
+                .map(int.parse)
+                .toList(growable: false);
+            final replayPosition = confirmed.lastIndexWhere(
+              (word) =>
+                  word.surahNumber == surah &&
+                  word.ayahNumber == ayah &&
+                  word.wordIndex == replay.activeWordIndex,
+            );
+            if (replayPosition >= 0) position = replayPosition;
+          }
+          final current = confirmed[position];
+          _matchedSurah = current.surahNumber;
+          _matchedAyah = current.ayahNumber;
+          _currentPage = _calculatePage(
+            current.surahNumber,
+            current.ayahNumber,
+          );
+          _lastMatchedWordIndex = current.wordIndex;
+          _liveReadingWords = confirmed
+              .getRange(position >= 4 ? position - 4 : 0, position + 1)
+              .map((word) => word.expectedWord)
+              .join(' ');
+        }
+        if (active != null && _blockedWord != null) {
+          final [surah, ayah] = active.verse.verseKey
+              .split(':')
+              .map(int.parse)
+              .toList();
           _matchedSurah = surah;
           _matchedAyah = ayah;
           _currentPage = _calculatePage(surah, ayah);
         }
-        _lastMatchedWordIndex = -1;
-        final words = _confirmedWords(verses);
         _liveWordVerdicts.clear();
+        final revealed = <String>{};
         for (final word in words) {
+          if (!word.coversReferenceWord) continue;
           final key =
               '${word.surahNumber}_${word.ayahNumber}_${word.wordIndex + 1}';
           _liveWordVerdicts[key] = word.verdict;
-          if (word.surahNumber == _matchedSurah &&
-              word.ayahNumber == _matchedAyah) {
-            _lastMatchedWordIndex = word.wordIndex;
-          }
+          if (word.verdict == WordVerdict.correct) revealed.add(key);
         }
-        _matchedAyahsCount = verses.where((v) => v.isComplete).length;
+        _revealedWordKeys = Set.unmodifiable(revealed);
+        _matchedAyahsCount = verses
+            .where(
+              (verse) =>
+                  verse.isComplete &&
+                  verse.words.any(
+                    (word) =>
+                        word.status == WordRecitationStatus.matched ||
+                        word.status == WordRecitationStatus.corrected,
+                  ),
+            )
+            .length;
         _mistakesCount = words
             .where(
               (word) =>
@@ -853,20 +1027,51 @@ class RecitationProvider extends ChangeNotifier {
     });
   }
 
-  List<MatchedWord> _confirmedWords(List<ZipformerVerseAlignment> verses) {
+  List<MatchedWord> _reportedWords(
+    List<ZipformerVerseAlignment> verses, {
+    ZipformerAudioTimeline? timeline,
+  }) {
     final words = <MatchedWord>[];
     for (final item in verses) {
       final parts = item.verse.verseKey.split(':');
       final surah = int.parse(parts[0]);
       final ayah = int.parse(parts[1]);
       for (final word in item.words) {
-        final verdict = switch (word.status) {
-          WordRecitationStatus.matched => WordVerdict.correct,
-          WordRecitationStatus.omitted => WordVerdict.skipped,
-          WordRecitationStatus.incorrect => WordVerdict.incorrect,
+        final classification = switch (word.status) {
+          WordRecitationStatus.matched => (WordVerdict.correct, null),
+          WordRecitationStatus.corrected => (
+            WordVerdict.correct,
+            RecitationReviewKind.corrected,
+          ),
+          WordRecitationStatus.omitted => (
+            WordVerdict.skipped,
+            RecitationReviewKind.skippedWord,
+          ),
+          WordRecitationStatus.omittedVerse => (
+            WordVerdict.skipped,
+            RecitationReviewKind.skippedAyah,
+          ),
+          WordRecitationStatus.added => (
+            WordVerdict.incorrect,
+            RecitationReviewKind.addedWord,
+          ),
+          WordRecitationStatus.incorrect => (
+            WordVerdict.incorrect,
+            word.similarity <= 0.65 &&
+                    PhonemeUtils.phonemeEditDistance(
+                          word.recognizedPhonemes,
+                          word.referencePhonemes,
+                        ) >
+                        1
+                ? RecitationReviewKind.replacedWord
+                : RecitationReviewKind.unclassified,
+          ),
+          WordRecitationStatus.unconfirmed => (WordVerdict.unconfirmed, null),
           WordRecitationStatus.current || WordRecitationStatus.unspoken => null,
         };
-        if (verdict == null) continue;
+        if (classification == null) continue;
+        final (verdict, kind) = classification;
+        final clip = timeline?.clip(word.phonemeStart, word.phonemeEnd);
         words.add(
           MatchedWord(
             spokenWord: word.recognizedPhonemes,
@@ -876,6 +1081,9 @@ class RecitationProvider extends ChangeNotifier {
             wordIndex: word.wordIndex,
             similarity: word.similarity,
             verdict: verdict,
+            reviewKind: kind,
+            startMs: clip?.startMs,
+            endMs: clip?.endMs,
           ),
         );
       }
@@ -961,15 +1169,26 @@ class RecitationProvider extends ChangeNotifier {
       }
       stage = RecitationDiagnosticStage.matching;
       message = 'تعذّر تحديد كلمات مؤكدة من التسجيل.';
-      final verses = _align(session, result.phonemes);
-      final words = _confirmedWords(verses);
-      if (words.isEmpty) {
+      final verses = _alignmentSession!.update(result.phonemes, isFinal: true);
+      final words = _reportedWords(
+        verses,
+        timeline: result.tokenTimings.isEmpty
+            ? null
+            : ZipformerAudioTimeline(
+                result.phonemes,
+                result.tokenTimings,
+                result.audioDurationMs,
+              ),
+      );
+      final gradedWords = words.where(
+        (word) =>
+            word.coversReferenceWord && word.verdict != WordVerdict.unconfirmed,
+      );
+      if (gradedWords.isEmpty) {
         throw StateError(message);
       }
       final first = words.first;
-      final last = words.lastWhere(
-        (word) => word.surahNumber == first.surahNumber,
-      );
+      final last = words.last;
       final match = MatchResult(
         surahNumber: first.surahNumber,
         surahName: verses.first.verse.surahNameAr,
@@ -977,8 +1196,8 @@ class RecitationProvider extends ChangeNotifier {
         endAyah: last.ayahNumber,
         matchedWords: words,
         overallConfidence:
-            words.fold<double>(0, (sum, word) => sum + word.similarity) /
-            words.length,
+            gradedWords.fold<double>(0, (sum, word) => sum + word.similarity) /
+            gradedWords.length,
       );
       stage = RecitationDiagnosticStage.finalization;
       message = 'تعذّر إكمال نتيجة الجلسة.';
@@ -992,6 +1211,9 @@ class RecitationProvider extends ChangeNotifier {
     } catch (_) {
       if (_isCurrent(session)) {
         _activeSessionConfig = null;
+        _alignmentSession = null;
+        _blockedWord = null;
+        _revealedWordKeys = const {};
         _liveWordVerdicts.clear();
         _state = RecitationState.error;
         _recordFailure(stage, message);
@@ -1066,12 +1288,13 @@ class RecitationProvider extends ChangeNotifier {
         ayahNumber: word.ayahNumber,
         wordIndex: word.wordIndex,
         verdict: word.verdict,
+        reviewKind: word.reviewKind,
         confidence: word.similarity,
         startTimeMs: word.startMs,
         endTimeMs: word.endMs,
       );
     }).toList();
-    final result = RecitationResult(
+    var result = RecitationResult(
       words: words,
       surahNumber: matchResult.surahNumber,
       surahName: matchResult.surahName,
@@ -1092,7 +1315,7 @@ class RecitationProvider extends ChangeNotifier {
           ..endAyah = result.endAyah
           ..mode = session.mode == RecitationMode.free ? 'free' : 'selected'
           ..accuracyPercent = result.accuracyPercent
-          ..totalWords = result.totalWords
+          ..totalWords = result.gradedWords
           ..correctWords = result.correctWords
           ..durationSeconds = (result.durationMs / 1000).round()
           ..overallGrade = result.overallGrade
@@ -1101,8 +1324,10 @@ class RecitationProvider extends ChangeNotifier {
             ...result.toJson(),
             'engine': session.engine.name,
           })
-          ..createdAt = DateTime.now();
+          ..createdAt = session.startTime;
         await saveSession(record);
+        if (_isCurrent(session)) _currentResultSession = record;
+        result = RecitationResult.fromSession(record);
       } finally {
         _savingResult = false;
       }
@@ -1112,11 +1337,15 @@ class RecitationProvider extends ChangeNotifier {
     _currentResult = result;
     _liveWordVerdicts.clear();
     for (final word in words) {
+      if (!word.coversReferenceWord) continue;
       final key =
           '${word.surahNumber}_${word.ayahNumber}_${word.wordIndex + 1}';
       _liveWordVerdicts[key] = word.verdict;
     }
     _activeSessionConfig = null;
+    _alignmentSession = null;
+    _blockedWord = null;
+    _revealedWordKeys = const {};
     _analysisProgress = 1;
     _state = RecitationState.result;
     notifyListeners();
@@ -1137,6 +1366,9 @@ class RecitationProvider extends ChangeNotifier {
     }
     if (_activeSessionConfig == null) return;
     _activeSessionConfig = null;
+    _alignmentSession = null;
+    _blockedWord = null;
+    _revealedWordKeys = const {};
     _recordingClock.stop();
     _clearPartialUpdate();
     _promptTimer?.cancel();
@@ -1183,6 +1415,7 @@ class RecitationProvider extends ChangeNotifier {
     }
     _state = RecitationState.setup;
     _currentResult = null;
+    _currentResultSession = null;
     _errorMessage = null;
     _promptWord = null;
     _promptTimer?.cancel();
@@ -1195,6 +1428,7 @@ class RecitationProvider extends ChangeNotifier {
   // ═══════════════════════════════════════════════
 
   String? getNextWord() {
+    if (_blockedWord case final blocked?) return blocked.wordText;
     final session = _activeSessionConfig;
     int surah;
     int ayah;
@@ -1338,63 +1572,18 @@ class RecitationProvider extends ChangeNotifier {
   // تحديد جلسة سابقة لاستعراض نتائجها
   void selectSession(RecitationSession session) {
     if (_hasSession) return;
-    if (session.resultJson != null && session.resultJson!.isNotEmpty) {
-      try {
-        final Map<String, dynamic> json = jsonDecode(session.resultJson!);
-        _currentResult = RecitationResult(
-          words: (json['words'] as List<dynamic>)
-              .map(
-                (w) => WordResult(
-                  spokenWord: w['spoken'] ?? '',
-                  expectedWord: w['expected'] ?? '',
-                  surahNumber: w['surah'] ?? 1,
-                  ayahNumber: w['ayah'] ?? 1,
-                  wordIndex: w['wordIndex'] ?? 0,
-                  verdict: WordVerdict.values.firstWhere(
-                    (v) => v.name == w['verdict'],
-                    orElse: () => WordVerdict.skipped,
-                  ),
-                  confidence: w['confidence'] ?? 1.0,
-                  startTimeMs: w['startMs'],
-                  endTimeMs: w['endMs'],
-                ),
-              )
-              .toList(),
-          surahNumber: json['surah'] ?? 1,
-          surahName: json['surahName'] ?? '',
-          startAyah: json['startAyah'] ?? 1,
-          endAyah: json['endAyah'] ?? 1,
-          durationMs: json['durationMs'] ?? 0,
-          rawTranscript: json['rawTranscript'] ?? '',
-          analyzedAt: DateTime.parse(json['analyzedAt']),
-          audioPath: json['audioPath'],
-        );
-
-        // إعادة ملء التلوين
-        _liveWordVerdicts.clear();
-        for (var w in _currentResult!.words) {
-          final key = "${w.surahNumber}_${w.ayahNumber}_${w.wordIndex + 1}";
-          _liveWordVerdicts[key] = w.verdict;
-        }
-
-        _state = RecitationState.result;
-        notifyListeners();
-      } catch (e) {
-        debugPrint('Error parsing session resultJson: $e');
-      }
-    } else {
-      _currentResult = RecitationResult(
-        words: [],
-        surahNumber: session.surahNumber,
-        surahName: session.surahName,
-        startAyah: session.startAyah,
-        endAyah: session.endAyah,
-        durationMs: session.durationSeconds * 1000,
-        rawTranscript: session.rawTranscript,
-      );
-      _state = RecitationState.result;
-      notifyListeners();
+    final result = RecitationResult.fromSession(session);
+    _currentResult = result;
+    _currentResultSession = session;
+    _liveWordVerdicts.clear();
+    for (final word in result.words) {
+      if (!word.coversReferenceWord) continue;
+      final key =
+          '${word.surahNumber}_${word.ayahNumber}_${word.wordIndex + 1}';
+      _liveWordVerdicts[key] = word.verdict;
     }
+    _state = RecitationState.result;
+    notifyListeners();
   }
 
   // ── حسابات لوحة التحليلات ──

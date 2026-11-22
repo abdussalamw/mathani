@@ -316,19 +316,6 @@ class _DownloadCenterScreenState extends State<DownloadCenterScreen> {
                   : null,
               isSelected: provider.engine == RecitationEngine.zipformer,
             ),
-            _buildDownloadCard(
-              context,
-              title: 'محرك التسميع الكلاسيكي (Whisper)',
-              subtitle:
-                  'قيد التطوير إلى حين إصلاح تحويل النموذج.',
-              isDownloaded: provider.isWhisperDownloaded,
-              isDownloading: false,
-              progress: 0,
-              size: '142 MB',
-              badge: 'قيد التطوير',
-              badgeColor: Colors.amber[800],
-              isSelected: false,
-            ),
           ],
         );
       },

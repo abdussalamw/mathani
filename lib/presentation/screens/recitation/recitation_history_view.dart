@@ -1,198 +1,254 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
-import 'package:mathani/core/constants/app_colors.dart';
+import 'package:mathani/data/models/recitation_result.dart';
+import 'package:mathani/data/models/recitation_session.dart';
 import 'package:mathani/presentation/providers/recitation_provider.dart';
-import 'package:intl/intl.dart';
 
-/// شاشة سجل التسميعات السابقة
-class RecitationHistoryView extends StatelessWidget {
-  const RecitationHistoryView({Key? key}) : super(key: key);
+import 'recitation_result_view.dart';
+
+enum _HistoryPeriod {
+  today('اليوم'),
+  week('آخر 7 أيام'),
+  all('الكل');
+
+  const _HistoryPeriod(this.label);
+  final String label;
+}
+
+class RecitationHistoryView extends StatefulWidget {
+  const RecitationHistoryView({super.key, required this.onOpenResult});
+
+  final ValueChanged<RecitationResult> onOpenResult;
+
+  @override
+  State<RecitationHistoryView> createState() => _RecitationHistoryViewState();
+}
+
+class _RecitationHistoryViewState extends State<RecitationHistoryView> {
+  final _scroll = ScrollController();
+  _HistoryPeriod _period = _HistoryPeriod.all;
+  DateTime? _date;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Future<void> _chooseDay(
+    List<RecitationSession> sessions,
+    DateTime today,
+  ) async {
+    final days = sessions.map((s) => DateUtils.dateOnly(s.createdAt.toLocal()));
+    var earliest = today;
+    var latest = today;
+    for (final day in days) {
+      if (day.isBefore(earliest)) earliest = day;
+      if (day.isAfter(latest)) latest = day;
+    }
+    final selected = await showDatePicker(
+      context: context,
+      firstDate: earliest,
+      lastDate: latest,
+      initialDate: _date ?? today,
+      helpText: 'تاريخ التسميع',
+    );
+    if (!mounted || selected == null) return;
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+    setState(() => _date = selected);
+  }
+
+  bool _includes(DateTime day, DateTime today) {
+    if (_date != null) return DateUtils.isSameDay(day, _date);
+    return switch (_period) {
+      _HistoryPeriod.today => day == today,
+      _HistoryPeriod.week =>
+        !day.isBefore(DateTime(today.year, today.month, today.day - 6)) &&
+            !day.isAfter(today),
+      _HistoryPeriod.all => true,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final provider = context.watch<RecitationProvider>();
+    final sessions = context.watch<RecitationProvider>().allSessions;
+    final localizations = MaterialLocalizations.of(context);
+    final today = DateUtils.dateOnly(DateTime.now());
+    final scheme = Theme.of(context).colorScheme;
+    final matching =
+        sessions
+            .where(
+              (s) =>
+                  _includes(DateUtils.dateOnly(s.createdAt.toLocal()), today),
+            )
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    return Container(
-      color: isDark ? const Color(0xFF131315) : AppColors.brandBackground,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // ─── شريط علوي ───
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.slateText,
-                    ),
-                    onPressed: () => provider.goToSetup(),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'سجل التسميعات',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Tajawal',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.slateText,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 48),
-                ],
-              ),
-            ),
-
-            // ─── القائمة ───
-            Expanded(
-              child: provider.sessions.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: provider.sessions.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final session = provider.sessions[index];
-                        return GestureDetector(
-                          onTap: () => provider.selectSession(session),
-                          child: _buildSessionCard(session, isDark),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.history_rounded,
-            size: 64,
-            color: Colors.grey.withValues(alpha: 0.4),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'لا توجد تسميعات سابقة',
-            style: TextStyle(
-              fontFamily: 'Tajawal',
-              fontSize: 16,
-              color: AppColors.mutedText,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'ابدأ تسميعك الأول من الشاشة الرئيسية',
-            style: TextStyle(
-              fontFamily: 'Tajawal',
-              fontSize: 12,
-              color: AppColors.mutedText,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSessionCard(dynamic session, bool isDark) {
-    Color gradeColor;
-    if (session.accuracyPercent >= 85) {
-      gradeColor = AppColors.success;
-    } else if (session.accuracyPercent >= 60) {
-      gradeColor = AppColors.warning;
-    } else {
-      gradeColor = Colors.red;
+    final rows = <({DateTime day, RecitationSession? session})>[];
+    DateTime? previousDay;
+    for (final session in matching) {
+      final day = DateUtils.dateOnly(session.createdAt.toLocal());
+      if (day != previousDay) {
+        rows.add((day: day, session: null));
+        previousDay = day;
+      }
+      rows.add((day: day, session: session));
     }
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E22) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.08)),
-      ),
-      child: Row(
-        children: [
-          // النسبة
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: gradeColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '${session.accuracyPercent}%',
-              style: TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: gradeColor,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // التفاصيل
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'سورة ${session.surahName}',
-                  style: const TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.slateText,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'آية ${session.startAyah} - ${session.endAyah} • ${session.correctWords}/${session.totalWords} كلمة',
-                  style: const TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 11,
-                    color: AppColors.mutedText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // التاريخ
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text(
-                DateFormat('MM/dd').format(session.createdAt),
-                style: const TextStyle(
-                  fontFamily: 'Tajawal',
-                  fontSize: 10,
-                  color: AppColors.mutedText,
+              for (final period in _HistoryPeriod.values)
+                ChoiceChip(
+                  label: Text(period.label),
+                  selected: _date == null && _period == period,
+                  onSelected: (_) {
+                    if (_scroll.hasClients) _scroll.jumpTo(0);
+                    setState(() {
+                      _period = period;
+                      _date = null;
+                    });
+                  },
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                session.overallGrade,
-                style: TextStyle(
-                  fontFamily: 'Tajawal',
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: gradeColor,
+              OutlinedButton.icon(
+                onPressed: () => _chooseDay(sessions, today),
+                icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                label: Text(
+                  _date == null
+                      ? 'اختيار تاريخ'
+                      : localizations.formatCompactDate(_date!),
                 ),
               ),
             ],
           ),
-        ],
+        ),
+        Expanded(
+          child: rows.isEmpty
+              ? Center(
+                  child: Text(
+                    sessions.isEmpty
+                        ? 'لا توجد تسميعات سابقة'
+                        : 'لا توجد جلسات في الفترة المختارة',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                )
+              : ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  itemCount: rows.length,
+                  itemBuilder: (context, index) {
+                    final row = rows[index];
+                    final session = row.session;
+                    if (session != null) {
+                      return _sessionCard(context, session, localizations);
+                    }
+                    final heading = localizations.formatFullDate(row.day);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 16, bottom: 6),
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          heading,
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sessionCard(
+    BuildContext context,
+    RecitationSession session,
+    MaterialLocalizations localizations,
+  ) {
+    final result = RecitationResult.fromSession(session);
+    final scheme = Theme.of(context).colorScheme;
+    final time = localizations.formatTimeOfDay(
+      TimeOfDay.fromDateTime(session.createdAt.toLocal()),
+    );
+    final duration = Duration(seconds: session.durationSeconds);
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => widget.onOpenResult(result),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                alignment: WrapAlignment.start,
+                spacing: 12,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    recitationSurahName(
+                      context,
+                      result.surahNumber,
+                      fallback: result.surahName,
+                    ),
+                    style: TextStyle(
+                      color: scheme.onSurface,
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(time, style: TextStyle(color: scheme.onSurfaceVariant)),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                recitationRangeLabel(context, result),
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  Text(
+                    '$minutes:$seconds',
+                    textDirection: TextDirection.ltr,
+                    semanticsLabel:
+                        '$minutes دقيقة و${duration.inSeconds.remainder(60)} ثانية',
+                  ),
+                  if (session.totalWords > 0)
+                    Text(
+                      '${session.correctWords} من ${session.totalWords} مقيّمة',
+                    ),
+                  if (result.words.isNotEmpty) ...[
+                    Text('الأخطاء ${result.reviewIssueCount}'),
+                    if (result.unconfirmedWords > 0)
+                      Text('غير مؤكدة ${result.unconfirmedWords}'),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

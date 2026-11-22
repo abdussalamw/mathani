@@ -98,6 +98,10 @@ enum WordRecitationStatus {
   matched, // قُرئت بنجاح
   omitted, // تم تجاوزها أو نسيانها
   incorrect, // ثبت الاختلاف بعد محاذاة الكلمات اللاحقة
+  unconfirmed, // لم تكفِ نتيجة التعرّف للحكم على الكلمة
+  omittedVerse, // ثبت الانتقال إلى الآية التي تلي الآية المتجاوزة
+  added, // ظهر لفظ مرجعي زائد قبل موضع متابعة مؤكد
+  corrected, // أعاد القارئ كلمة ملتبسة وطابق لفظها المرجع
 }
 
 /// نتيجة مطابقة لحظية لكلمة قرآنية.
@@ -109,6 +113,10 @@ class WordMatchEvent {
   final double similarity;
   final WordRecitationStatus status;
 
+  /// Half-open UTF-16 offsets in the normalized cumulative hypothesis.
+  final int? phonemeStart;
+  final int? phonemeEnd;
+
   const WordMatchEvent({
     required this.wordIndex,
     required this.wordText,
@@ -116,5 +124,18 @@ class WordMatchEvent {
     required this.recognizedPhonemes,
     required this.similarity,
     required this.status,
+    this.phonemeStart,
+    this.phonemeEnd,
   });
+
+  WordMatchEvent asUnconfirmed() => WordMatchEvent(
+    wordIndex: wordIndex,
+    wordText: wordText,
+    referencePhonemes: referencePhonemes,
+    recognizedPhonemes: recognizedPhonemes,
+    similarity: 0,
+    status: WordRecitationStatus.unconfirmed,
+    phonemeStart: phonemeStart,
+    phonemeEnd: phonemeEnd,
+  );
 }

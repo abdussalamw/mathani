@@ -9,6 +9,19 @@ abstract interface class ZipformerNpuStream {
   Future<void> close();
 }
 
+/// Approximate positions from the CTC frames, in raw transcript code units and
+/// milliseconds of the shared PCM stream.
+typedef ZipformerTokenTiming = ({
+  int rawStart,
+  int rawEnd,
+  int startMs,
+  int endMs,
+});
+
+abstract interface class ZipformerTimedNpuStream implements ZipformerNpuStream {
+  Future<List<ZipformerTokenTiming>> readTokenTimings();
+}
+
 class ZipformerNpuUnavailable implements Exception {
   const ZipformerNpuUnavailable([
     this.message = 'هذه النسخة من مثاني لم تُجهّز لتشغيل Zipformer على NPU.',

@@ -23,7 +23,6 @@ class RecitationModelDownloader {
   static const String tokensFileName = 'tokens.txt';
 
   static const _downloadFiles = [
-    (ZipformerNpuPackage.context, 'ملف تهيئة NPU'),
     (ZipformerNpuPackage.binary, 'نموذج Zipformer المجهّز لـNPU'),
     (ZipformerNpuPackage.phonemes, 'مرجع الفونيمات'),
   ];
@@ -41,10 +40,42 @@ class RecitationModelDownloader {
   static Future<bool> isModelReady() async {
     try {
       final dir = await getModelDirectory(create: false);
+      if (!await dir.exists()) return false;
+      final binaryFile = File('${dir.path}/${ZipformerNpuPackage.binary.name}');
+      if (!await binaryFile.exists()) return false;
+      await ensureContextModelExtracted();
       return await compute(_verifyNpuFiles, dir.path);
     } catch (_) {
       return false;
     }
+  }
+
+  static Future<Uint8List> readBundledContextModel() async {
+    final byteData = await rootBundle.load(
+      'assets/data/${ZipformerNpuPackage.context.name}',
+    );
+    final bytes = byteData.buffer.asUint8List(
+      byteData.offsetInBytes,
+      byteData.lengthInBytes,
+    );
+    if (sha256.convert(bytes).toString() != ZipformerNpuPackage.context.sha256) {
+      throw const FormatException('Invalid bundled Zipformer context model');
+    }
+    return bytes;
+  }
+
+  static Future<File> ensureContextModelExtracted() async {
+    final dir = await getModelDirectory();
+    final target = File('${dir.path}/${ZipformerNpuPackage.context.name}');
+    if (!await ZipformerNpuPackage.matches(
+      target,
+      ZipformerNpuPackage.context,
+    )) {
+      final temporary = File('${target.path}.tmp');
+      await temporary.writeAsBytes(await readBundledContextModel(), flush: true);
+      await temporary.rename(target.path);
+    }
+    return target;
   }
 
   static Future<Uint8List> readBundledTokens() async {
@@ -77,6 +108,9 @@ class RecitationModelDownloader {
     required void Function(double progress, String statusText) onProgress,
   }) async {
     final dir = await getModelDirectory();
+    onProgress(0.01, 'استخراج ملف التهيئة المدمج...');
+    await ensureContextModelExtracted();
+    await ensureTokensExtracted();
     final total = _downloadFiles.fold(0, (sum, entry) => sum + entry.$1.size);
     var completed = 0;
     for (final (spec, label) in _downloadFiles) {

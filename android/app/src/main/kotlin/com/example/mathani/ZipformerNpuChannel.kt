@@ -31,9 +31,10 @@ internal class ZipformerNpuChannel(context: Context, messenger: BinaryMessenger)
 
     private fun capability(): String? {
         if (!Process.is64Bit() || "arm64-v8a" !in Build.SUPPORTED_ABIS) return "unsupported_abi"
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            !Build.SOC_MODEL.equals("SM8650", ignoreCase = true)
-        ) return "unsupported_soc"
+        val soc = Build.SOC_MODEL.uppercase()
+        val hardware = Build.HARDWARE.lowercase()
+        val isSm8650Family = soc.contains("SM8650") || hardware == "pineapple"
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !isSm8650Family) return "unsupported_soc"
         val libraries = File(application.applicationInfo.nativeLibraryDir)
         return if (requiredLibraries.all { File(libraries, it).isFile }) null else "runtime_missing"
     }
@@ -44,7 +45,7 @@ internal class ZipformerNpuChannel(context: Context, messenger: BinaryMessenger)
             result.success(mapOf("supported" to (reason == null), "reason" to reason))
             return
         }
-        if (call.method !in setOf("open", "acceptPcm", "finish", "close")) {
+        if (call.method !in setOf("open", "acceptPcm", "finish", "tokenTimings", "close")) {
             result.notImplemented()
             return
         }
@@ -56,6 +57,7 @@ internal class ZipformerNpuChannel(context: Context, messenger: BinaryMessenger)
                         "open" -> open(call)
                         "acceptPcm" -> acceptPcm(call)
                         "finish" -> currentStream(call).finish()
+                        "tokenTimings" -> currentStream(call).tokenTimings()
                         else -> {
                             // A late close from an old session must not affect a new one.
                             if (call.argument<Any>("session") == sessionId) closeStream()
@@ -115,9 +117,9 @@ internal class ZipformerNpuChannel(context: Context, messenger: BinaryMessenger)
         val model = File(path).canonicalFile
         val context = File(model.parentFile, contextName).canonicalFile
         if (!model.toPath().startsWith(root.toPath()) ||
-            model.name != modelName || !model.isFile || model.length() != modelSize ||
+            model.name != modelName || !model.isFile || model.length() <= 0L ||
             context.parentFile != model.parentFile || context.name != contextName ||
-            !context.isFile || context.length() != contextSize
+            !context.isFile || context.length() <= 0L
         ) throw ChannelFailure("model_unavailable")
         return model
     }
@@ -152,6 +154,8 @@ internal class ZipformerNpuChannel(context: Context, messenger: BinaryMessenger)
 
     private class ChannelFailure(val code: String) : Exception()
 
+    private data class TokenTiming(val rawStart: Int, val rawEnd: Int, val startMs: Int, var endMs: Int)
+
     private class ZipformerStream(
         model: File,
         libraries: File,
@@ -160,6 +164,8 @@ internal class ZipformerNpuChannel(context: Context, messenger: BinaryMessenger)
         private val features = ZipformerFbank()
         private val logits = FloatArray(12 * tokenCount)
         private val cumulative = StringBuilder()
+        private val timings = ArrayList<TokenTiming>()
+        private var frameTimeMs = 0
         private var previousToken = blankId
         private var finished = false
         private var handle = ZipformerQnn.open(model.path, libraries.path).also { check(it != 0L) }
@@ -172,8 +178,19 @@ internal class ZipformerNpuChannel(context: Context, messenger: BinaryMessenger)
                 for (token in 1 until tokenCount) {
                     if (logits[offset + token] > logits[offset + best]) best = token
                 }
-                if (best != blankId && best != previousToken) cumulative.append(tokens[best])
+                // 12 CTC steps represent 480 ms of advancing PCM per window.
+                val frameEndMs = frameTimeMs + 40
+                if (best != blankId) {
+                    if (best != previousToken) {
+                        val start = cumulative.length
+                        cumulative.append(tokens[best])
+                        timings.add(TokenTiming(start, cumulative.length, frameTimeMs, frameEndMs))
+                    } else {
+                        timings.lastOrNull()?.endMs = frameEndMs
+                    }
+                }
                 previousToken = best
+                frameTimeMs = frameEndMs
             }
         }
 
@@ -199,6 +216,19 @@ internal class ZipformerNpuChannel(context: Context, messenger: BinaryMessenger)
                 finished = true
             }
             return cumulative.toString()
+        }
+
+        fun tokenTimings(): IntArray {
+            if (!finished) throw ChannelFailure("invalid_session")
+            val values = IntArray(timings.size * 4)
+            timings.forEachIndexed { index, span ->
+                val offset = index * 4
+                values[offset] = span.rawStart
+                values[offset + 1] = span.rawEnd
+                values[offset + 2] = span.startMs
+                values[offset + 3] = span.endMs
+            }
+            return values
         }
 
         override fun close() {
