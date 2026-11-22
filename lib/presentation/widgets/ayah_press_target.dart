@@ -4,6 +4,8 @@ import 'package:material_ui/material_ui.dart';
 class AyahPressTarget extends StatelessWidget {
   const AyahPressTarget({super.key, required this.child, this.onSelected});
 
+  static const holdDuration = Duration(milliseconds: 350);
+
   final Widget child;
   final VoidCallback? onSelected;
 
@@ -15,9 +17,7 @@ class AyahPressTarget extends StatelessWidget {
       gestures: {
         LongPressGestureRecognizer:
             GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
-              () => LongPressGestureRecognizer(
-                duration: const Duration(milliseconds: 350),
-              ),
+              () => LongPressGestureRecognizer(duration: holdDuration),
               (recognizer) => recognizer.onLongPress = onSelected,
             ),
       },

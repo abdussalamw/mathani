@@ -1,7 +1,10 @@
+import 'dart:async';
+
+import '../../../l10n/app_localizations.dart';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/constants/app_colors.dart';
-import '../../../data/services/qcf4_font_downloader.dart';
 import '../../../data/services/local_tafsir_service.dart';
 import '../../providers/mushaf_metadata_provider.dart';
 
@@ -48,50 +51,44 @@ class _SplashScreenState extends State<SplashScreen>
     _navigateToHome();
   }
 
-  void _navigateToHome() async {
-    // 1. Wait for minimum splash time
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
+  bool _startupFailed = false;
 
-    final provider = context.read<MushafMetadataProvider>();
-
-    // 2. Wait for Provider to initialize (max 5 seconds timeout)
-    int retryCount = 0;
-    while (!provider.isInitialized && retryCount < 50) {
-      await Future.delayed(const Duration(milliseconds: 100));
-      retryCount++;
-    }
-
-    if (!mounted) return;
-
-    final currentId = provider.currentMushafId;
-
-    // 3. Check if Tafseer is ready
-    final tafsirReady = await LocalTafsirService.instance.isTafsirDownloaded();
-
-    // 4. Check if selected Mushaf is ready
-    bool mushafReady = false;
-    if (currentId == 'qcf2_v4_woff2') {
-      mushafReady = await QCF4FontDownloader.areAllFontsAvailable();
-    } else {
-      final mushafList = provider.availableMushafs;
-      if (mushafList.isNotEmpty) {
-        final mushaf = mushafList.firstWhere(
-          (m) => m.identifier == currentId,
-          orElse: () => mushafList.first,
-        );
-        mushafReady = mushaf.isDownloaded || mushaf.type == 'svg';
-      }
-    }
-
-    if (mounted) {
-      if (tafsirReady && mushafReady) {
-        // Load tafsir locally (background)
-        LocalTafsirService.instance.loadTafsirData();
-        Navigator.of(context).pushReplacementNamed('/home');
+  Future<void> _navigateToHome({bool retry = false}) async {
+    try {
+      final provider = context.read<MushafMetadataProvider>();
+      if (retry) {
+        setState(() => _startupFailed = false);
+        await provider.refresh();
       } else {
-        Navigator.of(context).pushReplacementNamed('/initial_download');
+        await Future.wait([
+          Future<void>.delayed(const Duration(seconds: 2)),
+          if (!provider.isInitialized) provider.initialized,
+        ]);
       }
+
+      if (!mounted) return;
+      final error = provider.initializationError;
+      if (error != null) throw error;
+
+      final currentId = provider.currentMushafId;
+
+      // 4. Check if selected Mushaf is ready
+      final mushafReady = provider.availableMushafs.any(
+        (m) => m.identifier == currentId && m.isDownloaded,
+      );
+
+      if (mounted) {
+        if (mushafReady) {
+          // إذا كان المصحف جاهزاً، ندخل القراءة مباشرة دون حجب المستخدم
+          unawaited(LocalTafsirService.instance.loadTafsirData());
+          Navigator.of(context).pushReplacementNamed('/home');
+        } else {
+          Navigator.of(context).pushReplacementNamed('/initial_download');
+        }
+      }
+    } catch (e) {
+      debugPrint('Startup navigation error: $e');
+      if (mounted) setState(() => _startupFailed = true);
     }
   }
 
@@ -156,9 +153,18 @@ class _SplashScreenState extends State<SplashScreen>
                 const SizedBox(height: 48),
 
                 // مؤشر التحميل
-                const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                ),
+                if (_startupFailed) ...[
+                  Text(AppLocalizations.of(context)!.errorLoading),
+                  TextButton(
+                    onPressed: () => _navigateToHome(retry: true),
+                    child: Text(AppLocalizations.of(context)!.retry),
+                  ),
+                ] else
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
+                  ),
               ],
             ),
           ),

@@ -11,7 +11,8 @@ import 'package:path_provider/path_provider.dart';
 /// خدمة تحميل بيانات Glyphs من ملف JSON
 class GlyphDataLoader {
   static List<PageGlyph>? _cachedPages;
-  static bool _isLoading = false;
+  static Future<List<PageGlyph>>? _pending;
+  static int _generation = 0;
 
   /// تحميل جميع الصفحات من JSON
   Future<List<PageGlyph>> loadAllPages() async {
@@ -20,19 +21,16 @@ class GlyphDataLoader {
       return _cachedPages!;
     }
 
-    // إذا كان التحميل جارياً، ننتظر
-    while (_isLoading) {
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-
-    // إذا تم التحميل أثناء الانتظار
-    if (_cachedPages != null) {
-      return _cachedPages!;
-    }
-
+    final pending = _pending ??= _load(_generation);
     try {
-      _isLoading = true;
+      return await pending;
+    } finally {
+      if (identical(_pending, pending)) _pending = null;
+    }
+  }
 
+  Future<List<PageGlyph>> _load(int generation) async {
+    try {
       // تحميل ملف JSON
       String jsonString;
 
@@ -58,13 +56,12 @@ class GlyphDataLoader {
 
       // استخدام compute للمعالجة في خلفية التطبيق (Isolates)
       // لمنع تجمد الواجهة (Stutter)
-      _cachedPages = await compute(_parseGlyphs, jsonString);
-
-      return _cachedPages!;
+      final pages = await compute(_parseGlyphs, jsonString);
+      if (generation != _generation) return await loadAllPages();
+      _cachedPages = pages;
+      return pages;
     } catch (e) {
       throw Exception('فشل تحميل بيانات المصحف: $e');
-    } finally {
-      _isLoading = false;
     }
   }
 
@@ -96,6 +93,8 @@ class GlyphDataLoader {
 
   /// مسح الذاكرة المؤقتة
   void clearCache() {
+    _generation++;
+    _pending = null;
     _cachedPages = null;
   }
 }

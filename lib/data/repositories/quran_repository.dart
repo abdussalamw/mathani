@@ -16,6 +16,8 @@ class QuranRepositoryImpl implements QuranRepository {
   // Lazy getter allows delay of access until initialization is complete
   Isar get _isar => _injectedIsar ?? IsarService.instance.isar;
 
+  Future<void>? _loadingAyahsFuture;
+
   QuranRepositoryImpl({QuranLocalDataSource? localDataSource, Isar? isar})
     : _localDataSource = localDataSource ?? QuranLocalDataSource.instance,
       _injectedIsar = isar;
@@ -29,72 +31,82 @@ class QuranRepositoryImpl implements QuranRepository {
         return Right(surahs);
       }
 
-      // تحقق من قاعدة البيانات أولاً
-      final localSurahs = await _isar.surahs.where().findAll();
-
-      // Check if we have data AND if the data is valid (has page numbers populated)
-      // AND NEW CHECK: Check if Ayahs have textClean populated (Migration)
-      bool isDataValid =
-          localSurahs.isNotEmpty &&
-          localSurahs.any((s) => s.page != null && s.page! > 0);
-
-      if (isDataValid) {
-        // Migration Check: Check if data is corrupted (e.g. all ayahs have ayahNumber=1)
-        final checkAyah = await _isar.ayahs.where().offset(5).findFirst();
-        if (checkAyah != null &&
-            (checkAyah.textClean.isEmpty || checkAyah.ayahNumber == 1)) {
-          isDataValid = false; // Force reload to fix ayahNumber bug
-          debugPrint(
-            'Migration: triggering reload to fix corrupted ayahNumber',
-          );
-        }
-      }
-
-      if (isDataValid) {
-        return Right(localSurahs);
-      }
-
-      // If data is invalid/stale, clear it before reloading
-      if (localSurahs.isNotEmpty) {
+      final local = await _isar.surahs.where().findAll();
+      if (local.length != 114 || local.any((s) => (s.page ?? 0) < 1)) {
+        final fresh = await _localDataSource.loadAllSurahs();
         await _isar.writeTxn(() async {
-          await _isar.surahs.clear();
-          await _isar.ayahs.clear(); // Clear Ayahs too ensuring full reload
+          final existing = {
+            for (final s in await _isar.surahs.where().findAll()) s.number: s,
+          };
+          for (final surah in fresh) {
+            final stored = existing[surah.number];
+            if (stored != null) {
+              surah.id = stored.id;
+              surah.isFavorite = stored.isFavorite;
+              surah.lastReadTime = stored.lastReadTime;
+              surah.lastReadAyah = stored.lastReadAyah;
+            }
+          }
+          await _isar.surahs.putAll(fresh);
         });
       }
-
-      // جلب من assets المحلية
-      final surahs = await _localDataSource.loadAllSurahs();
-
-      // حفظ السور في قاعدة البيانات
-      await _isar.writeTxn(() async {
-        await _isar.surahs.putAll(surahs);
-      });
-
-      // Also trigger loading of all Ayahs to populate the DB immediately
-      // (Optional but good for search availability)
-      // For now, we rely on lazy loading or user opening Surahs, BUT for search to work globally,
-      // we really should have all Ayahs loaded.
-      // Let's load them in background or just wait for user interaction?
-      // Better: Load all Ayahs now if we are doing a full reset.
-      _loadAllAyahsToDb();
-
-      return Right(surahs);
+      await _ensureAyahs();
+      return Right(await _isar.surahs.where().sortByNumber().findAll());
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }
   }
 
-  Future<void> _loadAllAyahsToDb() async {
+  bool _ayahsReady = false;
+  Future<void> _ensureAyahs() async {
+    if (_ayahsReady) return;
+    final pending = _loadingAyahsFuture ??= _mergeAyahs();
     try {
-      final allAyahs = await _localDataSource.loadAllAyahs();
-      if (allAyahs.isNotEmpty) {
-        await _isar.writeTxn(() async {
-          await _isar.ayahs.putAll(allAyahs);
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading all ayahs: $e');
+      await pending;
+      _ayahsReady = true;
+    } finally {
+      if (identical(_loadingAyahsFuture, pending)) _loadingAyahsFuture = null;
     }
+  }
+
+  Future<void> _mergeAyahs() async {
+    final source = await _localDataSource.loadAllAyahs();
+    if (source.isEmpty) throw StateError('بيانات الآيات غير متاحة');
+    await _isar.writeTxn(() async {
+      final rows = await _isar.ayahs.where().findAll();
+      final stored = <(int, int), List<Ayah>>{};
+      for (final row in rows) {
+        stored
+            .putIfAbsent((row.surahNumber, row.ayahNumber), () => [])
+            .add(row);
+      }
+      final updates = <Ayah>[];
+      for (final canonical in source) {
+        final matches = stored[(canonical.surahNumber, canonical.ayahNumber)];
+        if (matches == null) {
+          updates.add(canonical);
+          continue;
+        }
+        for (final row in matches) {
+          if (row.text != canonical.text ||
+              row.textClean != canonical.textClean ||
+              row.juz != canonical.juz ||
+              row.page != canonical.page) {
+            row.text = canonical.text;
+            row.textClean = canonical.textClean;
+            row.juz = canonical.juz;
+            row.page = canonical.page;
+            updates.add(row);
+          }
+        }
+      }
+      if (updates.isNotEmpty) await _isar.ayahs.putAll(updates);
+    });
+  }
+
+  List<Ayah> _uniqueAyahs(List<Ayah> rows) {
+    final keys = <(int, int)>{};
+    return rows.where((a) => keys.add((a.surahNumber, a.ayahNumber))).toList();
   }
 
   @override
@@ -108,12 +120,13 @@ class QuranRepositoryImpl implements QuranRepository {
         return const Right([]);
       }
 
+      await _ensureAyahs();
       final results = await _isar.ayahs
           .filter()
           .textCleanContains(normalizedQuery, caseSensitive: false)
           .findAll();
 
-      return Right(results);
+      return Right(_uniqueAyahs(results));
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }
@@ -159,6 +172,7 @@ class QuranRepositoryImpl implements QuranRepository {
         }
       }
 
+      await _ensureAyahs();
       final ayah = await _isar.ayahs
           .filter()
           .surahNumberEqualTo(surahNumber)
@@ -180,25 +194,13 @@ class QuranRepositoryImpl implements QuranRepository {
         return Right(ayahs);
       }
 
-      // تحقق من قاعدة البيانات
-      final localAyahs = await _isar.ayahs
+      await _ensureAyahs();
+      final rows = await _isar.ayahs
           .filter()
           .surahNumberEqualTo(surahNumber)
+          .sortByAyahNumber()
           .findAll();
-
-      if (localAyahs.isNotEmpty) {
-        return Right(localAyahs);
-      }
-
-      // جلب من assets المحلية
-      final ayahs = await _localDataSource.loadAyahsForSurah(surahNumber);
-
-      // حفظ في قاعدة البيانات
-      await _isar.writeTxn(() async {
-        await _isar.ayahs.putAll(ayahs);
-      });
-
-      return Right(ayahs);
+      return Right(_uniqueAyahs(rows));
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }
@@ -273,13 +275,16 @@ class QuranRepositoryImpl implements QuranRepository {
       }
 
       // Check Database first
+      await _ensureAyahs();
       final localAyahs = await _isar.ayahs
           .filter()
           .pageEqualTo(pageNumber)
+          .sortBySurahNumber()
+          .thenByAyahNumber()
           .findAll();
 
       if (localAyahs.isNotEmpty) {
-        return Right(localAyahs);
+        return Right(_uniqueAyahs(localAyahs));
       }
 
       // Fallback
@@ -306,6 +311,7 @@ class QuranRepositoryImpl implements QuranRepository {
       List<Ayah> results = [];
 
       // 1. Get Start Surah Ayahs
+      await _ensureAyahs();
       final startAyahs = await _isar.ayahs
           .filter()
           .surahNumberEqualTo(startSurah)
@@ -348,7 +354,7 @@ class QuranRepositoryImpl implements QuranRepository {
         return a.ayahNumber.compareTo(b.ayahNumber);
       });
 
-      return Right(results);
+      return Right(_uniqueAyahs(results));
     } catch (e) {
       return Left(CacheFailure(e.toString()));
     }

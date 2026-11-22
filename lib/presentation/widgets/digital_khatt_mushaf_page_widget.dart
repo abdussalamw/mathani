@@ -18,6 +18,7 @@ class DigitalKhattMushafPageWidget extends StatefulWidget {
     this.selectedAyah,
     this.onAyahLongPress,
     this.wordVerdicts = const {},
+    this.revealedWordKeys,
     this.fontFamily = 'DigitalKhattMadina',
     this.loader,
   });
@@ -27,6 +28,7 @@ class DigitalKhattMushafPageWidget extends StatefulWidget {
   final int? selectedAyah;
   final void Function(int surah, int ayah)? onAyahLongPress;
   final Map<String, WordVerdict> wordVerdicts;
+  final Set<String>? revealedWordKeys;
   final String fontFamily;
   final DigitalKhattPageLoader? loader;
 
@@ -106,6 +108,7 @@ class _DigitalKhattPageState extends State<DigitalKhattMushafPageWidget> {
                         selectedAyah: widget.selectedAyah,
                         onAyahLongPress: widget.onAyahLongPress,
                         wordVerdicts: widget.wordVerdicts,
+                        revealedWordKeys: widget.revealedWordKeys,
                         fontFamily: widget.fontFamily,
                       ),
                     ),
@@ -130,6 +133,7 @@ class _MadinaTextLine extends StatefulWidget {
     required this.selectedAyah,
     required this.onAyahLongPress,
     required this.wordVerdicts,
+    required this.revealedWordKeys,
     required this.fontFamily,
   });
   final MadinaLine line;
@@ -140,6 +144,7 @@ class _MadinaTextLine extends StatefulWidget {
   final int? selectedAyah;
   final void Function(int, int)? onAyahLongPress;
   final Map<String, WordVerdict> wordVerdicts;
+  final Set<String>? revealedWordKeys;
   final String fontFamily;
 
   @override
@@ -151,11 +156,17 @@ class _MadinaTextLineState extends State<_MadinaTextLine> {
 
   TextSpan _verseSpan(MadinaVerseRun run, int index) {
     final lead = index == 0 ? '' : ' ';
+    final revealedWordKeys = widget.revealedWordKeys;
     final style =
-        run.surah == widget.selectedSurah && run.ayah == widget.selectedAyah
+        revealedWordKeys == null &&
+            run.surah == widget.selectedSurah &&
+            run.ayah == widget.selectedAyah
         ? TextStyle(backgroundColor: AppColors.golden.withValues(alpha: .2))
         : null;
-    final press = run.ayah == 0 || widget.onAyahLongPress == null
+    final press =
+        run.ayah == 0 ||
+            revealedWordKeys != null ||
+            widget.onAyahLongPress == null
         ? null
         : (_presses.putIfAbsent(
               index,
@@ -165,26 +176,36 @@ class _MadinaTextLineState extends State<_MadinaTextLine> {
             )
             ..onLongPress = () =>
                 widget.onAyahLongPress?.call(run.surah, run.ayah));
-    if (widget.wordVerdicts.isEmpty || run.ayah == 0) {
+    if (run.ayah == 0 ||
+        (revealedWordKeys == null && widget.wordVerdicts.isEmpty)) {
       return TextSpan(text: lead + run.text, style: style, recognizer: press);
     }
     final words = run.text.split(' ');
-    return TextSpan(
-      style: style,
-      children: [
-        for (var i = 0; i < words.length; i++)
-          TextSpan(
-            text: (i == 0 ? lead : ' ') + words[i],
-            recognizer: press,
-            style: words[i].startsWith('۝')
-                ? null
-                : _verdictStyle(
-                    widget
-                        .wordVerdicts['${run.surah}_${run.ayah}_${run.firstWord + i}'],
-                  ),
-          ),
-      ],
-    );
+    final spans = <TextSpan>[];
+    var wordNumber = run.firstWord;
+    for (final word in words) {
+      final isLayoutWord = isMadinaLayoutWord(word);
+      final wordKey = '${run.surah}_${run.ayah}_$wordNumber';
+      final hidden =
+          isLayoutWord &&
+          revealedWordKeys != null &&
+          !revealedWordKeys.contains(wordKey);
+      spans.add(
+        TextSpan(
+          text: (spans.isEmpty ? lead : ' ') + word,
+          semanticsLabel: hidden ? '' : null,
+          recognizer: press,
+          style: hidden
+              ? const TextStyle(color: Colors.transparent)
+              : isLayoutWord
+              ? _verdictStyle(widget.wordVerdicts[wordKey])
+              : null,
+        ),
+      );
+      // Decorative signs and numbered verse ends have no alignment index.
+      if (isLayoutWord) wordNumber++;
+    }
+    return TextSpan(style: style, children: spans);
   }
 
   TextStyle? _verdictStyle(WordVerdict? verdict) {

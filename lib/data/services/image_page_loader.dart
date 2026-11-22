@@ -1,3 +1,8 @@
+import 'dart:ui' as ui;
+
+import 'mushaf_package.dart';
+import '../../core/utils/async_work_pool.dart';
+
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -15,36 +20,61 @@ class ImagePageLoader {
     return path;
   }
 
+  static final _work = AsyncWorkPool<(String, int, String, String), File?>();
+  static Future<bool> _valid(Uint8List bytes) async {
+    if (!imageHeaderValid(bytes, bytes.length)) return false;
+    try {
+      final codec = await ui.instantiateImageCodec(bytes, targetWidth: 1);
+      try {
+        final frame = await codec.getNextFrame();
+        frame.image.dispose();
+        return true;
+      } finally {
+        codec.dispose();
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<File?> getPageImage(
     String mushafId,
     int pageNumber,
     String baseUrl, {
     String extension = 'jpg',
-  }) async {
+  }) => _work.run((
+    mushafId,
+    pageNumber,
+    baseUrl,
+    extension,
+  ), () => _load(mushafId, pageNumber, baseUrl, extension));
+
+  static Future<File?> _load(
+    String mushafId,
+    int pageNumber,
+    String baseUrl,
+    String extension,
+  ) async {
     try {
       final localDir = await getLocalPath(mushafId);
       final padPage = pageNumber.toString().padLeft(3, '0');
 
       // 1. Check ALL possible local extensions first
-      // This ensures if we switched metadata from webp -> png, but files are still webp, we load them.
-      // Also checking for 'page_' prefix based on user feedback.
       final supportedExtensions = ['webp', 'png', 'jpg'];
       for (var ext in supportedExtensions) {
-        // Pattern A: 001.png
-        final f1 = File('$localDir/$padPage.$ext');
-        if (await f1.exists()) return f1;
-
-        // Pattern B: 1.png
-        final f2 = File('$localDir/$pageNumber.$ext');
-        if (await f2.exists()) return f2;
-
-        // Pattern C: page_001.png (User reported format)
-        final f3 = File('$localDir/page_$padPage.$ext');
-        if (await f3.exists()) return f3;
+        for (final candidate in [
+          File('$localDir/$padPage.$ext'),
+          File('$localDir/$pageNumber.$ext'),
+          File('$localDir/page_$padPage.$ext'),
+        ]) {
+          if (await candidate.exists() &&
+              await _valid(await candidate.readAsBytes())) {
+            return candidate;
+          }
+        }
       }
 
       // 2. Download if not exists
-      // Prioritize the requested extension for download
       String baseUrlFormatted = baseUrl.endsWith('/') ? baseUrl : '$baseUrl/';
 
       final extensionsToTry = [extension];
@@ -53,30 +83,27 @@ class ImagePageLoader {
       }
 
       for (var ext in extensionsToTry) {
-        // Try padded first (e.g. 001.webp)
-        String paddedUrl = '$baseUrlFormatted$padPage.$ext';
-        if (kDebugMode) print('Trying: $paddedUrl');
-
-        var response = await http.get(Uri.parse(paddedUrl));
-
-        if (response.statusCode == 200) {
-          // Success! Save with correct extension
-          final correctFile = File('$localDir/$padPage.$ext');
-          await correctFile.writeAsBytes(response.bodyBytes);
-          return correctFile;
-        }
-
-        // If padded fails, try unpadded (e.g. 1.webp)
-        String unpaddedUrl = '$baseUrlFormatted$pageNumber.$ext';
-        if (kDebugMode) print('Trying Unpadded: $unpaddedUrl');
-
-        response = await http.get(Uri.parse(unpaddedUrl));
-
-        if (response.statusCode == 200) {
-          // Success! Save as padded locally for consistency
-          final correctFile = File('$localDir/$padPage.$ext');
-          await correctFile.writeAsBytes(response.bodyBytes);
-          return correctFile;
+        for (final name in {'$padPage.$ext', '$pageNumber.$ext'}) {
+          try {
+            final response = await http
+                .get(Uri.parse('$baseUrlFormatted$name'))
+                .timeout(const Duration(seconds: 15));
+            if (response.statusCode != 200 ||
+                !await _valid(response.bodyBytes)) {
+              continue;
+            }
+            final target = File('$localDir/$padPage.$ext');
+            final temp = await Directory(localDir).createTemp('.image-');
+            try {
+              final file = await File('${temp.path}/page')
+                  .writeAsBytes(response.bodyBytes);
+              return await file.rename(target.path);
+            } finally {
+              await temp.delete(recursive: true);
+            }
+          } on Exception catch (e) {
+            debugPrint('Unable to load $name: $e');
+          }
         }
       }
 
@@ -96,6 +123,6 @@ class ImagePageLoader {
     final localDir = await getLocalPath(mushafId);
     final padPage = pageNumber.toString().padLeft(3, '0');
     final file = File('$localDir/$padPage.$extension');
-    return file.exists();
+    return await file.exists() && await _valid(await file.readAsBytes());
   }
 }

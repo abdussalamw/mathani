@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mathani/data/services/mushaf_downloader_service.dart';
 
 void main() {
-  for (final extension in ['zip', 'tar.bz2']) {
+  for (final extension in ['zip', 'tar.bz2', 'tar.gz']) {
     test(
       'downloads and extracts nested mushaf pages from $extension',
       () async {
@@ -23,6 +23,8 @@ void main() {
           ..addFile(ArchiveFile('pages/.metadata', 1, [42]));
         final bytes = extension == 'zip'
             ? ZipEncoder().encode(archive)
+            : extension == 'tar.gz'
+            ? GZipEncoder().encode(TarEncoder().encode(archive))
             : BZip2Encoder().encode(TarEncoder().encode(archive));
         server.listen((request) async {
           request.response.contentLength = bytes.length;

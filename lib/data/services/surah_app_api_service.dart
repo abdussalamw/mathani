@@ -31,16 +31,16 @@ class SurahAppApiService {
   }) async {
     final url = Uri.parse('$_baseUrl/aya/$slug/$suraNumber/$ayaNumber');
     try {
-      final response = await http.get(url);
+      final response = await http
+          .get(url)
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         return AyaContent.fromJson(data);
       } else {
-        // Handle 404 or other errors
         return null;
       }
     } catch (e) {
-      // Handle network errors
       return null;
     }
   }
@@ -56,7 +56,9 @@ class SurahAppApiService {
       '$_baseUrl/word/$slug/$suraNumber/$ayaNumber/$wordNumber',
     );
     try {
-      final response = await http.get(url);
+      final response = await http
+          .get(url)
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         return WordContent.fromJson(data);
@@ -69,26 +71,20 @@ class SurahAppApiService {
   }
 
   /// Fetch Content for ALL words in an Ayah (Helper)
-  /// Note: The API supports ranges, but words in an ayah are usually 1..N
-  /// We might need to know how many words are there first, or just try fetching until 404?
-  /// Better approach: The API supports ranges! /word/{slug}/{sura}/{aya}/{from}/{to}
-  /// But we don't know 'to'.
-  /// However, we can use the 'Page' or 'Aya' endpoint if it returns words? No.
-  /// Text-based Mushaf knows token count. We can pass it from the UI.
   Future<List<WordContent>> getAyahWordsContent({
     required int suraNumber,
     required int ayaNumber,
     required int wordCount,
     String slug = 'meaning-word',
   }) async {
-    // Determine range: 1 to wordCount
-    // Endpoint: /word/{slug}/{sura}/{aya}/{from}/{to}
     final url = Uri.parse(
       '$_baseUrl/word/$slug/$suraNumber/$ayaNumber/1/$wordCount',
     );
 
     try {
-      final response = await http.get(url);
+      final response = await http
+          .get(url)
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final List<dynamic> list = json.decode(response.body);
         return list.map((e) => WordContent.fromJson(e)).toList();

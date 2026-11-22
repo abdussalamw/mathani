@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../data/models/ayah.dart';
+import '../../data/models/mushaf_navigation_data.dart';
 import '../../data/services/image_page_loader.dart';
 import '../../core/constants/app_colors.dart';
 
@@ -9,6 +11,7 @@ import 'package:provider/provider.dart';
 
 import '../../presentation/providers/settings_provider.dart';
 import '../../presentation/providers/bookmark_provider.dart';
+import '../../presentation/providers/quran_provider.dart';
 import '../../data/providers/mushaf_navigation_provider.dart';
 import '../../presentation/providers/ui_provider.dart';
 import '../../core/constants/responsive_constants.dart';
@@ -19,6 +22,7 @@ class MushafImageWidget extends StatefulWidget {
   final String baseUrl;
   final String imageExtension;
   final bool showInfo;
+  final Set<String>? revealedWordKeys;
 
   const MushafImageWidget({
     super.key,
@@ -27,6 +31,7 @@ class MushafImageWidget extends StatefulWidget {
     required this.baseUrl,
     this.imageExtension = 'jpg',
     this.showInfo = true,
+    this.revealedWordKeys,
   });
 
   @override
@@ -112,6 +117,7 @@ class _MushafImageWidgetState extends State<MushafImageWidget> {
       builder: (context, navProvider, child) {
         // Get dynamic page info
         final pageInfo = navProvider.getPageInfo(widget.pageNumber);
+        final revealedWordKeys = widget.revealedWordKeys;
         final juzNumber = pageInfo?.juz ?? 1;
         final surahs = pageInfo?.surahs ?? [];
 
@@ -293,7 +299,27 @@ class _MushafImageWidgetState extends State<MushafImageWidget> {
               ),
 
             // 2. Image Content
-            Expanded(child: _buildContent(isTablet)),
+            Expanded(
+              child: switch (revealedWordKeys) {
+                null => _buildContent(isTablet),
+                _
+                    when navProvider.currentNavigationData?.mushafId ==
+                            widget.mushafId &&
+                        pageInfo != null &&
+                        pageInfo.startSurah > 0 =>
+                  _MemorizationText(
+                    key: ValueKey((
+                      pageInfo.startSurah,
+                      pageInfo.startAyah,
+                      pageInfo.endSurah,
+                      pageInfo.endAyah,
+                    )),
+                    pageInfo: pageInfo,
+                    revealedWordKeys: revealedWordKeys,
+                  ),
+                _ => const SizedBox.expand(),
+              },
+            ),
           ],
         );
       },
@@ -403,5 +429,87 @@ class _MushafImageWidgetState extends State<MushafImageWidget> {
         );
       },
     );
+  }
+}
+
+/// A bitmap cannot conceal individual words. Lay out the range's local text
+/// while the bitmap is hidden, using canonical indices for progressive reveal.
+class _MemorizationText extends StatefulWidget {
+  const _MemorizationText({
+    super.key,
+    required this.pageInfo,
+    required this.revealedWordKeys,
+  });
+
+  final PageInfo pageInfo;
+  final Set<String> revealedWordKeys;
+
+  @override
+  State<_MemorizationText> createState() => _MemorizationTextState();
+}
+
+class _MemorizationTextState extends State<_MemorizationText> {
+  late final Future<List<Ayah>> _ayahs;
+
+  @override
+  void initState() {
+    super.initState();
+    final page = widget.pageInfo;
+    _ayahs = context.read<QuranProvider>().getAyahsByRange(
+      page.startSurah,
+      page.startAyah,
+      page.endSurah,
+      page.endAyah,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final quranColor = context.watch<SettingsProvider>().isDarkMode
+        ? AppColors.darkText
+        : AppColors.darkBrown;
+    return FutureBuilder<List<Ayah>>(
+      future: _ayahs,
+      builder: (context, snapshot) {
+        final ayahs = snapshot.data;
+        if (ayahs == null || ayahs.isEmpty) return const SizedBox.expand();
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: RichText(
+            textDirection: TextDirection.rtl,
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: TextStyle(
+                fontFamily: 'UthmanicHafs',
+                color: quranColor,
+                fontSize: 22,
+                height: 1.8,
+              ),
+              children: [for (final ayah in ayahs) ..._ayahSpans(ayah)],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Iterable<TextSpan> _ayahSpans(Ayah ayah) sync* {
+    final words = (ayah.textUthmani ?? ayah.text)
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty && !word.startsWith('۝'));
+    var number = 0;
+    for (final word in words) {
+      number++;
+      final visible = widget.revealedWordKeys.contains(
+        '${ayah.surahNumber}_${ayah.ayahNumber}_$number',
+      );
+      yield TextSpan(
+        text: '$word ',
+        style: visible ? null : const TextStyle(color: Colors.transparent),
+        semanticsLabel: visible ? null : '',
+      );
+    }
+    yield TextSpan(text: '﴿${ayah.ayahNumber}﴾ ');
   }
 }

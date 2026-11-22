@@ -30,8 +30,13 @@ class MatchedWord {
   final int wordIndex; // ترتيب الكلمة في الآية
   final double similarity; // نسبة التشابه (0.0 - 1.0)
   final WordVerdict verdict; // تقييم الكلمة
+  final RecitationReviewKind? reviewKind;
   final int? startMs;
   final int? endMs;
+
+  bool get coversReferenceWord =>
+      reviewKind != RecitationReviewKind.addedWord &&
+      reviewKind != RecitationReviewKind.skippedAyah;
 
   const MatchedWord({
     required this.spokenWord,
@@ -41,6 +46,7 @@ class MatchedWord {
     required this.wordIndex,
     required this.similarity,
     required this.verdict,
+    this.reviewKind,
     this.startMs,
     this.endMs,
   });

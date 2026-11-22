@@ -1,3 +1,5 @@
+import '../../core/utils/async_work_pool.dart';
+
 import 'dart:io';
 import 'dart:convert';
 
@@ -13,6 +15,7 @@ class LocalTafsirService extends ChangeNotifier {
 
   bool _isLoaded = false;
   Future<void>? _loadFuture;
+  int _generation = 0;
   final Map<String, String> _tafsirMap = {};
   String? _lastError;
 
@@ -40,8 +43,14 @@ class LocalTafsirService extends ChangeNotifier {
     return await file.exists();
   }
 
-  Future<void> downloadAndExtractTafsir({Function(double)? onProgress}) async {
+  final _downloads = AsyncWorkPool<String, void>();
+  Future<void> downloadAndExtractTafsir({Function(double)? onProgress}) =>
+      _downloads.run(fileName, () => _download(onProgress));
+
+  Future<void> _download(Function(double)? onProgress) async {
     if (kIsWeb) return;
+    File? tempFile;
+    final client = http.Client();
     try {
       _lastError = null;
       _isDownloading = true;
@@ -58,7 +67,9 @@ class LocalTafsirService extends ChangeNotifier {
       _downloadProgress = 0.1;
       notifyListeners();
 
-      final response = await http.get(Uri.parse(tafsirUrl));
+      final response = await client
+          .get(Uri.parse(tafsirUrl))
+          .timeout(const Duration(seconds: 60));
       if (response.statusCode != 200) {
         throw Exception('Server returned ${response.statusCode}');
       }
@@ -71,34 +82,56 @@ class LocalTafsirService extends ChangeNotifier {
         }
       }
 
-      final outFile = File(p.join(targetDir.path, fileName));
-      await outFile.writeAsBytes(bytes);
+      // Write to temp file first to verify parsing before replacing production file
+      tempFile = File(p.join(targetDir.path, '$fileName.tmp'));
+      await tempFile.writeAsBytes(bytes);
 
-      if (onProgress != null) onProgress(0.9);
-      _downloadProgress = 0.9;
-      _isLoaded = false;
-      _loadFuture = null;
+      if (onProgress != null) onProgress(0.7);
+      _downloadProgress = 0.7;
       notifyListeners();
 
-      await loadTafsirData();
+      // Verify and parse the downloaded content in isolate
+      final result = await compute(_parseCsvIsolate, bytes);
+      final parsedData = (result != null && result.containsKey('data'))
+          ? result['data'] as Map<String, String>?
+          : null;
 
-      if (_tafsirMap.isEmpty) {
-        throw Exception(
-          'تم تحميل ملف HTML ولكن فشل استخراج البيانات. يرجى مراجعة الهيكل.',
-        );
+      if (parsedData == null || parsedData.isEmpty) {
+        final errorMsg =
+            result?['error']?.toString() ??
+            'فشل استخراج بيانات التفسير من الملف الذي تم تنزيله';
+        throw Exception(errorMsg);
       }
+
+      // Atomic swap: replace production file with verified temp file
+      final outFile = File(p.join(targetDir.path, fileName));
+      await tempFile.rename(outFile.path);
+
+      _generation++;
+      // Update memory state
+      _tafsirMap.clear();
+      _tafsirMap.addAll(parsedData);
+      _isLoaded = true;
+      _lastError = null;
 
       if (onProgress != null) onProgress(1.0);
       _downloadProgress = 1.0;
       _isDownloading = false;
       notifyListeners();
     } catch (e) {
+      if (tempFile != null && await tempFile.exists()) {
+        try {
+          await tempFile.delete();
+        } catch (_) {}
+      }
       _isDownloading = false;
       _downloadProgress = 0.0;
       _lastError = e.toString();
       notifyListeners();
       debugPrint('LocalTafsirService Download Error: $e');
       rethrow;
+    } finally {
+      client.close();
     }
   }
 
@@ -116,6 +149,7 @@ class LocalTafsirService extends ChangeNotifier {
   }
 
   Future<void> _loadInternal() async {
+    final generation = _generation;
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final filePath = p.join(appDir.path, 'tafsir', fileName);
@@ -132,6 +166,7 @@ class LocalTafsirService extends ChangeNotifier {
 
       final result = await compute(_parseCsvIsolate, bytes);
 
+      if (generation != _generation) return;
       if (result != null && result.containsKey('data')) {
         final data = result['data'] as Map<String, String>;
         if (data.isNotEmpty) {
@@ -153,6 +188,7 @@ class LocalTafsirService extends ChangeNotifier {
       }
       notifyListeners();
     } catch (e) {
+      if (generation != _generation) return;
       _isLoaded = false;
       _lastError = e.toString();
       notifyListeners();

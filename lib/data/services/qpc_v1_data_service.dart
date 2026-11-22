@@ -14,12 +14,30 @@ class QPCV1DataService {
 
   Map<String, String> _glyphMap = {};
   bool _isLoaded = false;
-  bool _isLoading = false;
+  Future<void>? _loadingFuture;
+
+  int _generation = 0;
+
+  void invalidate() {
+    _generation++;
+    _glyphMap = {};
+    _isLoaded = false;
+    _loadingFuture = null;
+  }
 
   Future<void> load() async {
-    if (_isLoaded || _isLoading) return;
-    _isLoading = true;
+    if (_isLoaded && _glyphMap.isNotEmpty) return;
+    if (_loadingFuture != null) return _loadingFuture;
 
+    final pending = _loadingFuture = _loadInternal(_generation);
+    try {
+      await pending;
+    } finally {
+      if (identical(_loadingFuture, pending)) _loadingFuture = null;
+    }
+  }
+
+  Future<void> _loadInternal(int generation) async {
     try {
       String jsonString;
       if (!kIsWeb) {
@@ -54,13 +72,18 @@ class QPCV1DataService {
       // The JSON structure is: "S:A:W": { "text": "GLYPH", ... }
       // We only need the "text" field.
 
-      _glyphMap = await compute(_parseGlyphMap, rawMap);
-
-      _isLoaded = true;
+      final parsed = await compute(_parseGlyphMap, rawMap);
+      if (generation != _generation) return;
+      if (parsed.isNotEmpty) {
+        _glyphMap = parsed;
+        _isLoaded = true;
+      } else {
+        _isLoaded = false;
+      }
     } catch (e) {
+      if (generation != _generation) return;
       debugPrint('Error loading QPC V1 Glyphs: $e');
-    } finally {
-      _isLoading = false;
+      _isLoaded = false;
     }
   }
 

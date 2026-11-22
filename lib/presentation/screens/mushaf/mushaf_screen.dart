@@ -1,11 +1,14 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:mathani/l10n/app_localizations.dart';
 import 'package:mathani/data/models/page_glyph.dart';
+import 'package:mathani/data/models/recitation_result.dart';
 import 'package:mathani/data/services/glyph_data_loader.dart';
 import 'package:mathani/presentation/widgets/mushaf_page_widget.dart';
 import 'package:mathani/presentation/widgets/mushaf_image_widget.dart';
 import 'package:mathani/presentation/widgets/digital_khatt_mushaf_page_widget.dart';
+
 import '../../../data/services/digital_khatt_page_loader.dart';
+
 import 'package:mathani/presentation/widgets/reader_page_frame.dart';
 import 'package:mathani/presentation/widgets/reader_loading_indicator.dart';
 import 'package:mathani/core/constants/app_colors.dart';
@@ -109,6 +112,7 @@ class _MushafScreenState extends State<MushafScreen>
   String? _errorMessage;
   late PageController _pageController;
   int _currentPage = 1;
+  int? _recitationPageTarget;
   String? _loadedMushafId;
   String? _displayMushafId;
   String? _displayMushafType;
@@ -255,14 +259,24 @@ class _MushafScreenState extends State<MushafScreen>
           );
         }
 
-        if (page != null && page != _currentPage) {
-          if (_pageController.hasClients) {
-            _pageController.animateToPage(
-              page - 1,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-            );
-          }
+        if (page != null &&
+            page != _currentPage &&
+            page != _recitationPageTarget &&
+            _pageController.hasClients) {
+          _recitationPageTarget = page;
+          unawaited(
+            _pageController
+                .animateToPage(
+                  page - 1,
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeInOut,
+                )
+                .whenComplete(() {
+                  if (_recitationPageTarget == page) {
+                    _recitationPageTarget = null;
+                  }
+                }),
+          );
         }
 
         _selectedSurah = recitation.matchedSurah;
@@ -270,6 +284,7 @@ class _MushafScreenState extends State<MushafScreen>
       }
       setState(() {});
     } else {
+      _recitationPageTarget = null;
       if (_selectedSurah != null || _selectedAyah != null) {
         final audio = context.read<AudioProvider>();
         if (!audio.isPlaying) {
@@ -690,7 +705,7 @@ class _MushafScreenState extends State<MushafScreen>
         _secondaryTargetPage = target;
         _cachedTargetPageWidget = target == null
             ? null
-            : _buildPageItem(context, target - 1, settings, ui);
+            : _buildPageItem(target - 1, settings, ui);
       });
     }
   }
@@ -992,7 +1007,6 @@ class _MushafScreenState extends State<MushafScreen>
                                               return const SizedBox.expand();
                                             }
                                             return _buildPageItem(
-                                              context,
                                               index,
                                               settings,
                                               uiProvider,
@@ -1112,14 +1126,12 @@ class _MushafScreenState extends State<MushafScreen>
   }
 
   Widget _buildPageItem(
-    BuildContext context,
     int index,
     SettingsProvider settings,
     UiProvider uiProvider,
   ) {
-    final currentType = _displayMushafType!;
     final currentId = _displayMushafId!;
-    final isDigital = currentType == 'digital';
+    final page = _pages![index];
 
     // ط¥ظ†ط´ط§ط، ScrollController ظ„ظ„طµظپط­ط© ط¥ط°ط§ ظ„ظ… ظٹظƒظ† ظ…ظˆط¬ظˆط¯ط§ظ‹ (ظ„ظ„ظˆط¶ط¹ ط§ظ„ظ‡ط¬ظٹظ†)
     if (settings.isHybridMode &&
@@ -1127,60 +1139,21 @@ class _MushafScreenState extends State<MushafScreen>
       _innerScrollControllers[index + 1] = ScrollController();
     }
 
-    Widget pageContent;
-
-    if (currentType == 'single_font') {
-      final isOldMadina = currentId == 'digital_khatt_old_madina';
-      pageContent = DigitalKhattMushafPageWidget(
-        pageNumber: _pages![index].page,
-        fontFamily: isOldMadina
-            ? 'DigitalKhattOldMadina'
-            : 'DigitalKhattMadina',
-        loader: isOldMadina
-            ? digitalKhattOldMadinaLoader
-            : digitalKhattPageLoader,
-        wordVerdicts: uiProvider.isRecitationActive
-            ? context.read<RecitationProvider>().liveWordVerdicts
-            : const {},
-        selectedSurah: _selectedSurah,
-        selectedAyah: _selectedAyah,
-        onAyahLongPress: (_isAutoScrolling || _isAutoScrollPaused)
-            ? null
-            : _onAyahInteraction,
-      );
-    } else if (currentType == 'image') {
-      final mushafProvider = context.read<MushafMetadataProvider>();
-      final mushaf = mushafProvider.availableMushafs.firstWhere(
-        (m) => m.identifier == currentId,
-        orElse: () => mushafProvider.availableMushafs.first,
-      );
-
-      pageContent = MushafImageWidget(
-        pageNumber: _pages![index].page,
-        mushafId: currentId,
-        baseUrl: mushaf.baseUrl ?? '',
-        imageExtension: mushaf.imageExtension ?? 'jpg',
-        showInfo: false,
-      );
-    } else {
-      pageContent = MushafPageWidget(
-        page: _pages![index],
-        mushafId: currentId,
-        selectedSurah: _selectedSurah,
-        selectedAyah: _selectedAyah,
-        // إيقاف الضغط على الآيات في الوضع المتحرك لمنع التعارض مع ضغطة الإيقاف
-        onAyahLongPress: (_isAutoScrolling || _isAutoScrollPaused)
-            ? null
-            : _onAyahInteraction,
-        showInfo: false,
-        paintBackground: false,
-        isDigital: isDigital,
-      );
-    }
-
-    pageContent = Padding(
+    final currentType = _displayMushafType!;
+    Widget pageContent = Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      child: pageContent,
+      // Keep the visibility state live even for the cached swipe preview.
+      child: Consumer<RecitationProvider>(
+        builder: (context, recitation, child) => _buildPageContent(
+          context,
+          page,
+          currentType,
+          currentId,
+          recitation,
+          uiProvider.showRecitationMinibar,
+          uiProvider.isRecitationActive,
+        ),
+      ),
     );
 
     // Keep the line layout bounded inside the hybrid scrolling viewport.
@@ -1194,13 +1167,83 @@ class _MushafScreenState extends State<MushafScreen>
 
     // لا نلف بـ GestureDetector هنا — كل النقرات تُعالج من الخارج (سطر 718)
     if (settings.isHorizontalMode) {
-      final identity = '$currentId-${_pages![index].page}';
+      final identity = '$currentId-${page.page}';
       return KeyedSubtree(
         key: _verticalPageKeys.putIfAbsent(identity, () => GlobalKey()),
         child: pageContent,
       );
     }
     return pageContent;
+  }
+
+  Widget _buildPageContent(
+    BuildContext context,
+    PageGlyph page,
+    String mushafType,
+    String mushafId,
+    RecitationProvider recitation,
+    bool showRecitationMinibar,
+    bool isRecitationActive,
+  ) {
+    final hideVerses =
+        showRecitationMinibar &&
+        recitation.hideVerses &&
+        (recitation.isRecording || recitation.isInitializingRecording);
+    final revealedWordKeys = hideVerses ? recitation.revealedWordKeys : null;
+    final wordVerdicts = isRecitationActive
+        ? recitation.liveWordVerdicts
+        : const <String, WordVerdict>{};
+    final onAyahLongPress =
+        _isAutoScrolling || _isAutoScrollPaused || hideVerses
+        ? null
+        : _onAyahInteraction;
+
+    if (mushafType == 'single_font') {
+      final isOldMadina = mushafId == 'digital_khatt_old_madina';
+      return DigitalKhattMushafPageWidget(
+        pageNumber: page.page,
+        fontFamily: isOldMadina
+            ? 'DigitalKhattOldMadina'
+            : 'DigitalKhattMadina',
+        loader: isOldMadina
+            ? digitalKhattOldMadinaLoader
+            : digitalKhattPageLoader,
+        wordVerdicts: wordVerdicts,
+        revealedWordKeys: revealedWordKeys,
+        selectedSurah: _selectedSurah,
+        selectedAyah: _selectedAyah,
+        onAyahLongPress: onAyahLongPress,
+      );
+    }
+
+    if (mushafType == 'image') {
+      final mushafs = context.read<MushafMetadataProvider>().availableMushafs;
+      final mushaf = mushafs.firstWhere(
+        (entry) => entry.identifier == mushafId,
+        orElse: () => mushafs.first,
+      );
+      return MushafImageWidget(
+        pageNumber: page.page,
+        mushafId: mushafId,
+        baseUrl: mushaf.baseUrl ?? '',
+        imageExtension: mushaf.imageExtension ?? 'jpg',
+        showInfo: false,
+        revealedWordKeys: revealedWordKeys,
+      );
+    }
+
+    return MushafPageWidget(
+      page: page,
+      mushafId: mushafId,
+      selectedSurah: _selectedSurah,
+      selectedAyah: _selectedAyah,
+      onAyahLongPress: onAyahLongPress,
+      showInfo: false,
+      paintBackground: false,
+      isDigital: mushafType == 'digital',
+      wordVerdicts: wordVerdicts,
+      revealedWordKeys: revealedWordKeys,
+    );
   }
 
   BoxDecoration _pageDecoration(SettingsProvider settings) => BoxDecoration(

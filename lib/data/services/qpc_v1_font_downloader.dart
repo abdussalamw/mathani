@@ -6,12 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 
-// Import to use the robust extraction logic
+import 'mushaf_package.dart';
 
 /// خدمة تحميل خطوط QPC V1 (مصحف المدينة القديم)
 class QPCV1FontDownloader {
-  static const int _totalFonts = 604;
-
   static final Map<String, bool> _loadedFonts = {};
   static final Map<String, FontLoader> _fontLoaders = {};
 
@@ -24,10 +22,8 @@ class QPCV1FontDownloader {
       // Updated path to match MushafMetadataProvider's download location
       final fontsDir = Directory('${dir.path}/mushafs/madani_old_v1');
 
-      if (!await fontsDir.exists()) return false;
-
-      final entityCount = fontsDir.listSync().length;
-      return entityCount >= _totalFonts;
+      recoverMushafDirectory(fontsDir);
+      return await validMushafPackage('madani_old_v1', fontsDir);
     } catch (e) {
       return false;
     }

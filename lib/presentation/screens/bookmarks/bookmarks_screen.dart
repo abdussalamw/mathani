@@ -209,16 +209,28 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                                 context,
                                 listen: false,
                               );
-                          uiProvider.jumpToSurah(
-                            bookmark.surahNumber,
-                            navProvider,
-                          );
+
+                          final isPageBookmark = bookmark.surahNumber == 0;
+                          final int targetPage = isPageBookmark
+                              ? bookmark.ayahNumber
+                              : (navProvider.getPageForAyah(
+                                    bookmark.surahNumber,
+                                    bookmark.ayahNumber,
+                                  ) ??
+                                  navProvider.getPageForSurah(
+                                    bookmark.surahNumber,
+                                  ) ??
+                                  1);
+
+                          uiProvider.jumpToPage(targetPage);
 
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                AppLocalizations.of(context)!
-                                    .goingToAyah(bookmark.ayahNumber),
+                                isPageBookmark
+                                    ? 'الانتقال إلى صفحة $targetPage'
+                                    : AppLocalizations.of(context)!
+                                        .goingToAyah(bookmark.ayahNumber),
                               ),
                               duration: const Duration(seconds: 1),
                             ),
@@ -263,24 +275,58 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      _getSurahGlyph(surah.number),
-                                      style: const TextStyle(
-                                        fontFamily: 'QCF4_BSML',
-                                        fontSize: 18,
-                                        color: AppColors.slateText,
-                                        height: 1.0,
+                                    if (bookmark.surahNumber == 0) ...[
+                                      Text(
+                                        'صفحة ${bookmark.ayahNumber}',
+                                        style: const TextStyle(
+                                          fontFamily: 'Tajawal',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.slateText,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${AppLocalizations.of(context)!.ayahNum(bookmark.ayahNumber)} • صفحة ${surah.page ?? ""}',
-                                      style: const TextStyle(
-                                        fontFamily: 'Tajawal',
-                                        fontSize: 11,
-                                        color: AppColors.mutedText,
+                                      const SizedBox(height: 2),
+                                      const Text(
+                                        'علامة صفحة',
+                                        style: TextStyle(
+                                          fontFamily: 'Tajawal',
+                                          fontSize: 11,
+                                          color: AppColors.mutedText,
+                                        ),
                                       ),
-                                    ),
+                                    ] else ...[
+                                      Text(
+                                        _getSurahGlyph(surah.number),
+                                        style: const TextStyle(
+                                          fontFamily: 'QCF4_BSML',
+                                          fontSize: 18,
+                                          color: AppColors.slateText,
+                                          height: 1.0,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Builder(
+                                        builder: (ctx) {
+                                          final nav = ctx.read<MushafNavigationProvider>();
+                                          final page = nav.getPageForAyah(
+                                                bookmark.surahNumber,
+                                                bookmark.ayahNumber,
+                                              ) ??
+                                              nav.getPageForSurah(
+                                                bookmark.surahNumber,
+                                              ) ??
+                                              surah.page;
+                                          return Text(
+                                            '${AppLocalizations.of(context)!.ayahNum(bookmark.ayahNumber)} • صفحة ${page ?? ""}',
+                                            style: const TextStyle(
+                                              fontFamily: 'Tajawal',
+                                              fontSize: 11,
+                                              color: AppColors.mutedText,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),

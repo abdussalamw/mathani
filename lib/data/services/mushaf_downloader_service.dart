@@ -1,109 +1,101 @@
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:archive/archive.dart';
 
 class MushafDownloaderService {
+  /// Extracts into a staging directory supplied by the installer. The caller
+  /// validates all parts of the package before committing that directory.
   static Future<void> downloadAndExtract({
     required String url,
     required String destinationPath,
     required Function(double progress) onProgress,
   }) async {
+    final dest = await Directory(destinationPath).create(recursive: true);
+    final scratch = await dest.createTemp('.download-');
+    final client = http.Client();
+    const timeout = Duration(seconds: 30);
     try {
-      // 1. Prepare destination
-      final destDir = Directory(destinationPath);
-      if (!await destDir.exists()) {
-        await destDir.create(recursive: true);
-      }
-
-      // 2. Download
-      final httpClient = http.Client();
-      final request = http.Request('GET', Uri.parse(url));
-      final response = await httpClient.send(request);
-
+      final uri = Uri.parse(url);
+      final response = await client
+          .send(http.Request('GET', uri))
+          .timeout(timeout);
       if (response.statusCode != 200) {
-        throw Exception('Failed to download: ${response.statusCode}');
+        throw HttpException('HTTP ${response.statusCode}', uri: uri);
       }
-
-      final totalBytes = response.contentLength ?? 0;
-      int receivedBytes = 0;
-      final List<int> allBytes = [];
-
-      await for (final chunk in response.stream) {
-        allBytes.addAll(chunk);
-        receivedBytes += chunk.length;
-        if (totalBytes > 0) {
-          // Download is 0% to 70% of the progress
-          onProgress((receivedBytes / totalBytes) * 0.7);
-        }
+      final downloaded = File('${scratch.path}/download');
+      var received = 0;
+      final length = response.contentLength;
+      final stream = response.stream.timeout(timeout).map((chunk) {
+        received += chunk.length;
+        if (length != null && length > 0) onProgress(0.7 * received / length);
+        return chunk;
+      });
+      final sink = downloaded.openWrite();
+      try {
+        await sink.addStream(stream);
+      } finally {
+        await sink.close();
       }
-      httpClient.close();
-
-      // 3. Handle Archive vs Direct File
-      final isArchive =
-          url.endsWith('.zip') ||
-          url.endsWith('.tar.bz2') ||
-          url.endsWith('.tar.gz');
-
-      if (isArchive) {
+      if (received == 0 || (length != null && received != length)) {
+        throw const FormatException('Incomplete download');
+      }
+      final name = uri.pathSegments.last;
+      if (name.endsWith('.zip') ||
+          name.endsWith('.tar.bz2') ||
+          name.endsWith('.tar.gz') ||
+          name.endsWith('.tgz')) {
         onProgress(0.75);
-        if (!kIsWeb) {
-          await compute(_extractArchive, {
-            'bytes': allBytes,
-            'path': destinationPath,
-            'url': url,
-          });
-        }
+        await compute(_extract, (downloaded.path, dest.path, name));
       } else {
-        // Direct file download
-        onProgress(0.9);
-        final fileName = url.split('/').last;
-        final outFile = File('$destinationPath/$fileName');
-        await outFile.parent.create(recursive: true);
-        await outFile.writeAsBytes(allBytes);
+        await downloaded.rename('${dest.path}/$name');
       }
-
       onProgress(1.0);
-    } catch (e) {
-      debugPrint('Mushaf Download Error: $e');
-      rethrow;
+    } finally {
+      client.close();
+      await scratch.delete(recursive: true);
     }
   }
 
-  static Future<void> _extractArchive(Map<String, dynamic> args) async {
-    final bytes = args['bytes'] as List<int>;
-    final targetPath = args['path'] as String;
-    final url = args['url'] as String;
-
-    Archive archive;
-
-    if (url.endsWith('.tar.bz2')) {
-      final decompressed = BZip2Decoder().decodeBytes(bytes);
-      archive = TarDecoder().decodeBytes(decompressed);
-    } else {
-      // Default to ZIP
-      archive = ZipDecoder().decodeBytes(bytes);
+  static void _extract((String, String, String) args) {
+    final (source, dest, name) = args;
+    final input = InputFileStream(source);
+    var files = 0;
+    void extract(ArchiveFile entry) {
+      if (!entry.isFile || entry.isSymbolicLink) return;
+      final leaf = entry.name.replaceAll('\\', '/').split('/').last;
+      if (leaf.isEmpty || leaf.startsWith('.') || leaf.contains(':')) return;
+      final output = OutputFileStream('$dest/$leaf');
+      try {
+        entry.writeContent(output);
+      } finally {
+        output.closeSync();
+      }
+      files++;
     }
 
-    for (final file in archive) {
-      final filename = file.name;
-      if (file.isFile) {
-        final data = file.content as List<int>;
-
-        // Handle potential nested folders in ZIP/Tar: flatten or preserve?
-        // For Mushaf images, we usually want them in the root of targetPath
-        // to match ImagePageLoader expectations (001.webp).
-        // Check if filename has digits
-        final nameParts = filename.split('/');
-        final actualName = nameParts.last;
-
-        if (actualName.isNotEmpty && !actualName.startsWith('.')) {
-          final outFile = File('$targetPath/$actualName');
-          outFile.parent.createSync(recursive: true);
-          outFile.writeAsBytesSync(data);
+    try {
+      if (name.endsWith('.zip')) {
+        ZipDecoder().decodeStream(input, verify: true, callback: extract);
+      } else {
+        final tar = name.endsWith('.tar.bz2')
+            ? BZip2Decoder().decodeLazy(input, verify: true)
+            : GZipDecoder().decodeLazy(input, verify: true);
+        try {
+          TarDecoder().decodeStream(
+            tar,
+            verify: true,
+            callback: extract,
+            keepEntries: false,
+          );
+        } finally {
+          tar.closeSync();
         }
       }
+      if (files == 0) throw const FormatException('Empty package');
+    } finally {
+      input.closeSync();
     }
   }
 }

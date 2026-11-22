@@ -117,6 +117,7 @@ void main() {
       'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle';
   const readerSystemChannel = MethodChannel('mathani/reader_system_ui');
   final systemModes = <bool>[];
+  final wakeMessages = <List<int>>[];
   late UiProvider ui;
   late SettingsProvider settings;
   late _Quran quran;
@@ -128,6 +129,7 @@ void main() {
 
   setUp(() {
     systemModes.clear();
+    wakeMessages.clear();
     SharedPreferences.setMockInitialValues({});
     ui = UiProvider();
     settings = SettingsProvider();
@@ -137,10 +139,16 @@ void main() {
     inactive = _InactiveRecitation();
     bookmarks = _Bookmarks();
     navigation = MushafNavigationProvider();
-    binding.defaultBinaryMessenger.setMockMessageHandler(
-      wakelockChannel,
-      (_) async => const StandardMessageCodec().encodeMessage([null]),
-    );
+    binding.defaultBinaryMessenger.setMockMessageHandler(wakelockChannel, (
+      message,
+    ) async {
+      wakeMessages.add(
+        message!.buffer
+            .asUint8List(message.offsetInBytes, message.lengthInBytes)
+            .toList(),
+      );
+      return const StandardMessageCodec().encodeMessage([null]);
+    });
     binding.defaultBinaryMessenger.setMockMethodCallHandler(
       readerSystemChannel,
       (call) async {
@@ -195,6 +203,33 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 700));
   }
+
+  testWidgets('releases the reader wake lock when hidden or backgrounded', (
+    tester,
+  ) async {
+    ui.setTabIndex(1);
+    await show(tester, const MushafScreen(initialPage: 3));
+    expect(wakeMessages, hasLength(1));
+    ui.setTabIndex(0);
+    await tester.pump();
+    expect(wakeMessages, hasLength(2));
+    expect(wakeMessages[0], isNot(equals(wakeMessages[1])));
+    ui.setTabIndex(1);
+    await tester.pump();
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(wakeMessages, [
+      wakeMessages[0],
+      wakeMessages[1],
+      wakeMessages[0],
+      wakeMessages[1],
+      wakeMessages[0],
+      wakeMessages[1],
+    ]);
+  });
 
   testWidgets(
     'page taps toggle immersive mode without an extra floating button',

@@ -19,7 +19,6 @@ class UiProvider with ChangeNotifier {
   // ─── حالة التسميع الذكي ───
   bool _showRecitationMinibar = false;
   bool _isRecitationActive = false; // قيد التسجيل حالياً
-  bool _showRecitationResults = false; // بعد إيقاف التسجيل، النتائج التفصيلية
 
   int get currentTabIndex => _currentTabIndex;
   int? get pageToJump => _pageToJump;
@@ -32,7 +31,6 @@ class UiProvider with ChangeNotifier {
   bool get hasNpu => _hasNpu;
   bool get showRecitationMinibar => _showRecitationMinibar;
   bool get isRecitationActive => _isRecitationActive;
-  bool get showRecitationResults => _showRecitationResults;
 
   void toggleAudioMinibar() {
     _showAudioMinibar = !_showAudioMinibar;
@@ -98,6 +96,13 @@ class UiProvider with ChangeNotifier {
     }
   }
 
+  void hideTafsir() {
+    if (_showingTafsir) {
+      _showingTafsir = false;
+      notifyListeners();
+    }
+  }
+
   void jumpToPage(int page) {
     _isImmersiveMode = false;
     _pageToJump = page < 1 ? 1 : page;
@@ -137,18 +142,12 @@ class UiProvider with ChangeNotifier {
     _showRecitationMinibar = !_showRecitationMinibar;
     if (!_showRecitationMinibar) {
       _isRecitationActive = false;
-      _showRecitationResults = false;
     }
     notifyListeners();
   }
 
   void setRecitationActive(bool active) {
     _isRecitationActive = active;
-    notifyListeners();
-  }
-
-  void setShowRecitationResults(bool show) {
-    _showRecitationResults = show;
     notifyListeners();
   }
 
@@ -164,7 +163,6 @@ class UiProvider with ChangeNotifier {
   void hideRecitationMinibar() {
     _showRecitationMinibar = false;
     _isRecitationActive = false;
-    _showRecitationResults = false;
     notifyListeners();
   }
 }

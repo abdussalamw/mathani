@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../data/models/page_glyph.dart';
 import '../../data/models/ayah.dart';
+import '../../data/models/recitation_result.dart';
 import '../../core/constants/app_colors.dart';
 import 'page_line_widget.dart';
 
@@ -36,6 +37,8 @@ class MushafPageWidget extends StatefulWidget {
   final double? headerHeight;
   final bool
   hideContent; // إضافة خاصية لإخفاء المحتوى عند الحاجة (للشريط الثابت)
+  final Map<String, WordVerdict> wordVerdicts;
+  final Set<String>? revealedWordKeys;
 
   final String? mushafId; // Added to distinguish between QCF4 and QPC V1
 
@@ -52,6 +55,8 @@ class MushafPageWidget extends StatefulWidget {
     this.paintBackground = true,
     this.headerHeight,
     this.hideContent = false, // القيمة الافتراضية هي إظهار المحتوى
+    this.wordVerdicts = const {},
+    this.revealedWordKeys,
   });
 
   @override
@@ -64,6 +69,8 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   bool _isLoadingDigital = false;
   int _loadGeneration = 0;
   final Map<int, List<String>> _lineWordsMap = {};
+  List<PageLine>? _wordKeyLines;
+  final Map<Glyph, String> _wordKeys = {};
 
   @override
   void initState() {
@@ -86,13 +93,25 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
   Future<void> _loadData() async {
     final generation = ++_loadGeneration;
-    if (mounted) setState(() => _isLoadingDigital = true);
+    if (mounted) {
+      setState(() {
+        _isLoadingDigital = true;
+        _digitalAyahs = null;
+      });
+    }
 
     final isV1 = widget.mushafId == 'madani_old_v1';
     final pageNum = widget.page.page;
 
     try {
       if (widget.hideContent) {
+        if (widget.mushafId == 'shamarly_15lines') {
+          setState(() {
+            _digitalAyahs = null;
+            _isLoadingDigital = false;
+          });
+          return;
+        }
         final ayahs = await context.read<QuranProvider>().getAyahsForPage(
           pageNum,
         );
@@ -203,6 +222,35 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
       return _v1Lines!;
     }
     return widget.page.lines;
+  }
+
+  Map<Glyph, String> _getWordKeys(List<PageLine> lines) {
+    if (widget.revealedWordKeys == null && widget.wordVerdicts.isEmpty) {
+      return const {};
+    }
+    if (identical(lines, _wordKeyLines)) return _wordKeys;
+    _wordKeyLines = lines;
+    _wordKeys.clear();
+    final usesAyahWordIds = widget.mushafId == 'madani_old_v1';
+    final wordCounts = <(int, int), int>{};
+    for (final line in lines) {
+      for (final glyph in line.glyphs) {
+        final surah = glyph.surah;
+        final ayah = glyph.ayah;
+        if (!glyph.isWord || surah == null || ayah == null) continue;
+        // QCF4 IDs are Quran-wide. The Madani page layout keeps each ayah
+        // on one page, so count its words across all its lines on that page.
+        final number = usesAyahWordIds
+            ? glyph.wordId
+            : wordCounts.update(
+                (surah, ayah),
+                (count) => count + 1,
+                ifAbsent: () => 1,
+              );
+        if (number != null) _wordKeys[glyph] = '${surah}_${ayah}_$number';
+      }
+    }
+    return _wordKeys;
   }
 
   Widget _buildErrorState(String message) {
@@ -373,7 +421,21 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                               Consumer<BookmarkProvider>(
                                 builder: (context, bookmarks, child) {
                                   int? targetSurah, targetAyah;
-                                  if (_digitalAyahs != null &&
+                                  if (widget.hideContent &&
+                                      widget.mushafId == 'shamarly_15lines') {
+                                    final nav = context
+                                        .watch<MushafNavigationProvider>();
+                                    final pageInfo = nav.getPageInfo(
+                                      widget.page.page,
+                                    );
+                                    if (nav.currentNavigationData?.mushafId ==
+                                            widget.mushafId &&
+                                        pageInfo != null &&
+                                        pageInfo.startSurah > 0) {
+                                      targetSurah = pageInfo.startSurah;
+                                      targetAyah = pageInfo.startAyah;
+                                    }
+                                  } else if (_digitalAyahs != null &&
                                       _digitalAyahs!.isNotEmpty) {
                                     targetSurah =
                                         _digitalAyahs!.first.surahNumber;
@@ -528,6 +590,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
 
   Widget _buildMobileLayout(bool showInfo) {
     final displayLines = _getDisplayLines();
+    final wordKeys = _getWordKeys(displayLines);
     // For full pages (13+ lines), use SpaceBetween to stick the first line directly under the top bar
     // For smaller pages (like Fatiha), use SpaceEvenly or Center to look balanced
     final useSpaceBetween = showInfo && displayLines.length >= 13;
@@ -556,6 +619,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
           onAyahLongPress: widget.onAyahLongPress,
           isDigital: widget.isDigital,
           digitalWords: widget.isDigital ? _lineWordsMap[line.line] : null,
+          wordKeys: wordKeys,
+          wordVerdicts: widget.wordVerdicts,
+          revealedWordKeys: widget.revealedWordKeys,
           mushafId: widget.mushafId,
           isCentered: widget.mushafId != 'madani_old_v1'
               ? (widget.page.page <= 2
@@ -590,6 +656,7 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
   }
 
   Widget _buildTabletLayout(bool showInfo) {
+    final wordKeys = _getWordKeys(_getDisplayLines());
     return LayoutBuilder(
       builder: (context, constraints) {
         final availableWidth = constraints.maxWidth;
@@ -646,6 +713,9 @@ class _MushafPageWidgetState extends State<MushafPageWidget> {
                         digitalWords: widget.isDigital
                             ? _lineWordsMap[line.line]
                             : null,
+                        wordKeys: wordKeys,
+                        wordVerdicts: widget.wordVerdicts,
+                        revealedWordKeys: widget.revealedWordKeys,
                         mushafId: widget.mushafId,
                         isCentered: widget.mushafId != 'madani_old_v1'
                             ? (widget.page.page <= 2

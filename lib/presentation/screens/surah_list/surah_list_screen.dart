@@ -84,6 +84,7 @@ class _SurahListScreenState extends State<SurahListScreen> {
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 18),
                         onPressed: () {
+                          _debounce?.cancel();
                           setState(() {
                             _searchQuery = '';
                             _searchController.clear();

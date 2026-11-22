@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 
 typedef MadinaVerseRun = ({int surah, int ayah, String text, int firstWord});
 
+bool isMadinaLayoutWord(String text) =>
+    text.isNotEmpty && !text.startsWith('۝') && text != '۞' && text != '۩';
+
 class MadinaLine {
   const MadinaLine(this.centered, this.runs);
   final bool centered;
@@ -19,7 +22,8 @@ class DigitalKhattPageLoader {
 
   static const pageCount = 604;
   static const layoutAsset1441 = 'assets/data/digital_khatt_1441.json';
-  static const layoutAssetOldMadina = 'assets/data/digital_khatt_old_madina.json';
+  static const layoutAssetOldMadina =
+      'assets/data/digital_khatt_old_madina.json';
   final AssetBundle _bundle;
   final String layoutAsset;
   List<List<MadinaLine>>? _pages;
@@ -56,10 +60,7 @@ List<List<MadinaLine>> _decodePages(String json) {
     final key = (surah, ayah);
     final firstWord = ayah == 0 ? 0 : (wordCounts[key] ?? 0) + 1;
     if (ayah != 0) {
-      final count = text
-          .split(' ')
-          .where((word) => !word.startsWith('۝'))
-          .length;
+      final count = text.split(' ').where(isMadinaLayoutWord).length;
       wordCounts[key] = firstWord + count - 1;
     }
     return (surah: surah, ayah: ayah, text: text, firstWord: firstWord);

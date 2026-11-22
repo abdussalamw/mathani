@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -13,18 +15,30 @@ class QuranLocalDataSource {
   QuranLocalDataSource._internal();
 
   // Cache للبيانات المحملة
-  List<dynamic>? _cachedData;
+  Future<List<dynamic>>? _pending;
+  final _byPage = <int, List<({int surah, Map<String, dynamic> verse})>>{};
 
-  /// تحميل البيانات من assets
-  Future<List<dynamic>> _loadData() async {
-    if (_cachedData != null) return _cachedData!;
-
-    // استخدام الملف المتقدم المدمج (نص + صفحات)
-    final jsonString = await rootBundle.loadString(
-      'assets/data/quran_advanced.json',
-    );
-    _cachedData = json.decode(jsonString) as List<dynamic>;
-    return _cachedData!;
+  Future<List<dynamic>> _loadData() => _pending ??= _read();
+  Future<List<dynamic>> _read() async {
+    try {
+      final json = await rootBundle.loadString(
+        'assets/data/quran_advanced.json',
+      );
+      final rows = await compute(_decodeSurahs, json);
+      for (final surah in rows) {
+        for (final verse in surah['verses']) {
+          _byPage.putIfAbsent(verse['page'], () => []).add((
+            surah: surah['id'],
+            verse: verse,
+          ));
+        }
+      }
+      return rows;
+    } catch (_) {
+      _pending = null;
+      _byPage.clear();
+      rethrow;
+    }
   }
 
   /// جلب جميع السور
@@ -76,16 +90,7 @@ class QuranLocalDataSource {
       for (var verse in verses) {
         if (verse is! Map<String, dynamic>) continue;
 
-        ayahs.add(
-          Ayah()
-            ..surahNumber = surahNumber
-            ..ayahNumber = verse['id'] as int
-            ..text = verse['text'] as String
-            ..juz =
-                verse['juz']
-                    as int // متوفر الآن
-            ..page = verse['page'] as int, // متوفر الآن
-        );
+        ayahs.add(Ayah.fromJson(verse, surahNumber));
       }
     }
 
@@ -94,30 +99,11 @@ class QuranLocalDataSource {
 
   /// جلب آيات صفحة معينة
   Future<List<Ayah>> loadAyahsForPage(int pageNumber) async {
-    final data = await _loadData();
-    final List<Ayah> pageAyahs = [];
-
-    for (var surahItem in data) {
-      if (surahItem['verses'] is List) {
-        final verses = surahItem['verses'] as List;
-        for (var verse in verses) {
-          if (verse['page'] == pageNumber) {
-            pageAyahs.add(
-              Ayah()
-                ..surahNumber = surahItem['id'] as int
-                ..ayahNumber = verse['id'] as int
-                ..text = verse['text'] as String
-                ..juz = verse['juz'] as int
-                ..page = verse['page'] as int,
-            );
-          }
-        }
-      }
-    }
-
-    // Sort by Surah then Ayah to be safe?
-    // Usually they are in order.
-    return pageAyahs;
+    await _loadData();
+    return [
+      for (final item in _byPage[pageNumber] ?? [])
+        Ayah.fromJson(item.verse, item.surah),
+    ];
   }
 
   /// جلب جميع الآيات (للبحث والتهيئة)
@@ -141,3 +127,6 @@ class QuranLocalDataSource {
     return allAyahs;
   }
 }
+
+List<dynamic> _decodeSurahs(String source) =>
+    jsonDecode(source) as List<dynamic>;

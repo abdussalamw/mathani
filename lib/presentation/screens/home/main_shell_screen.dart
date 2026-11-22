@@ -13,7 +13,6 @@ import '../../providers/settings_provider.dart';
 import '../../widgets/audio_minibar.dart';
 import '../../widgets/audio_player_sheet.dart';
 import '../../widgets/recitation_minibar.dart';
-import '../../widgets/recitation_expanded_panel.dart';
 
 import 'package:provider/provider.dart';
 
@@ -44,7 +43,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
             // If we are on Mushaf but showing Tafsir, go back to Mushaf
             if (uiProvider.showingTafsir) {
-              uiProvider.toggleTafsir();
+              uiProvider.hideTafsir();
               return;
             }
 
@@ -153,25 +152,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (uiProvider.showRecitationMinibar)
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (child, animation) {
-                              return SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0, 1),
-                                  end: Offset.zero,
-                                ).animate(animation),
-                                child: child,
-                              );
-                            },
-                            child: uiProvider.showRecitationResults
-                                ? const RecitationExpandedPanel(
-                                    key: ValueKey('expanded'),
-                                  )
-                                : const RecitationMiniBar(
-                                    key: ValueKey('minibar'),
-                                  ),
-                          )
+                          const RecitationMiniBar()
                         else ...[
                           // Audio minibar (استماع)
                           if (uiProvider.showAudioMinibar) const AudioMinibar(),

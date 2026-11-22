@@ -240,15 +240,7 @@ class _MainControls extends StatelessWidget {
           _CircleActionBtn(
             icon: Icons.skip_next_rounded,
             tooltip: 'الآية السابقة',
-            onPressed: () {
-              if (audio.player.hasPrevious) {
-                audio.player.seekToPrevious();
-              } else if (audio.currentSurah != null &&
-                  audio.currentAyah != null &&
-                  audio.currentAyah! > 1) {
-                audio.playAyah(audio.currentSurah!, audio.currentAyah! - 1);
-              }
-            },
+            onPressed: () => audio.skipRelative(-1),
           ),
 
           // 3. Play/Pause (Central)
@@ -306,14 +298,7 @@ class _MainControls extends StatelessWidget {
           _CircleActionBtn(
             icon: Icons.skip_previous_rounded,
             tooltip: 'الآية التالية',
-            onPressed: () {
-              if (audio.player.hasNext) {
-                audio.player.seekToNext();
-              } else if (audio.currentSurah != null &&
-                  audio.currentAyah != null) {
-                audio.playAyah(audio.currentSurah!, audio.currentAyah! + 1);
-              }
-            },
+            onPressed: () => audio.skipRelative(1),
           ),
 
           // 5. Stop (Changed icon to be more unique for test)
@@ -407,12 +392,18 @@ class _AdvancedOptionsState extends State<_AdvancedOptions> {
   @override
   void initState() {
     super.initState();
-    startSurah = widget.audio.currentSurah ?? widget.quran.readingSurah;
-    startAyah = widget.audio.currentAyah ?? widget.quran.readingAyah;
+    startSurah =
+        widget.audio.startSurah ??
+        widget.audio.currentSurah ??
+        widget.quran.readingSurah;
+    startAyah =
+        widget.audio.startAyah ??
+        widget.audio.currentAyah ??
+        widget.quran.readingAyah;
     if (startAyah == 0) startAyah = 1;
 
-    endSurah = startSurah;
-    endAyah = startAyah;
+    endSurah = widget.audio.endSurah ?? startSurah;
+    endAyah = widget.audio.endAyah ?? startAyah;
   }
 
   int _getAyahCountForSurah(int surahNumber) {

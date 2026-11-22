@@ -24,12 +24,14 @@ class SurahContentProvider extends ChangeNotifier {
   int? _selectedSurah;
   int? _selectedAyah;
   int? _selectedWordCount;
+  int _requestGeneration = 0;
 
   Future<void> fetchContent(
     int suraNumber,
     int ayaNumber,
     int wordCount,
   ) async {
+    final currentGen = ++_requestGeneration;
     _isLoading = true;
     _selectedSurah = suraNumber;
     _selectedAyah = ayaNumber;
@@ -41,24 +43,47 @@ class SurahContentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Parallel Fetch
-      final results = await Future.wait([
-        _fetchAyaContentLogic(suraNumber, ayaNumber, _selectedTafsirSlug),
-        _apiService.getAyahWordsContent(
+      // 1. Fetch Tafsir (local finishes immediately)
+      final tafsirFuture = _fetchAyaContentLogic(
+        suraNumber,
+        ayaNumber,
+        _selectedTafsirSlug,
+      );
+
+      // If local tafsir finishes fast, display it without waiting for words API
+      tafsirFuture.then((content) {
+        if (currentGen == _requestGeneration) {
+          _currentAyaContent = content;
+          _isLoading = false;
+          notifyListeners();
+        }
+      });
+
+      // 2. Fetch word-by-word content without blocking tafsir
+      try {
+        final words = await _apiService.getAyahWordsContent(
           suraNumber: suraNumber,
           ayaNumber: ayaNumber,
           wordCount: wordCount,
           slug: 'meaning-word',
-        ),
-      ]);
+        );
+        if (currentGen == _requestGeneration) {
+          _currentAyaWords = words;
+          notifyListeners();
+        }
+      } catch (_) {}
 
-      _currentAyaContent = results[0] as AyaContent?;
-      _currentAyaWords = results[1] as List<WordContent>;
+      final finalContent = await tafsirFuture;
+      if (currentGen == _requestGeneration) {
+        _currentAyaContent = finalContent;
+      }
     } catch (e) {
       debugPrint('Error fetching content: $e');
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (currentGen == _requestGeneration) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 

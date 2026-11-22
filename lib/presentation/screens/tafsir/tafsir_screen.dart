@@ -81,9 +81,8 @@ class _TafsirScreenState extends State<TafsirScreen> {
   @override
   void didUpdateWidget(TafsirScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialPage != null) {
+    if (widget.initialPage != null && widget.initialPage != oldWidget.initialPage) {
       final newPage = widget.initialPage!;
-      // Even if newPage == oldWidget.initialPage, we might want to sync if internal _currentPage is different
       if (_currentPage != newPage) {
         setState(() {
           _currentPage = newPage;
@@ -186,8 +185,8 @@ class _TafsirScreenState extends State<TafsirScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () {
-            // Switch back to Mushaf Tab
-            context.read<UiProvider>().setTabIndex(1);
+            // Close Tafsir view explicitly
+            context.read<UiProvider>().hideTafsir();
           },
         ),
         actions: const [

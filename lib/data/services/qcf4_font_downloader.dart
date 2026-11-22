@@ -6,7 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
-import 'package:archive/archive_io.dart';
+
+import 'mushaf_package.dart';
+import 'mushaf_downloader_service.dart';
+import 'glyph_data_loader.dart';
+import 'qcf4_alignment_service.dart';
+
 import 'package:flutter/foundation.dart';
 
 /// خدمة تحميل خطوط QCF4 من GitHub
@@ -15,7 +20,7 @@ class QCF4FontDownloader {
   static const String _baseUrl =
       'https://github.com/abdussalamw/mathani/releases/download/v1.0-assets';
   static const String _zipFileName = 'quran_fonts_qfc4.zip';
-  static const int _totalFonts = 604;
+  static final _installWork = AsyncWorkPool<String, void>();
 
   static final Map<String, bool> _loadedFonts = {};
   static final Map<String, FontLoader> _fontLoaders = {};
@@ -33,11 +38,8 @@ class QCF4FontDownloader {
       final dir = await getApplicationDocumentsDirectory();
       final fontsDir = Directory('${dir.path}/fonts/qcf4');
 
-      if (!await fontsDir.exists()) return false;
-
-      final entityCount = fontsDir.listSync().length;
-      final jsonFile = File('${fontsDir.path}/quran_glyphs.json');
-      return entityCount >= _totalFonts && await jsonFile.exists();
+      recoverMushafDirectory(fontsDir);
+      return await validMushafPackage('qcf2_v4_woff2', fontsDir);
     } catch (e) {
       return false;
     }
@@ -47,125 +49,48 @@ class QCF4FontDownloader {
   static Future<void> downloadAllFonts({
     required Function(double progress) onProgress,
     required Function(String status) onStatusChanged,
-  }) async {
-    // Determine target file for native, or use memory for web
-    File? zipFile;
-    if (!kIsWeb) {
-      final dir = await getApplicationDocumentsDirectory();
-      zipFile = File('${dir.path}/$_zipFileName');
-      await clearCache();
-    } else {
-      _webParamsCache.clear();
-    }
-
-    try {
-      // 1. Download Zip
-      onStatusChanged('جاري تحميل ملف الخطوط...');
-
-      // We need the bytes whether it's web (memory) or native (file)
-      final httpClient = http.Client();
-      final request = http.Request('GET', Uri.parse('$_baseUrl/$_zipFileName'));
-      final response = await httpClient.send(request);
-
+  }) => _installWork.run('qcf4', () async {
+    if (kIsWeb) {
+      final response = await http
+          .get(Uri.parse('$_baseUrl/$_zipFileName'))
+          .timeout(const Duration(minutes: 2));
       if (response.statusCode != 200) {
-        throw Exception('Failed to download zip: ${response.statusCode}');
+        throw HttpException('HTTP ${response.statusCode}');
       }
-
-      final totalBytes = response.contentLength ?? 0;
-      int receivedBytes = 0;
-      final List<int> allBytes = [];
-
-      // Stream download
-      await for (final chunk in response.stream) {
-        allBytes.addAll(chunk);
-        receivedBytes += chunk.length;
-        if (totalBytes > 0) {
-          onProgress(receivedBytes / totalBytes * 0.5); // 50% for download
-        }
-      }
-      httpClient.close();
-
-      final zipBytes = Uint8List.fromList(allBytes);
-
-      if (!kIsWeb && zipFile != null) {
-        await zipFile.writeAsBytes(zipBytes);
-      }
-
-      // 2. Extract Zip
-      onStatusChanged('جاري فك ضغط الخطوط...');
-
-      // Extract logic
-      await _extractZipBytes(
-        zipBytes,
-        !kIsWeb
-            ? '${(await getApplicationDocumentsDirectory()).path}/fonts/qcf4'
-            : null,
+      final archive = ZipDecoder().decodeBytes(
+        response.bodyBytes,
+        verify: true,
       );
-
-      // 3. Cleanup
-      onStatusChanged('تمت العملية بنجاح');
-      if (!kIsWeb && zipFile != null && await zipFile.exists()) {
-        await zipFile.delete();
+      for (final entry in archive.files.where((e) => e.isFile)) {
+        _webParamsCache[entry.name.split('/').last] = entry.content;
       }
       onProgress(1.0);
-    } catch (e) {
-      debugPrint('Error downloading all fonts: $e');
-      rethrow;
-    }
-  }
-
-  static Future<void> _extractZipBytes(
-    Uint8List zipBytes,
-    String? targetPath,
-  ) async {
-    // For Web, we extract to _webParamsCache
-    // For Native, we extract to targetPath
-
-    if (kIsWeb) {
-      final archive = ZipDecoder().decodeBytes(zipBytes);
-      for (final file in archive) {
-        if (file.isFile) {
-          final filename = file.name.split('/').last;
-          if (filename.endsWith('.woff') ||
-              filename.endsWith('.ttf') ||
-              filename.endsWith('.json')) {
-            _webParamsCache[filename] = file.content;
-          }
-        }
-      }
       return;
     }
-
-    // Native: Use compute for performance
-    await compute(_decodeAndExtract, {'bytes': zipBytes, 'path': targetPath});
-  }
-
-  static Future<void> _decodeAndExtract(Map<String, dynamic> args) async {
-    final archive = ZipDecoder().decodeBytes(args['bytes'] as List<int>);
-    final String targetPath = args['path'] as String;
-
-    final targetDir = Directory(targetPath);
-    if (!targetDir.existsSync()) {
-      targetDir.createSync(recursive: true);
-    }
-
-    for (final file in archive) {
-      if (file.isFile) {
-        final filename = file.name;
-        final data = file.content as List<int>;
-        final flatName = filename.split('/').last;
-
-        if (flatName.isNotEmpty &&
-            (flatName.endsWith('.woff') ||
-                flatName.endsWith('.ttf') ||
-                flatName.endsWith('.json'))) {
-          File('$targetPath/$flatName')
-            ..createSync(recursive: true)
-            ..writeAsBytesSync(data);
-        }
+    final docs = await getApplicationDocumentsDirectory();
+    final target = Directory('${docs.path}/fonts/qcf4');
+    await target.parent.create(recursive: true);
+    final stage = await target.parent.createTemp('.qcf4-install-');
+    try {
+      onStatusChanged('جاري تحميل الخطوط والتحقق منها');
+      await MushafDownloaderService.downloadAndExtract(
+        url: '$_baseUrl/$_zipFileName',
+        destinationPath: stage.path,
+        onProgress: (p) => onProgress(p * .95),
+      );
+      if (!await validMushafPackage('qcf2_v4_woff2', stage)) {
+        throw const FormatException('حزمة خطوط المصحف تالفة أو ناقصة');
       }
+      commitMushafDirectory(stage, target);
+      _loadedFonts.clear();
+      _fontLoaders.clear();
+      GlyphDataLoader().clearCache();
+      QCF4AlignmentService().invalidate();
+      onProgress(1.0);
+    } finally {
+      if (await stage.exists()) await stage.delete(recursive: true);
     }
-  }
+  });
 
   // --- Individual Loading ---
 
@@ -209,7 +134,9 @@ class QCF4FontDownloader {
       final targetUrl = '$_baseUrl/$fontName.woff';
       final url = 'https://corsproxy.io/?${Uri.encodeComponent(targetUrl)}';
 
-      final response = await http.get(Uri.parse(url));
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 30));
       if (response.statusCode != 200) {
         throw Exception('Failed to download font (Web)');
       }
@@ -233,7 +160,9 @@ class QCF4FontDownloader {
 
     // 3. Download (Fallback)
     final url = '$_baseUrl/$fontName.woff';
-    final response = await http.get(Uri.parse(url));
+    final response = await http
+        .get(Uri.parse(url))
+        .timeout(const Duration(seconds: 30));
     if (response.statusCode != 200) throw Exception('Failed to download font');
 
     final fontData = response.bodyBytes;

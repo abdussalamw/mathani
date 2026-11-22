@@ -33,10 +33,14 @@ class QuranProvider with ChangeNotifier {
   List<Ayah> get searchResults => _searchResults;
   bool _isSearching = false;
   bool get isSearching => _isSearching;
+  int _searchGeneration = 0;
 
   Future<void> search(String query) async {
-    if (query.isEmpty) {
+    final currentGen = ++_searchGeneration;
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
       _searchResults = [];
+      _isSearching = false;
       notifyListeners();
       return;
     }
@@ -44,7 +48,10 @@ class QuranProvider with ChangeNotifier {
     _isSearching = true;
     notifyListeners();
 
-    final result = await _repository.searchAyahs(query);
+    final result = await _repository.searchAyahs(trimmed);
+
+    // Drop stale async search results
+    if (currentGen != _searchGeneration) return;
 
     result.fold(
       (failure) {
@@ -60,7 +67,9 @@ class QuranProvider with ChangeNotifier {
   }
 
   void clearSearch() {
+    _searchGeneration++;
     _searchResults = [];
+    _isSearching = false;
     notifyListeners();
   }
 

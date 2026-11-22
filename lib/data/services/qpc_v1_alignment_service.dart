@@ -19,15 +19,21 @@ class QPCV1AlignmentService {
 
   Map<String, dynamic>? _data;
   bool _isLoaded = false;
-  bool _isLoading = false;
+  int _generation = 0;
 
-  final _loadWork = AsyncWorkPool<String, void>();
+  void invalidate() {
+    _generation++;
+    _data = null;
+    _isLoaded = false;
+  }
 
-  Future<void> load() => _loadWork.run('alignment', _loadOnce);
+  final _loadWork = AsyncWorkPool<int, void>();
 
-  Future<void> _loadOnce() async {
-    if (_isLoaded || _isLoading) return;
-    _isLoading = true;
+  Future<void> load() =>
+      _loadWork.run(_generation, () => _loadOnce(_generation));
+
+  Future<void> _loadOnce(int generation) async {
+    if (_isLoaded && _data != null && _data!.isNotEmpty) return;
 
     try {
       String jsonString;
@@ -56,13 +62,19 @@ class QPCV1AlignmentService {
           jsonString = '{}';
         }
       }
-      _data = jsonDecode(jsonString) as Map<String, dynamic>;
-      debugPrint('QPC V1 Alignment data loaded: ${_data!.length} pages');
-      _isLoaded = true;
+      if (generation != _generation) return;
+      final parsed = jsonDecode(jsonString) as Map<String, dynamic>;
+      if (parsed.isNotEmpty) {
+        _data = parsed;
+        _isLoaded = true;
+        debugPrint('QPC V1 Alignment data loaded: ${_data!.length} pages');
+      } else {
+        _isLoaded = false;
+      }
     } catch (e) {
+      if (generation != _generation) return;
       debugPrint('Error loading QPC V1 alignment data: $e');
-    } finally {
-      _isLoading = false;
+      _isLoaded = false;
     }
   }
 

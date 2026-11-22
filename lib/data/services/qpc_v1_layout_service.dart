@@ -19,15 +19,21 @@ class QPCV1LayoutService {
 
   Map<int, List<dynamic>>? _rawLayout;
   bool _isLoaded = false;
-  bool _isLoading = false;
+  int _generation = 0;
 
-  final _loadWork = AsyncWorkPool<String, void>();
+  final _loadWork = AsyncWorkPool<int, void>();
 
-  Future<void> _load() => _loadWork.run('layout', _loadOnce);
+  void invalidate() {
+    _generation++;
+    _isLoaded = false;
+    _rawLayout = null;
+  }
 
-  Future<void> _loadOnce() async {
-    if (_isLoaded || _isLoading) return;
-    _isLoading = true;
+  Future<void> _load() =>
+      _loadWork.run(_generation, () => _loadOnce(_generation));
+
+  Future<void> _loadOnce(int generation) async {
+    if (_isLoaded) return;
 
     try {
       String jsonString;
@@ -56,6 +62,7 @@ class QPCV1LayoutService {
           jsonString = '[]';
         }
       }
+      if (generation != _generation) return;
       final Map<String, dynamic> decoded = jsonDecode(jsonString);
 
       _rawLayout = {};
@@ -68,9 +75,8 @@ class QPCV1LayoutService {
       debugPrint('Successfully loaded QPC V1 Layout');
       _isLoaded = true;
     } catch (e) {
+      if (generation != _generation) return;
       debugPrint('Error loading QPC V1 Layout: $e');
-    } finally {
-      _isLoading = false;
     }
   }
 

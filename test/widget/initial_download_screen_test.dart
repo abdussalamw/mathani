@@ -18,8 +18,9 @@ class _DownloadProvider extends ChangeNotifier
   bool delaySelection = false;
   bool selectionStarted = false;
   bool throwOnDownload = true;
+  bool alreadyDownloaded = false;
   bool multipleMushafs = false;
-  bool includeStreamingMushaf = false;
+  bool includeBundledMushaf = false;
   String? selectedId;
   int downloads = 0;
   bool get hasActiveListeners => hasListeners;
@@ -29,18 +30,18 @@ class _DownloadProvider extends ChangeNotifier
     MushafMetadata()
       ..identifier = 'qcf2_v4_woff2'
       ..nameArabic = 'مصحف المدينة'
-      ..isDownloaded = false,
+      ..isDownloaded = alreadyDownloaded,
     if (multipleMushafs)
       MushafMetadata()
         ..identifier = 'madani_old_v1'
         ..nameArabic = 'مصحف آخر'
         ..isDownloaded = false,
-    if (includeStreamingMushaf)
+    if (includeBundledMushaf)
       MushafMetadata()
         ..identifier = 'digital_khatt_1441'
         ..nameArabic = 'مصحف المدينة 1441 (تجريبي)'
-        ..type = 'svg'
-        ..isDownloaded = false,
+        ..type = 'single_font'
+        ..isDownloaded = true,
   ];
 
   @override
@@ -95,11 +96,12 @@ void main() {
           ChangeNotifierProvider<MushafMetadataProvider>.value(value: provider),
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
         ],
-        child: const MaterialApp(
-          locale: Locale('ar'),
+        child: MaterialApp(
+          locale: const Locale('ar'),
           localizationsDelegates: appLocalizationDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: InitialDownloadScreen(),
+          home: const InitialDownloadScreen(),
+          routes: {'/home': (_) => const Text('ready reader')},
         ),
       ),
     );
@@ -130,14 +132,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('streamed SVG mushaf is not offered as a bulk download', (
+  testWidgets('bundled single-font mushaf is not offered as a bulk download', (
     tester,
   ) async {
-    provider.includeStreamingMushaf = true;
+    provider.includeBundledMushaf = true;
     await showScreen(tester);
 
     expect(find.text('مصحف المدينة 1441 (تجريبي)'), findsNothing);
   });
+
+  testWidgets(
+    'a ready mushaf remains readable when optional tafsir setup fails',
+    (tester) async {
+      provider.alreadyDownloaded = true;
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        paths,
+        (_) async => throw PlatformException(code: 'storage-unavailable'),
+      );
+      addTearDown(
+        () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          paths,
+          null,
+        ),
+      );
+      await showScreen(tester);
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pumpAndSettle();
+      expect(provider.downloads, 0);
+      expect(find.text('متابعة القراءة'), findsOneWidget);
+      await tester.tap(find.text('متابعة القراءة'));
+      await tester.pumpAndSettle();
+      expect(find.text('ready reader'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('allows retry when enabling wakelock fails', (tester) async {
     binding.defaultBinaryMessenger.setMockMessageHandler(channel, (_) async {

@@ -5,9 +5,6 @@ import 'ayah_press_target.dart';
 import '../../data/models/page_glyph.dart';
 import '../../core/constants/app_colors.dart';
 
-import 'package:provider/provider.dart';
-
-import '../providers/recitation_provider.dart';
 import '../../data/models/recitation_result.dart';
 
 /// Widget لعرض سطر واحد من صفحة المصحف
@@ -24,6 +21,9 @@ class PageLineWidget extends StatelessWidget {
   final List<String>? digitalWords;
   final String? mushafId; // Added
   final bool? isCentered; // Official alignment from QUL database (null = use fallback heuristic)
+  final Map<Glyph, String> wordKeys;
+  final Map<String, WordVerdict> wordVerdicts;
+  final Set<String>? revealedWordKeys;
 
   const PageLineWidget({
     super.key,
@@ -38,7 +38,13 @@ class PageLineWidget extends StatelessWidget {
     this.digitalWords,
     this.mushafId,
     this.isCentered,
+    this.wordKeys = const {},
+    this.wordVerdicts = const {},
+    this.revealedWordKeys,
   });
+
+  bool _isHiddenWord(Glyph glyph) =>
+      glyph.isWord && revealedWordKeys?.contains(wordKeys[glyph]) == false;
 
   @override
   Widget build(BuildContext context) {
@@ -107,12 +113,7 @@ class PageLineWidget extends StatelessWidget {
                     glyph.ayah == selectedAyah;
 
                 // تلوين الكلمات لحظياً أثناء التسميع
-                final recProvider = Provider.of<RecitationProvider>(
-                  context,
-                  listen: false,
-                );
-                final wordKey = "${glyph.surah}_${glyph.ayah}_${glyph.wordId}";
-                final liveVerdict = recProvider.liveWordVerdicts[wordKey];
+                final liveVerdict = wordVerdicts[wordKeys[glyph]];
 
                 BoxDecoration decoration = const BoxDecoration();
                 Color? customColor;
@@ -175,8 +176,14 @@ class PageLineWidget extends StatelessWidget {
                   ),
                 );
 
+                if (_isHiddenWord(glyph)) {
+                  return Opacity(opacity: 0, child: child);
+                }
+
                 // Intearaction
-                if (glyph.surah != null && glyph.ayah != null) {
+                if (revealedWordKeys == null &&
+                    glyph.surah != null &&
+                    glyph.ayah != null) {
                   return AyahPressTarget(
                     onSelected:
                         onAyahLongPress == null && onAyahSelected == null
@@ -265,12 +272,7 @@ class PageLineWidget extends StatelessWidget {
                     glyph.ayah == selectedAyah;
 
                 // تلوين الكلمات لحظياً أثناء التسميع
-                final recProvider = Provider.of<RecitationProvider>(
-                  context,
-                  listen: false,
-                );
-                final wordKey = "${glyph.surah}_${glyph.ayah}_${glyph.wordId}";
-                final liveVerdict = recProvider.liveWordVerdicts[wordKey];
+                final liveVerdict = wordVerdicts[wordKeys[glyph]];
 
                 BoxDecoration decoration = const BoxDecoration();
                 Color? customColor;
@@ -329,8 +331,16 @@ class PageLineWidget extends StatelessWidget {
                   ),
                 );
 
+                if (_isHiddenWord(glyph)) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 1.0),
+                    child: Opacity(opacity: 0, child: child),
+                  );
+                }
+
                 // Wrap in interaction if it's a verse part
-                if ((glyph.isWord || glyph.isAyahEnd) &&
+                if (revealedWordKeys == null &&
+                    (glyph.isWord || glyph.isAyahEnd) &&
                     glyph.surah != null &&
                     glyph.ayah != null) {
                   return AyahPressTarget(

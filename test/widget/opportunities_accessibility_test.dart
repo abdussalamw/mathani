@@ -31,6 +31,12 @@ class _Audio extends ChangeNotifier implements AudioProvider {
   @override
   int get startSurah => 1;
   @override
+  int get startAyah => 1;
+  @override
+  int get endSurah => 1;
+  @override
+  int get endAyah => 1;
+  @override
   int ayahRepeatLimit = 1;
   @override
   int get rangeRepeatLimit => 1;

@@ -129,35 +129,12 @@ class AudioMinibar extends StatelessWidget {
                   // Prev (Right arrow → plays previous Ayah)
                   _SmallButton(
                     icon: Icons.skip_next_rounded, // Mirrored icon
-                    onPressed: () {
-                      if (audio.player.hasPrevious) {
-                        audio.player.seekToPrevious();
-                      } else if (audio.currentSurah != null &&
-                          audio.currentAyah != null &&
-                          audio.currentAyah! > 1) {
-                        // Fallback if not in playlist
-                        audio.playAyah(
-                          audio.currentSurah!,
-                          audio.currentAyah! - 1,
-                        );
-                      }
-                    },
+                    onPressed: () => audio.skipRelative(-1),
                   ),
                   // Next (Left arrow → plays next Ayah)
                   _SmallButton(
                     icon: Icons.skip_previous_rounded, // Mirrored icon
-                    onPressed: () {
-                      if (audio.player.hasNext) {
-                        audio.player.seekToNext();
-                      } else if (audio.currentSurah != null &&
-                          audio.currentAyah != null) {
-                        // Fallback
-                        audio.playAyah(
-                          audio.currentSurah!,
-                          audio.currentAyah! + 1,
-                        );
-                      }
-                    },
+                    onPressed: () => audio.skipRelative(1),
                   ),
                   // Toggle Repeat Ayah: 1 → 2 → 3 → ... → 10 → 1
                   _RepeatButton(audio: audio),

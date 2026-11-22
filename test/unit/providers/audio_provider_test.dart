@@ -82,13 +82,19 @@ class _Reciters implements ReciterRepository {
 }
 
 class _Quran implements QuranRepository {
+  int verseCount = 3;
+  Completer<void>? metadata;
   @override
-  Future<Either<Failure, Surah?>> getSurahByNumber(int number) async => Right(
-    Surah()
-      ..number = number
-      ..nameArabic = 'سورة الاختبار'
-      ..numberOfAyahs = 3,
-  );
+  Future<Either<Failure, Surah?>> getSurahByNumber(int number) async {
+    await metadata?.future;
+    return Right(
+      Surah()
+        ..number = number
+        ..nameArabic = 'سورة الاختبار'
+        ..numberOfAyahs = verseCount,
+    );
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -96,11 +102,12 @@ class _Quran implements QuranRepository {
 void main() {
   late _Player player;
   late AudioProvider provider;
+  late _Quran quran;
   setUp(() async {
     player = _Player();
     provider = AudioProvider(
       player: player,
-      quranRepository: _Quran(),
+      quranRepository: quran = _Quran(),
       reciterRepository: _Reciters(),
     );
     await Future<void>.delayed(Duration.zero);
@@ -150,6 +157,57 @@ void main() {
     },
   );
 
+  test(
+    'bounded playlists reach the last verse of every requested repetition',
+    () async {
+      quran.verseCount = 286;
+      provider.setAyahRepeatLimit(3);
+      provider.setRangeRepeatLimit(2);
+      await provider.playSurah(2);
+      final heard = <String>[];
+      for (var window = 0; window < 3; window++) {
+        expect(player.sources.length, lessThanOrEqualTo(600));
+        heard.addAll(
+          player.sources.cast<UriAudioSource>().map(
+            (s) => (s.tag as MediaItem).id,
+          ),
+        );
+        player.states.add(ProcessingState.completed);
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(heard, [
+        for (int i = 0; i < 286 * 3 * 2; i++) '2_${i ~/ 3 % 286 + 1}_$i',
+      ]);
+      expect(player.plays, 3);
+    },
+  );
+
+  test('closing while the surah lookup is pending cancels playback', () async {
+    quran.metadata = Completer<void>();
+    final play = provider.playSurah(2);
+    await provider.stopAndHide();
+    quran.metadata!.complete();
+    await play;
+    expect(player.plays, 0);
+    expect(provider.showMinibar, false);
+  });
+
+  test('disposing a pending surah request keeps the player stopped', () async {
+    final localPlayer = _Player();
+    final source = _Quran()..metadata = Completer<void>();
+    final audio = AudioProvider(
+      player: localPlayer,
+      quranRepository: source,
+      reciterRepository: _Reciters(),
+    );
+    await Future<void>.delayed(Duration.zero);
+    final pending = audio.playSurah(2);
+    audio.dispose();
+    source.metadata!.complete();
+    await pending;
+    expect(localPlayer.plays, 0);
+  });
+
   test('loading ends before playback completes', () async {
     player.playback = Completer<void>();
     await provider.playRange(
@@ -173,13 +231,7 @@ void main() {
     player.indices.add(1);
     player.playingValue = true;
     provider.setAyahRepeatLimit(2);
-    await provider.playRange(
-      startSurah: 1,
-      startAyah: 1,
-      endSurah: 1,
-      endAyah: 3,
-      preserveCurrentPosition: true,
-    );
+    await Future<void>.delayed(Duration.zero);
     expect(player.initialIndexValue, 2);
     expect(player.initialPositionValue, const Duration(seconds: 12));
     expect(provider.currentAyah, 2);
